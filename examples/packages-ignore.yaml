@@ -1,0 +1,34 @@
+rmw_cyclonedds_cpp:
+  win64: []
+rmw_opensplice_cpp:
+  win64: []
+rmw_connext_cpp:
+  win64: []
+gmock_vendor:
+  win64: []
+gtest_vendor:
+  win64: []
+libyaml_vendor:
+  win64: []
+connext_cmake_module:
+  win64: []
+opensplice_cmake_module:
+  win64: []
+rosidl_typesupport_connext_c:
+  win64: []
+rosidl_typesupport_connext_cpp:
+  win64: []
+rosidl_typesupport_opensplice_cpp:
+  win64: []
+rosidl_typesupport_opensplice_c:
+  win64: []
+test_msgs:
+  win64: []
+rttest:
+  win64: []
+tlsf:
+  win64: []
+tlsf_cpp:
+  win64: []
+pendulum_control:
+  win64: []

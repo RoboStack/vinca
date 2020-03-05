@@ -1,11 +1,12 @@
 import setuptools
+from vinca import __version__
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="vinca",
-    version="0.0.1",
+    version=__version__,
     author="Sean Yen",
     author_email="zishenyan@gmail.com",
     description="Conda recipe generator for ROS packages",
@@ -21,7 +22,7 @@ setuptools.setup(
     python_requires='>=3.7',
     entry_points={
         'console_scripts': [
-            'vinca = vinca.cli:main',
+            'vinca = vinca.main:main',
         ]
     }
 )

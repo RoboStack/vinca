@@ -1,0 +1,28 @@
+diff --git a/src/rviz_rendering/material_manager.cpp b/src/rviz_rendering/material_manager.cpp
+index 3866ae00..9cabc117 100644
+--- a/src/rviz_rendering/material_manager.cpp
++++ b/src/rviz_rendering/material_manager.cpp
+@@ -122,8 +122,9 @@ void MaterialManager::enableAlphaBlending(
+ 
+ void MaterialManager::createDefaultMaterials()
+ {
+-  auto material = Ogre::MaterialManager::getSingleton().create(
++  auto res = Ogre::MaterialManager::getSingleton().createOrRetrieve(
+     "BaseWhiteNoLighting", "rviz_rendering");
++  Ogre::MaterialPtr material = Ogre::static_pointer_cast<Ogre::Material>(res.first);
+   material->setLightingEnabled(false);
+ }
+ 
+diff --git a/src/rviz_rendering/render_system.cpp b/src/rviz_rendering/render_system.cpp
+index 384007ea..95794c23 100644
+--- a/src/rviz_rendering/render_system.cpp
++++ b/src/rviz_rendering/render_system.cpp
+@@ -302,7 +302,7 @@ RenderSystem::setPluginDirectory()
+   std::string prefix_path;
+   ament_index_cpp::get_resource("packages", "rviz_ogre_vendor", content, &prefix_path);
+ #ifdef _WIN32
+-  set_ogre_plugin_directory(prefix_path + "\\opt\\rviz_ogre_vendor\\bin\\");
++  set_ogre_plugin_directory(prefix_path + "\\bin\\");
+ #else
+   set_ogre_plugin_directory(prefix_path + "/opt/rviz_ogre_vendor/lib/OGRE/");
+ #endif

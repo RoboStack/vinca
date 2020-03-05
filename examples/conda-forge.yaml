@@ -1,0 +1,198 @@
+pkg-config:
+  win64: [pkg-config]
+python-rospkg:
+  win64: [rospkg]
+python3-rospkg:
+  win64: [rospkg]
+boost:
+  win64: [boost]
+python-argparse:
+  win64: []
+python-catkin-pkg:
+  win64: [catkin_pkg]
+python3-catkin-pkg:
+  win64: [catkin_pkg]
+python:
+  win64: ['python {{ python }}']
+python3:
+  win64: ['python {{ python }}']
+python3-dev:
+  win64: ['python {{ python }}']
+python-rosdep:
+  win64: [rosdep]
+python3-rosdep:
+  win64: [rosdep]
+python-empy:
+  win64: [empy]
+python3-empy:
+  win64: [empy]
+tinyxml:
+  win64: [tinyxml]
+tinyxml2:
+  win64: [tinyxml2]
+gtest:
+  win64: [gtest]
+cmake:
+  win64: [cmake]
+google-mock:
+  win64: [gmock]
+python-mock:
+  win64: [mock]
+python3-mock:
+  win64: [mock]
+python-nose:
+  win64: [nose]
+python3-nose:
+  win64: [nose]
+python-coverage:
+  win64: [coverage]
+python3-coverage:
+  win64: [coverage]
+libconsole-bridge-dev:
+  win64: [console_bridge]
+python-yaml:
+  win64: [pyyaml]
+python3-yaml:
+  win64: [pyyaml]
+python3-setuptools:
+  win64: [setuptools]
+python3-catkin-pkg-modules:
+  win64: [catkin_pkg]
+python3-rosdep-modules:
+  win64: [rosdep]
+libboost-system-dev:
+  win64: [boost]
+libboost-date-time-dev:
+  win64: [boost]
+libboost-thread-dev:
+  win64: [boost]
+libpoco-dev:
+  win64: [poco]
+python-gnupg:
+  win64: [python-gnupg]
+python-imaging:
+  win64: [pillow]
+python-crypto:
+  win64: [pycrypto]
+bzip2:
+  win64: [bzip2]
+libssl-dev:
+  win64: [openssl]
+libgpgme-dev:
+  win64: []
+log4cxx:
+  win64: [log4cxx]
+apr:
+  win64: [apr]
+python-netifaces:
+  win64: [netifaces]
+python3-netifaces:
+  win64: [netifaces]
+python-paramiko:
+  win64: [paramiko]
+sbcl:
+  win64: []
+lz4:
+  win64: [lz4]
+python-defusedxml:
+  win64: [defusedxml]
+python-numpy:
+  win64: [numpy]
+python3-pytest:
+  win64: [pytest]
+python3-rosdistro-modules:
+  win64: [rosdistro]
+python3-lark-parser:
+  win64: [lark-parser]
+cppcheck:
+  win64: [cppcheck]
+python3-mypy:
+  win64: [mypy]
+zlib:
+  win64: [zlib]
+python3-pkg-resources:
+  win64: []
+python3-cryptography:
+  win64: [cryptography]
+python3-numpy:
+  win64: [numpy]
+python3-ifcfg:
+  win64: [ifcfg]
+python3-flake8:
+  win64: [flake8]
+python3-pytest-mock:
+  win64: [pytest-mock]
+yaml:
+  win64: [yaml]
+asio:
+  win64: [asio]
+git:
+  win64: [git]
+spdlog:
+  win64: [spdlog]
+pcre:
+  win64: [pcre]
+pydocstyle:
+  win64: [pydocstyle]
+libxml2-utils:
+  win64: [libxml2]
+libcunit-dev:
+  win64: []
+uncrustify:
+  win64: [uncrustify]
+python3-lxml:
+  win64: [lxml]
+openssl:
+  win64: [openssl]
+eigen:
+  win64: [eigen]
+assimp:
+  win64: [assimp]
+libqt5-opengl:
+  win64: [qt]
+libqt5-widgets:
+  win64: [qt]
+curl:
+  win64: [libcurl]
+qtbase5-dev:
+  win64: [qt]
+libqt5-gui:
+  win64: [qt]
+libqt5-core:
+  win64: [qt]
+libfreetype6-dev:
+  win64: [freetype]
+libfreetype6:
+  win64: [freetype]
+opengl:
+  win64: []
+libxaw:
+  win64: []
+libx11-dev:
+  win64: []
+libxrandr:
+  win64: []
+libopencv-dev:
+  win64: [opencv 3*]
+qt5-qmake:
+  win64: [qt]
+python3-pydot:
+  win64: [pydot]
+python3-matplotlib:
+  win64: [matplotlib]
+python3-qt5-bindings:
+  win64: [pyqt]
+python3-psutil:
+  win64: [psutil]
+sdl-image:
+  win64: [sdl2_image]
+graphicsmagick:
+  win64: [graphicsmagick]
+libboost-program-options:
+  win64: [boost]
+sdl:
+  win64: [sdl2]
+libzmq3-dev:
+  win64: [zeromq]
+libboost-program-options-dev:
+  win64: [boost]
