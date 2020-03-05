@@ -62,6 +62,8 @@ def read_vinca_yaml(filepath):
 
 
 def generate_output(pkg_shortname, vinca_conf, rospack):
+    if pkg_shortname not in vinca_conf['_selected_pkgs']:
+        return None
     manifest = rospack.get_manifest(pkg_shortname)
     output = {
         'name': resolve_pkgname(pkg_shortname, vinca_conf)[0],
@@ -148,6 +150,8 @@ def generate_source(repos, base_dir, vinca_conf):
             entry['git_url'] = repo['url']
             entry['git_rev'] = repo['version']
         for pkg_shortname in rospack.list():
+            if pkg_shortname not in vinca_conf['_selected_pkgs']:
+                continue
             local_entry = copy.deepcopy(entry)
             pkg_name = resolve_pkgname(pkg_shortname, vinca_conf)[0]
             local_entry['folder'] = '%s/src/work' % pkg_name
@@ -173,6 +177,22 @@ def onerror(func, path, exc_info):
         func(path)
     else:
         raise
+
+
+def get_selected_packages(base_dir, vinca_conf):
+    import rospkg
+    rospack = rospkg.RosPack([base_dir])
+
+    selected_packages = set()
+    if vinca_conf['packages_select_by_deps']:
+        for i in vinca_conf['packages_select_by_deps']:
+            pkgs = rospack.get_depends(i)
+            selected_packages = selected_packages.union(pkgs)
+    if vinca_conf['packages_skip_by_deps']:
+        for i in vinca_conf['packages_skip_by_deps']:
+            pkgs = rospack.get_depends(i)
+            selected_packages = selected_packages.difference(pkgs)
+    return selected_packages
 
 
 def main():
@@ -202,13 +222,18 @@ def main():
     os.mkdir(base_src)
     subprocess.check_call(['vcs', 'import', base_src],
                           stdin=open(vinca_conf['repos'], 'r'))
+
+    selected_pkgs = get_selected_packages(base_src, vinca_conf)
+    vinca_conf['_selected_pkgs'] = selected_pkgs
     source = generate_source(repos, base_src, vinca_conf)
     # print(source)
 
     outputs = generate_outputs(base_src, vinca_conf)
+    # print(outputs)
 
     write_recipe(source, outputs)
     print(unsatisfied_deps)
 
     import shutil
     shutil.rmtree(tmpdirname, onerror=onerror)
+    print('meta.yaml is created successfully.')

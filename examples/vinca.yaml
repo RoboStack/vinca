@@ -1,12 +1,17 @@
 ros_distro: eloquent
 ros_python_version: 3
 
-# repos: 2020.03.04.rosinstall
-repos: build_tools.repos
+repos: 2020.03.04.rosinstall
+# repos: build_tools.repos
 
 # mapping for package keys
 conda_index:
   - conda-forge.yaml
   - packages-ignore.yaml
+
+packages_skip_by_deps:
+
+packages_select_by_deps:
+  - ament_cmake
 
 patch_dir: ./patch
