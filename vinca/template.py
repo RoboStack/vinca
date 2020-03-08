@@ -50,15 +50,22 @@ def generate_template(template_in, template_out):
     interpreter.shutdown()
 
 
-def generate_bld_cmake():
+def generate_bld_ament_cmake():
     import pkg_resources
     template_in = pkg_resources.resource_filename(
-      'vinca', 'templates/bld_cmake.bat.in')
-    generate_template(template_in, open('bld_cmake.bat', 'w'))
+      'vinca', 'templates/bld_ament_cmake.bat.in')
+    generate_template(template_in, open('bld_ament_cmake.bat', 'w'))
 
 
-def generate_bld_python():
+def generate_bld_ament_python():
     import pkg_resources
     template_in = pkg_resources.resource_filename(
-      'vinca', 'templates/bld_python.bat.in')
-    generate_template(template_in, open('bld_python.bat', 'w'))
+      'vinca', 'templates/bld_ament_python.bat.in')
+    generate_template(template_in, open('bld_ament_python.bat', 'w'))
+
+
+def generate_bld_catkin():
+    import pkg_resources
+    template_in = pkg_resources.resource_filename(
+      'vinca', 'templates/bld_catkin.bat.in')
+    generate_template(template_in, open('bld_catkin.bat', 'w'))

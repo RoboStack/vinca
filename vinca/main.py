@@ -86,10 +86,12 @@ def generate_output(pkg_shortname, vinca_conf, rospack):
     resolved_python = resolve_pkgname('python', vinca_conf, rospack)
     output['requirements']['run'].extend(resolved_python)
     output['requirements']['host'].extend(resolved_python)
-    if pkg.get_build_type() in ['cmake', 'catkin', 'ament_cmake']:
-        output['script'] = 'bld_cmake.bat'
+    if pkg.get_build_type() in ['cmake', 'catkin']:
+        output['script'] = 'bld_catkin.bat'
+    elif pkg.get_build_type() in ['ament_cmake']:
+        output['script'] = 'bld_ament_cmake.bat'
     elif pkg.get_build_type() in ['ament_python']:
-        output['script'] = 'bld_python.bat'
+        output['script'] = 'bld_ament_python.bat'
     else:
         return None
     build_deps = pkg.build_depends
@@ -243,8 +245,10 @@ def main():
     shutil.rmtree(tmpdirname, onerror=onerror)
     print('meta.yaml is created successfully.')
 
-    from .template import generate_bld_cmake
-    from .template import generate_bld_python
-    generate_bld_cmake()
-    generate_bld_python()
-    print('bld_cmake.bat and bld_python.bat are created successfully.')
+    from .template import generate_bld_ament_cmake
+    from .template import generate_bld_ament_python
+    from .template import generate_bld_catkin
+    generate_bld_ament_cmake()
+    generate_bld_ament_python()
+    generate_bld_catkin()
+    print('build scripts are created successfully.')
