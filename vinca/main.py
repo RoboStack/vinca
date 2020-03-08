@@ -123,6 +123,8 @@ def generate_output(pkg_shortname, vinca_conf, rospack):
 
     output['requirements']['run'] = list(set(output['requirements']['run']))
     output['requirements']['host'] = list(set(output['requirements']['host']))
+    output['requirements']['run'] = sorted(output['requirements']['run'])
+    output['requirements']['host'] = sorted(output['requirements']['host'])
 
     return output
 
