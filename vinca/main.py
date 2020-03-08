@@ -66,7 +66,7 @@ def generate_output(pkg_shortname, vinca_conf, rospack):
         return None
     manifest = rospack.get_manifest(pkg_shortname)
     output = {
-        'name': resolve_pkgname(pkg_shortname, vinca_conf)[0],
+        'name': resolve_pkgname(pkg_shortname, vinca_conf, rospack)[0],
         'version': manifest.version,
         'requirements': {
             'build': [
@@ -83,7 +83,7 @@ def generate_output(pkg_shortname, vinca_conf, rospack):
     pkg = catkin_pkg.package.parse_package(
         os.path.join(package_uri, 'package.xml'))
     pkg.evaluate_conditions(os.environ)
-    resolved_python = resolve_pkgname('python', vinca_conf)
+    resolved_python = resolve_pkgname('python', vinca_conf, rospack)
     output['requirements']['run'].extend(resolved_python)
     output['requirements']['host'].extend(resolved_python)
     if pkg.get_build_type() in ['cmake', 'catkin', 'ament_cmake']:
@@ -101,7 +101,7 @@ def generate_output(pkg_shortname, vinca_conf, rospack):
     build_deps = set(build_deps)
 
     for dep in build_deps:
-        resolved_dep = resolve_pkgname(dep, vinca_conf)
+        resolved_dep = resolve_pkgname(dep, vinca_conf, rospack)
         if not resolved_dep:
             unsatisfied_deps.add(dep)
             continue
@@ -115,7 +115,7 @@ def generate_output(pkg_shortname, vinca_conf, rospack):
     run_deps = set(run_deps)
 
     for dep in run_deps:
-        resolved_dep = resolve_pkgname(dep, vinca_conf)
+        resolved_dep = resolve_pkgname(dep, vinca_conf, rospack)
         if not resolved_dep:
             unsatisfied_deps.add(dep)
             continue
@@ -155,7 +155,7 @@ def generate_source(repos, base_dir, vinca_conf):
             if pkg_shortname not in vinca_conf['_selected_pkgs']:
                 continue
             local_entry = copy.deepcopy(entry)
-            pkg_name = resolve_pkgname(pkg_shortname, vinca_conf)[0]
+            pkg_name = resolve_pkgname(pkg_shortname, vinca_conf, rospack)[0]
             local_entry['folder'] = '%s/src/work' % pkg_name
             source.append(local_entry)
     return source

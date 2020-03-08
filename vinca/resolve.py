@@ -16,12 +16,15 @@ def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
     return None
 
 
-def resolve_pkgname(pkg_shortname, vinca_conf):
+def resolve_pkgname(pkg_shortname, vinca_conf, rospack):
     pkg_names = resolve_pkgname_from_indexes(
         pkg_shortname, vinca_conf['_conda_indexes'])
     if pkg_names is None:
-        return ['ros-%s-%s' %
-                (vinca_conf['ros_distro'],
-                 pkg_shortname.replace('_', '-'))]
+        if (pkg_shortname not in rospack.list()):
+            return []
+        else:
+            return ['ros-%s-%s' %
+                    (vinca_conf['ros_distro'],
+                     pkg_shortname.replace('_', '-'))]
     else:
         return pkg_names
