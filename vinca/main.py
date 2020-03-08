@@ -189,12 +189,12 @@ def get_selected_packages(base_dir, vinca_conf):
     skipped_packages = set()
     if vinca_conf['packages_select_by_deps']:
         for i in vinca_conf['packages_select_by_deps']:
-            selected_packages = selected_packages.union(i)
+            selected_packages = selected_packages.union([i])
             pkgs = rospack.get_depends(i)
             selected_packages = selected_packages.union(pkgs)
     if vinca_conf['packages_skip_by_deps']:
         for i in vinca_conf['packages_skip_by_deps']:
-            skipped_packages = skipped_packages.union(i)
+            skipped_packages = skipped_packages.union([i])
             pkgs = rospack.get_depends(i)
             skipped_packages = skipped_packages.union(pkgs)
     return selected_packages.difference(skipped_packages)

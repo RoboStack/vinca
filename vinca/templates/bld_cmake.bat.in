@@ -15,6 +15,8 @@ cmake ^
     -DCMAKE_BUILD_TYPE=Release ^
     -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=True ^
     -DBUILD_SHARED_LIBS=ON ^
+    -DSETUPTOOLS_DEB_LAYOUT=OFF ^
+    -DCATKIN_BUILD_BINARY_PACKAGE=1 ^
     %SRC_DIR%\%PKG_NAME%\src\work
 if errorlevel 1 exit 1
 
