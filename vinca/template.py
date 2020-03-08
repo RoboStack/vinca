@@ -46,7 +46,6 @@ def generate_template(template_in, template_out):
       output=template_out,
       options={em.RAW_OPT: True, em.BUFFERED_OPT: True})
     interpreter.updateGlobals(g)
-    print(template_in)
     interpreter.file(open(template_in))
     interpreter.shutdown()
 
