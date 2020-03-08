@@ -7,8 +7,8 @@ No guarantees everything works.
 
 ## Concept
 
-The tool is helping generate one big `conda` recipe to capture all the selected packages.
-And later one can use `conda-smithy` to auto-generate pipeline to release `conda` binary packages.
+The tool generates `conda` recipe to capture all the selected ROS packages.
+Later, one can use `conda-smithy` to auto-generate pipeline to release `conda` binary packages.
 
 ## Example
 
@@ -41,4 +41,3 @@ patch_dir: ./patch
 
 ## TODO
   - Implement patch_dir.
-  - Add bld_cmake.bat and bld_python.bat template.
