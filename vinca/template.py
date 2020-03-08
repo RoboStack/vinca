@@ -37,3 +37,29 @@ def write_recipe(source, outputs):
 
     with open("meta.yaml", 'w') as stream:
         yaml.dump(meta, stream)
+
+
+def generate_template(template_in, template_out):
+    import em
+    g = {}
+    interpreter = em.Interpreter(
+      output=template_out,
+      options={em.RAW_OPT: True, em.BUFFERED_OPT: True})
+    interpreter.updateGlobals(g)
+    print(template_in)
+    interpreter.file(open(template_in))
+    interpreter.shutdown()
+
+
+def generate_bld_cmake():
+    import pkg_resources
+    template_in = pkg_resources.resource_filename(
+      'vinca', 'templates/bld_cmake.bat.in')
+    generate_template(template_in, open('bld_cmake.bat', 'w'))
+
+
+def generate_bld_python():
+    import pkg_resources
+    template_in = pkg_resources.resource_filename(
+      'vinca', 'templates/bld_python.bat.in')
+    generate_template(template_in, open('bld_python.bat', 'w'))
