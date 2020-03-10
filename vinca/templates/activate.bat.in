@@ -8,3 +8,4 @@
 @@set "QT_PLUGIN_PATH=%CONDA_PREFIX%\Library\plugins"
 
 @@call "%CONDA_PREFIX%\Library\local_setup.bat"
+@@set PYTHONHOME=

@@ -7,9 +7,11 @@ set "PYTHONPATH=%LIBRARY_PREFIX%\lib\site-packages;%SP_DIR%"
 set CC=cl.exe
 set CXX=cl.exe
 
+set "CATKIN_BUILD_BINARY_PACKAGE_ARGS=-DCATKIN_BUILD_BINARY_PACKAGE=1"
 if "%PKG_NAME%" == "ros-@(ros_distro)-catkin" (
     :: create catkin cookie to make it is a catkin workspace
     echo > %LIBRARY_PREFIX%\.catkin
+    set CATKIN_BUILD_BINARY_PACKAGE_ARGS=
 )
 
 rd /s /q build
@@ -23,7 +25,7 @@ cmake ^
     -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=True ^
     -DBUILD_SHARED_LIBS=ON ^
     -DSETUPTOOLS_DEB_LAYOUT=OFF ^
-    -DCATKIN_BUILD_BINARY_PACKAGE=1 ^
+    %CATKIN_BUILD_BINARY_PACKAGE_ARGS% ^
     -DCATKIN_SKIP_TESTING=ON ^
     %SRC_DIR%\%PKG_NAME%\src\work
 if errorlevel 1 exit 1
