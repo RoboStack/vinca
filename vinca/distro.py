@@ -38,7 +38,7 @@ class Distro(object):
     def get_version(self, pkg_name):
         pkg = self._distro.release_packages[pkg_name]
         repo = self._distro.repositories[pkg.repository_name].release_repository
-        return repo.version
+        return repo.version.split('-')[0]
 
     def get_release_package_xml(self, pkg_name):
         return self._distro.get_release_package_xml(pkg_name)
