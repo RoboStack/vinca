@@ -10,6 +10,16 @@ class Distro(object):
     def __init__(self, distro_name):
         index = get_index(get_index_url())
         self._distro = get_cached_distribution(index, distro_name)
+
+        # set up ROS environments
+        os.environ['ROS_PYTHON_VERSION'] = '{0}'.format(
+            index.distributions[distro_name]['python_version'])
+        os.environ['ROS_DISTRO'] = '{0}'.format(
+            distro_name)
+        if 'ROS_ROOT' in os.environ:
+            os.environ.pop('ROS_ROOT')
+        if 'ROS_PACKAGE_PATH' in os.environ:
+            os.environ.pop('ROS_PACKAGE_PATH')
         self._walker = DependencyWalker(
             self._distro,
             evaluate_condition_context=os.environ)

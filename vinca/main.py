@@ -62,8 +62,11 @@ def read_vinca_yaml(filepath):
 def generate_output(pkg_shortname, vinca_conf, distro):
     if pkg_shortname not in vinca_conf['_selected_pkgs']:
         return None
+    pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
+    if not pkg_names:
+        return None
     output = {
-        'name': resolve_pkgname(pkg_shortname, vinca_conf, distro)[0],
+        'name': pkg_names[0],
         'version': distro.get_version(pkg_shortname),
         'requirements': {
             'build': [
@@ -143,7 +146,10 @@ def generate_source(distro, vinca_conf):
         entry = {}
         entry['git_url'] = url
         entry['git_rev'] = version
-        pkg_name = resolve_pkgname(pkg_shortname, vinca_conf, distro)[0]
+        pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
+        if not pkg_names:
+            continue
+        pkg_name = pkg_names[0]
         entry['folder'] = '%s/src/work' % pkg_name
         patch_path = os.path.join(
             vinca_conf['_patch_dir'], '%s.patch' % pkg_name)
@@ -179,14 +185,6 @@ def main():
     vinca_conf = read_vinca_yaml(vinca_yaml)
     vinca_conf['_conda_indexes'] = get_conda_index(vinca_conf)
 
-    os.environ['ROS_PYTHON_VERSION'] = '{0}'.format(
-        vinca_conf['ros_python_version'])
-    os.environ['ROS_DISTRO'] = '{0}'.format(
-        vinca_conf['ros_distro'])
-    if 'ROS_ROOT' in os.environ:
-        os.environ.pop('ROS_ROOT')
-    if 'ROS_PACKAGE_PATH' in os.environ:
-        os.environ.pop('ROS_PACKAGE_PATH')
     distro = Distro(vinca_conf['ros_distro'])
 
     selected_pkgs = get_selected_packages(distro, vinca_conf)
