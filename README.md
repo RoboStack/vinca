@@ -34,6 +34,3 @@ packages_select_by_deps:
 # patch directory
 patch_dir: ./patch
 ```
-
-## TODO
-  - Implement patch_dir.
