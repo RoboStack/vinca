@@ -203,7 +203,9 @@ def main():
     from .template import generate_bld_ament_cmake
     from .template import generate_bld_ament_python
     from .template import generate_bld_catkin
+    from .template import generate_activate_hook
     generate_bld_ament_cmake()
     generate_bld_ament_python()
     generate_bld_catkin()
+    generate_activate_hook()
     print('build scripts are created successfully.')

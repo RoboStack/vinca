@@ -72,3 +72,13 @@ def generate_bld_catkin():
     template_in = pkg_resources.resource_filename(
       'vinca', 'templates/bld_catkin.bat.in')
     generate_template(template_in, open('bld_catkin.bat', 'w'))
+
+
+def generate_activate_hook():
+    import pkg_resources
+    template_in = pkg_resources.resource_filename(
+      'vinca', 'templates/activate.bat.in')
+    generate_template(template_in, open('activate.bat', 'w'))
+    template_in = pkg_resources.resource_filename(
+      'vinca', 'templates/deactivate.bat.in')
+    generate_template(template_in, open('deactivate.bat', 'w'))
