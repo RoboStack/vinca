@@ -19,9 +19,6 @@ First you have to create a `vinca.yaml` to describe ROS information for `vinca` 
 ros_distro: eloquent
 ros_python_version: 3
 
-# both .rosinstall and .repos are supported
-repos: 2020.03.04.rosinstall
-
 # mapping of rosdep keys
 # it can be also used to shadow the unwanted packages.
 conda_index:

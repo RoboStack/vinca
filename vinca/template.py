@@ -1,5 +1,6 @@
 import datetime
 import ruamel
+import os
 
 TEMPLATE = """\
 package:
@@ -41,7 +42,9 @@ def write_recipe(source, outputs):
 
 def generate_template(template_in, template_out):
     import em
-    g = {}
+    g = {
+      'ros_distro': os.environ['ROS_DISTRO']
+    }
     interpreter = em.Interpreter(
       output=template_out,
       options={em.RAW_OPT: True, em.BUFFERED_OPT: True})

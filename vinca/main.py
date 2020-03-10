@@ -3,15 +3,15 @@
 import argparse
 import catkin_pkg
 import sys
-import subprocess
 import os
-from .repos import get_repos
 from vinca import __version__
 from .resolve import get_conda_index
 from .resolve import resolve_pkgname
 from .template import write_recipe
+from .distro import Distro
 
 unsatisfied_deps = set()
+distro = None
 
 
 def parse_command_line(argv):
@@ -51,23 +51,20 @@ def read_vinca_yaml(filepath):
     vinca_conf = yaml.load(open(filepath, 'r'))
 
     # normalize paths to absolute paths
-    vinca_conf['repos'] = os.path.abspath(vinca_conf['repos'])
-
     conda_index = []
     for i in vinca_conf['conda_index']:
         conda_index.append(os.path.abspath(i))
     vinca_conf['conda_index'] = conda_index
-    vinca_conf['patch_dir'] = os.path.abspath(vinca_conf['patch_dir'])
+    vinca_conf['_patch_dir'] = os.path.abspath(vinca_conf['patch_dir'])
     return vinca_conf
 
 
-def generate_output(pkg_shortname, vinca_conf, rospack):
+def generate_output(pkg_shortname, vinca_conf, distro):
     if pkg_shortname not in vinca_conf['_selected_pkgs']:
         return None
-    manifest = rospack.get_manifest(pkg_shortname)
     output = {
-        'name': resolve_pkgname(pkg_shortname, vinca_conf, rospack)[0],
-        'version': manifest.version,
+        'name': resolve_pkgname(pkg_shortname, vinca_conf, distro)[0],
+        'version': distro.get_version(pkg_shortname),
         'requirements': {
             'build': [
                 "{{ compiler('cxx') }}",
@@ -79,11 +76,10 @@ def generate_output(pkg_shortname, vinca_conf, rospack):
             'run': []
         }
     }
-    package_uri = rospack.get_path(pkg_shortname)
-    pkg = catkin_pkg.package.parse_package(
-        os.path.join(package_uri, 'package.xml'))
+    pkg = catkin_pkg.package.parse_package_string(
+        distro.get_release_package_xml(pkg_shortname))
     pkg.evaluate_conditions(os.environ)
-    resolved_python = resolve_pkgname('python', vinca_conf, rospack)
+    resolved_python = resolve_pkgname('python', vinca_conf, distro)
     output['requirements']['run'].extend(resolved_python)
     output['requirements']['host'].extend(resolved_python)
     if pkg.get_build_type() in ['cmake', 'catkin']:
@@ -103,7 +99,7 @@ def generate_output(pkg_shortname, vinca_conf, rospack):
     build_deps = set(build_deps)
 
     for dep in build_deps:
-        resolved_dep = resolve_pkgname(dep, vinca_conf, rospack)
+        resolved_dep = resolve_pkgname(dep, vinca_conf, distro)
         if not resolved_dep:
             unsatisfied_deps.add(dep)
             continue
@@ -117,7 +113,7 @@ def generate_output(pkg_shortname, vinca_conf, rospack):
     run_deps = set(run_deps)
 
     for dep in run_deps:
-        resolved_dep = resolve_pkgname(dep, vinca_conf, rospack)
+        resolved_dep = resolve_pkgname(dep, vinca_conf, distro)
         if not resolved_dep:
             unsatisfied_deps.add(dep)
             continue
@@ -131,78 +127,52 @@ def generate_output(pkg_shortname, vinca_conf, rospack):
     return output
 
 
-def generate_outputs(base_dir, vinca_conf):
-    import rospkg
+def generate_outputs(distro, vinca_conf):
     outputs = []
-    rospack = rospkg.RosPack([base_dir])
-    for pkg_shortname in rospack.list():
-        output = generate_output(pkg_shortname, vinca_conf, rospack)
+    for pkg_shortname in vinca_conf['_selected_pkgs']:
+        output = generate_output(pkg_shortname, vinca_conf, distro)
         if output is not None:
             outputs.append(output)
     return outputs
 
 
-def generate_source(repos, base_dir, vinca_conf):
-    import rospkg
-    import copy
+def generate_source(distro, vinca_conf):
     source = []
-    for path, repo in repos.items():
+    for pkg_shortname in vinca_conf['_selected_pkgs']:
+        url, version = distro.get_released_repo(pkg_shortname)
         entry = {}
-        path_root = os.path.abspath(os.path.join(base_dir, path))
-        rospack = rospkg.RosPack([path_root])
-        if repo['type'] == 'git':
-            entry['git_url'] = repo['url']
-            entry['git_rev'] = repo['version']
-        for pkg_shortname in rospack.list():
-            if pkg_shortname not in vinca_conf['_selected_pkgs']:
-                continue
-            local_entry = copy.deepcopy(entry)
-            pkg_name = resolve_pkgname(pkg_shortname, vinca_conf, rospack)[0]
-            local_entry['folder'] = '%s/src/work' % pkg_name
-            source.append(local_entry)
+        entry['git_url'] = url
+        entry['git_rev'] = version
+        pkg_name = resolve_pkgname(pkg_shortname, vinca_conf, distro)[0]
+        entry['folder'] = '%s/src/work' % pkg_name
+        patch_path = os.path.join(
+            vinca_conf['_patch_dir'], '%s.patch' % pkg_name)
+        if os.path.exists(patch_path):
+            entry['patches'] = ['%s/%s' % (
+                vinca_conf['patch_dir'], '%s.patch' % pkg_name)]
+        source.append(entry)
     return source
 
 
-def onerror(func, path, exc_info):
-    """
-    Error handler for ``shutil.rmtree``.
-
-    If the error is due to an access error (read only file)
-    it attempts to add write permission and then retries.
-
-    If the error is for another reason it re-raises the error.
-
-    Usage : ``shutil.rmtree(path, onerror=onerror)``
-    """
-    import stat
-    if not os.access(path, os.W_OK):
-        # Is the error an access error ?
-        os.chmod(path, stat.S_IWUSR)
-        func(path)
-    else:
-        raise
-
-
-def get_selected_packages(base_dir, vinca_conf):
-    import rospkg
-    rospack = rospkg.RosPack([base_dir])
-
+def get_selected_packages(distro, vinca_conf):
     selected_packages = set()
     skipped_packages = set()
     if vinca_conf['packages_select_by_deps']:
         for i in vinca_conf['packages_select_by_deps']:
             selected_packages = selected_packages.union([i])
-            pkgs = rospack.get_depends(i)
+            pkgs = distro.get_depends(i)
             selected_packages = selected_packages.union(pkgs)
     if vinca_conf['packages_skip_by_deps']:
         for i in vinca_conf['packages_skip_by_deps']:
             skipped_packages = skipped_packages.union([i])
-            pkgs = rospack.get_depends(i)
+            pkgs = distro.get_depends(i)
             skipped_packages = skipped_packages.union(pkgs)
     return selected_packages.difference(skipped_packages)
 
 
 def main():
+    global distro
+    global unsatisfied_deps
     arguments = parse_command_line(sys.argv)
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, 'vinca.yaml')
@@ -212,38 +182,25 @@ def main():
     os.environ['ROS_PYTHON_VERSION'] = '{0}'.format(
         vinca_conf['ros_python_version'])
     os.environ['ROS_DISTRO'] = '{0}'.format(
-        vinca_conf['ros_python_version'])
+        vinca_conf['ros_distro'])
     if 'ROS_ROOT' in os.environ:
         os.environ.pop('ROS_ROOT')
     if 'ROS_PACKAGE_PATH' in os.environ:
         os.environ.pop('ROS_PACKAGE_PATH')
-    # print(vinca_conf)
+    distro = Distro(vinca_conf['ros_distro'])
 
-    repos = get_repos(vinca_conf['repos'])
-    # print(repos)
+    selected_pkgs = get_selected_packages(distro, vinca_conf)
+    # print(selected_pkgs)
 
-    import tempfile
-    tmpdirname = tempfile.mkdtemp()
-    print('created temporary directory', tmpdirname)
-    base_src = os.path.join(tmpdirname, 'src')
-    os.mkdir(base_src)
-    subprocess.check_call(['vcs', 'import', base_src],
-                          stdin=open(vinca_conf['repos'], 'r'))
-
-    selected_pkgs = get_selected_packages(base_src, vinca_conf)
     vinca_conf['_selected_pkgs'] = selected_pkgs
-    source = generate_source(repos, base_src, vinca_conf)
+    source = generate_source(distro, vinca_conf)
     # print(source)
 
-    outputs = generate_outputs(base_src, vinca_conf)
+    outputs = generate_outputs(distro, vinca_conf)
     # print(outputs)
 
     write_recipe(source, outputs)
     print(unsatisfied_deps)
-
-    import shutil
-    shutil.rmtree(tmpdirname, onerror=onerror)
-    print('meta.yaml is created successfully.')
 
     from .template import generate_bld_ament_cmake
     from .template import generate_bld_ament_python

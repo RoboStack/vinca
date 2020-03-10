@@ -7,6 +7,11 @@ set "PYTHONPATH=%LIBRARY_PREFIX%\lib\site-packages;%SP_DIR%"
 set CC=cl.exe
 set CXX=cl.exe
 
+if "%PKG_NAME%" == "ros-@(ros_distro)-catkin" (
+    :: create catkin cookie to make it is a catkin workspace
+    echo > %LIBRARY_PREFIX%\.catkin
+)
+
 rd /s /q build
 mkdir build
 pushd build
