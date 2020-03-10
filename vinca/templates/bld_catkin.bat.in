@@ -10,7 +10,8 @@ set CXX=cl.exe
 set "CATKIN_BUILD_BINARY_PACKAGE_ARGS=-DCATKIN_BUILD_BINARY_PACKAGE=1"
 if "%PKG_NAME%" == "ros-@(ros_distro)-catkin" (
     :: create catkin cookie to make it is a catkin workspace
-    echo > %LIBRARY_PREFIX%\.catkin
+    type NUL > %LIBRARY_PREFIX%\.catkin
+    :: keep the workspace activation scripts (e.g., local_setup.bat)
     set CATKIN_BUILD_BINARY_PACKAGE_ARGS=
 )
 
