@@ -17,7 +17,6 @@ First you have to create a `vinca.yaml` to describe ROS information for `vinca` 
 ```yaml
 # vinca.yaml
 ros_distro: eloquent
-ros_python_version: 3
 
 # mapping of rosdep keys
 # it can be also used to shadow the unwanted packages.
