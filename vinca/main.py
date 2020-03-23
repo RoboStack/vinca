@@ -91,6 +91,8 @@ def generate_output(pkg_shortname, vinca_conf, distro):
         output['script'] = 'bld_ament_cmake.bat'
     elif pkg.get_build_type() in ['ament_python']:
         output['script'] = 'bld_ament_python.bat'
+        resolved_setuptools = resolve_pkgname('setuptools', vinca_conf, distro)
+        output['requirements']['host'].extend(resolved_setuptools)
     else:
         return None
     build_deps = pkg.build_depends
