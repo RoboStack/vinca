@@ -17,6 +17,7 @@ cmake ^
     -DCMAKE_BUILD_TYPE=Release ^
     -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=True ^
     -DBUILD_SHARED_LIBS=ON ^
+    -DBUILD_TESTING=OFF ^
     %SRC_DIR%\%PKG_NAME%\src\work
 if errorlevel 1 exit 1
 
