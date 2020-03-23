@@ -8,5 +8,13 @@ pushd %SRC_DIR%\%PKG_NAME%\src\work
 
 mkdir %LIBRARY_PREFIX%\lib\site-packages
 
-%PYTHON% setup.py install --prefix=%LIBRARY_PREFIX%
+for /f "usebackq tokens=*" %%a in ('%LIBRARY_PREFIX%') do (
+  set _LIBRARY_PREFIX_PATH=%%~pna
+  set _LIBRARY_PREFIX_ROOT=%%~da\
+)
+
+%PYTHON% setup.py install ^
+    --prefix=%_LIBRARY_PREFIX_PATH% ^
+    --install-scripts=%_LIBRARY_PREFIX_PATH%\bin ^
+    --root=%_LIBRARY_PREFIX_ROOT%
 if errorlevel 1 exit 1
