@@ -18,6 +18,10 @@ First you have to create a `vinca.yaml` to describe ROS information for `vinca` 
 # vinca.yaml
 ros_distro: eloquent
 
+# optionally, a fat archive can be generated too.
+fat_archive: true
+name: ros-eloquent-fat-ament-cmake
+
 # mapping of rosdep keys
 # it can be also used to shadow the unwanted packages.
 conda_index:
