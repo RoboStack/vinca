@@ -1,198 +1,198 @@
 pkg-config:
-  win64: [pkg-config]
+  conda-forge: [pkg-config]
 python-rospkg:
-  win64: [rospkg]
+  conda-forge: [rospkg]
 python3-rospkg:
-  win64: [rospkg]
+  conda-forge: [rospkg]
 boost:
-  win64: [boost]
+  conda-forge: [boost]
 python-argparse:
-  win64: []
+  conda-forge: []
 python-catkin-pkg:
-  win64: [catkin_pkg]
+  conda-forge: [catkin_pkg]
 python3-catkin-pkg:
-  win64: [catkin_pkg]
+  conda-forge: [catkin_pkg]
 python:
-  win64: ['python {{ python }}']
+  conda-forge: ['python {{ python }}']
 python3:
-  win64: ['python {{ python }}']
+  conda-forge: ['python {{ python }}']
 python3-dev:
-  win64: ['python {{ python }}']
+  conda-forge: ['python {{ python }}']
 python-rosdep:
-  win64: [rosdep]
+  conda-forge: [rosdep]
 python3-rosdep:
-  win64: [rosdep]
+  conda-forge: [rosdep]
 python-empy:
-  win64: [empy]
+  conda-forge: [empy]
 python3-empy:
-  win64: [empy]
+  conda-forge: [empy]
 tinyxml:
-  win64: [tinyxml]
+  conda-forge: [tinyxml]
 tinyxml2:
-  win64: [tinyxml2]
+  conda-forge: [tinyxml2]
 gtest:
-  win64: [gtest]
+  conda-forge: [gtest]
 cmake:
-  win64: [cmake]
+  conda-forge: [cmake]
 google-mock:
-  win64: [gmock]
+  conda-forge: [gmock]
 python-mock:
-  win64: [mock]
+  conda-forge: [mock]
 python3-mock:
-  win64: [mock]
+  conda-forge: [mock]
 python-nose:
-  win64: [nose]
+  conda-forge: [nose]
 python3-nose:
-  win64: [nose]
+  conda-forge: [nose]
 python-coverage:
-  win64: [coverage]
+  conda-forge: [coverage]
 python3-coverage:
-  win64: [coverage]
+  conda-forge: [coverage]
 libconsole-bridge-dev:
-  win64: [console_bridge]
+  conda-forge: [console_bridge]
 python-yaml:
-  win64: [pyyaml]
+  conda-forge: [pyyaml]
 python3-yaml:
-  win64: [pyyaml]
+  conda-forge: [pyyaml]
 python3-setuptools:
-  win64: [setuptools]
+  conda-forge: [setuptools]
 python3-catkin-pkg-modules:
-  win64: [catkin_pkg]
+  conda-forge: [catkin_pkg]
 python3-rosdep-modules:
-  win64: [rosdep]
+  conda-forge: [rosdep]
 libboost-system-dev:
-  win64: [boost]
+  conda-forge: [boost]
 libboost-date-time-dev:
-  win64: [boost]
+  conda-forge: [boost]
 libboost-thread-dev:
-  win64: [boost]
+  conda-forge: [boost]
 libpoco-dev:
-  win64: [poco]
+  conda-forge: [poco]
 python-gnupg:
-  win64: [python-gnupg]
+  conda-forge: [python-gnupg]
 python-imaging:
-  win64: [pillow]
+  conda-forge: [pillow]
 python-crypto:
-  win64: [pycrypto]
+  conda-forge: [pycrypto]
 bzip2:
-  win64: [bzip2]
+  conda-forge: [bzip2]
 libssl-dev:
-  win64: [openssl]
+  conda-forge: [openssl]
 libgpgme-dev:
-  win64: []
+  conda-forge: []
 log4cxx:
-  win64: [log4cxx]
+  conda-forge: [log4cxx]
 apr:
-  win64: [apr]
+  conda-forge: [apr]
 python-netifaces:
-  win64: [netifaces]
+  conda-forge: [netifaces]
 python3-netifaces:
-  win64: [netifaces]
+  conda-forge: [netifaces]
 python-paramiko:
-  win64: [paramiko]
+  conda-forge: [paramiko]
 sbcl:
-  win64: []
+  conda-forge: []
 lz4:
-  win64: [lz4]
+  conda-forge: [lz4]
 python-defusedxml:
-  win64: [defusedxml]
+  conda-forge: [defusedxml]
 python-numpy:
-  win64: [numpy]
+  conda-forge: [numpy]
 python3-pytest:
-  win64: [pytest]
+  conda-forge: [pytest]
 python3-rosdistro-modules:
-  win64: [rosdistro]
+  conda-forge: [rosdistro]
 python3-lark-parser:
-  win64: [lark-parser]
+  conda-forge: [lark-parser]
 cppcheck:
-  win64: [cppcheck]
+  conda-forge: [cppcheck]
 python3-mypy:
-  win64: [mypy]
+  conda-forge: [mypy]
 zlib:
-  win64: [zlib]
+  conda-forge: [zlib]
 python3-pkg-resources:
-  win64: []
+  conda-forge: []
 python3-cryptography:
-  win64: [cryptography]
+  conda-forge: [cryptography]
 python3-numpy:
-  win64: [numpy]
+  conda-forge: [numpy]
 python3-ifcfg:
-  win64: [ifcfg]
+  conda-forge: [ifcfg]
 python3-flake8:
-  win64: [flake8]
+  conda-forge: [flake8]
 python3-pytest-mock:
-  win64: [pytest-mock]
+  conda-forge: [pytest-mock]
 yaml:
-  win64: [yaml]
+  conda-forge: [yaml]
 asio:
-  win64: [asio]
+  conda-forge: [asio]
 git:
-  win64: [git]
+  conda-forge: [git]
 spdlog:
-  win64: [spdlog]
+  conda-forge: [spdlog]
 pcre:
-  win64: [pcre]
+  conda-forge: [pcre]
 pydocstyle:
-  win64: [pydocstyle]
+  conda-forge: [pydocstyle]
 libxml2-utils:
-  win64: [libxml2]
+  conda-forge: [libxml2]
 libcunit-dev:
-  win64: []
+  conda-forge: []
 uncrustify:
-  win64: [uncrustify]
+  conda-forge: [uncrustify]
 python3-lxml:
-  win64: [lxml]
+  conda-forge: [lxml]
 openssl:
-  win64: [openssl]
+  conda-forge: [openssl]
 eigen:
-  win64: [eigen]
+  conda-forge: [eigen]
 assimp:
-  win64: [assimp]
+  conda-forge: [assimp]
 libqt5-opengl:
-  win64: [qt]
+  conda-forge: [qt]
 libqt5-widgets:
-  win64: [qt]
+  conda-forge: [qt]
 curl:
-  win64: [libcurl]
+  conda-forge: [libcurl]
 qtbase5-dev:
-  win64: [qt]
+  conda-forge: [qt]
 libqt5-gui:
-  win64: [qt]
+  conda-forge: [qt]
 libqt5-core:
-  win64: [qt]
+  conda-forge: [qt]
 libfreetype6-dev:
-  win64: [freetype]
+  conda-forge: [freetype]
 libfreetype6:
-  win64: [freetype]
+  conda-forge: [freetype]
 opengl:
-  win64: []
+  conda-forge: []
 libxaw:
-  win64: []
+  conda-forge: []
 libx11-dev:
-  win64: []
+  conda-forge: []
 libxrandr:
-  win64: []
+  conda-forge: []
 libopencv-dev:
-  win64: [opencv 3*]
+  conda-forge: [opencv 3*]
 qt5-qmake:
-  win64: [qt]
+  conda-forge: [qt]
 python3-pydot:
-  win64: [pydot]
+  conda-forge: [pydot]
 python3-matplotlib:
-  win64: [matplotlib]
+  conda-forge: [matplotlib]
 python3-qt5-bindings:
-  win64: [pyqt]
+  conda-forge: [pyqt]
 python3-psutil:
-  win64: [psutil]
+  conda-forge: [psutil]
 sdl-image:
-  win64: [sdl2_image]
+  conda-forge: [sdl2_image]
 graphicsmagick:
-  win64: [graphicsmagick]
+  conda-forge: [graphicsmagick]
 libboost-program-options:
-  win64: [boost]
+  conda-forge: [boost]
 sdl:
-  win64: [sdl2]
+  conda-forge: [sdl2]
 libzmq3-dev:
-  win64: [zeromq]
+  conda-forge: [zeromq]
 libboost-program-options-dev:
-  win64: [boost]
+  conda-forge: [boost]

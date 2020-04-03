@@ -12,7 +12,7 @@ def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
     for i in conda_index:
         if pkg_shortname in i:
             # TODO: replace with platform variable.
-            return i[pkg_shortname]['win64']
+            return i[pkg_shortname]['conda-forge']
     return None
 
 
