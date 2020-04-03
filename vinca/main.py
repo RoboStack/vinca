@@ -250,6 +250,27 @@ def generate_source(distro, vinca_conf):
     return source
 
 
+def generate_fat_source(distro, vinca_conf):
+    source = []
+    for pkg_shortname in vinca_conf['_selected_pkgs']:
+        url, version = distro.get_released_repo(pkg_shortname)
+        entry = {}
+        entry['git_url'] = url
+        entry['git_rev'] = version
+        pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
+        if not pkg_names:
+            continue
+        pkg_name = pkg_names[0]
+        entry['folder'] = 'src/%s' % pkg_name
+        patch_path = os.path.join(
+            vinca_conf['_patch_dir'], '%s.patch' % pkg_name)
+        if os.path.exists(patch_path):
+            entry['patches'] = ['%s/%s' % (
+                vinca_conf['patch_dir'], '%s.patch' % pkg_name)]
+        source.append(entry)
+    return source
+
+
 def get_selected_packages(distro, vinca_conf):
     selected_packages = set()
     skipped_packages = set()
@@ -263,7 +284,9 @@ def get_selected_packages(distro, vinca_conf):
             skipped_packages = skipped_packages.union([i])
             pkgs = distro.get_depends(i)
             skipped_packages = skipped_packages.union(pkgs)
-    return selected_packages.difference(skipped_packages)
+    result = selected_packages.difference(skipped_packages)
+    result = sorted(list(result))
+    return result
 
 
 def main():
@@ -281,13 +304,15 @@ def main():
     # print(selected_pkgs)
 
     vinca_conf['_selected_pkgs'] = selected_pkgs
-    source = generate_source(distro, vinca_conf)
-    # print(source)
 
     if 'fat_archive' in vinca_conf and vinca_conf['fat_archive']:
+        source = generate_fat_source(distro, vinca_conf)
         outputs = generate_fat_outputs(distro, vinca_conf)
     else:
+        source = generate_source(distro, vinca_conf)
         outputs = generate_outputs(distro, vinca_conf)
+
+    # print(source)
     # print(outputs)
 
     write_recipe(source, outputs)
