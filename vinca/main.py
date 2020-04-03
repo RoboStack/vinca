@@ -7,6 +7,7 @@ import os
 from vinca import __version__
 from .resolve import get_conda_index
 from .resolve import resolve_pkgname
+from .resolve import resolve_pkgname_from_indexes
 from .template import write_recipe
 from .distro import Distro
 
@@ -141,6 +142,93 @@ def generate_outputs(distro, vinca_conf):
     return outputs
 
 
+def generate_fat_output(pkg_shortname, vinca_conf, distro):
+    if pkg_shortname not in vinca_conf['_selected_pkgs']:
+        return [], []
+    pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
+    if not pkg_names:
+        return [], []
+    pkg = catkin_pkg.package.parse_package_string(
+        distro.get_release_package_xml(pkg_shortname))
+    pkg.evaluate_conditions(os.environ)
+    resolved_python = resolve_pkgname_from_indexes(
+        'python', vinca_conf['_conda_indexes'])
+    resolved_setuptools = resolve_pkgname_from_indexes(
+        'setuptools', vinca_conf['_conda_indexes'])
+    host_requirements = []
+    run_requirements = []
+    run_requirements.extend(resolved_python)
+    host_requirements.extend(resolved_python)
+    host_requirements.extend(resolved_setuptools)
+
+    build_deps = pkg.build_depends
+    build_deps += pkg.buildtool_depends
+    build_deps += pkg.build_export_depends
+    build_deps += pkg.buildtool_export_depends
+    build_deps += pkg.test_depends
+    build_deps = [d.name for d in build_deps if d.evaluated_condition]
+    build_deps = set(build_deps)
+
+    for dep in build_deps:
+        if distro.check_package(dep):
+            continue
+        resolved_dep = resolve_pkgname_from_indexes(
+            dep, vinca_conf['_conda_indexes'])
+        if not resolved_dep:
+            unsatisfied_deps.add(dep)
+            continue
+        host_requirements.extend(resolved_dep)
+
+    run_deps = pkg.run_depends
+    run_deps += pkg.exec_depends
+    run_deps += pkg.build_export_depends
+    run_deps += pkg.buildtool_export_depends
+    run_deps = [d.name for d in run_deps if d.evaluated_condition]
+    run_deps = set(run_deps)
+
+    for dep in run_deps:
+        if distro.check_package(dep):
+            continue
+        resolved_dep = resolve_pkgname_from_indexes(
+            dep, vinca_conf['_conda_indexes'])
+        if not resolved_dep:
+            unsatisfied_deps.add(dep)
+            continue
+        run_requirements.extend(resolved_dep)
+
+    return host_requirements, run_requirements
+
+
+def generate_fat_outputs(distro, vinca_conf):
+    outputs = []
+    output = {
+        'name': vinca_conf['name'],
+        'requirements': {
+            'build': [
+                "{{ compiler('cxx') }}",
+                "{{ compiler('c') }}",
+                "ninja",
+                "cmake"
+            ],
+            'host': [],
+            'run': []
+        }
+    }
+    for pkg_shortname in vinca_conf['_selected_pkgs']:
+        host_requirements, run_requirements = generate_fat_output(
+            pkg_shortname, vinca_conf, distro)
+        output['requirements']['host'].extend(host_requirements)
+        output['requirements']['run'].extend(run_requirements)
+
+    output['requirements']['host'] = list(set(output['requirements']['host']))
+    output['requirements']['run'] = list(set(output['requirements']['run']))
+    output['requirements']['host'] = sorted(output['requirements']['host'])
+    output['requirements']['run'] = sorted(output['requirements']['run'])
+    outputs.append(output)
+
+    return outputs
+
+
 def generate_source(distro, vinca_conf):
     source = []
     for pkg_shortname in vinca_conf['_selected_pkgs']:
@@ -196,7 +284,10 @@ def main():
     source = generate_source(distro, vinca_conf)
     # print(source)
 
-    outputs = generate_outputs(distro, vinca_conf)
+    if 'fat_archive' in vinca_conf and vinca_conf['fat_archive']:
+        outputs = generate_fat_outputs(distro, vinca_conf)
+    else:
+        outputs = generate_outputs(distro, vinca_conf)
     # print(outputs)
 
     write_recipe(source, outputs)
