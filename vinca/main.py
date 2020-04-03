@@ -155,11 +155,14 @@ def generate_fat_output(pkg_shortname, vinca_conf, distro):
         'python', vinca_conf['_conda_indexes'])
     resolved_setuptools = resolve_pkgname_from_indexes(
         'setuptools', vinca_conf['_conda_indexes'])
+    resolved_colcon = resolve_pkgname_from_indexes(
+        'colcon-common-extensions', vinca_conf['_conda_indexes'])
     host_requirements = []
     run_requirements = []
     run_requirements.extend(resolved_python)
     host_requirements.extend(resolved_python)
     host_requirements.extend(resolved_setuptools)
+    host_requirements.extend(resolved_colcon)
 
     build_deps = pkg.build_depends
     build_deps += pkg.buildtool_depends
@@ -203,6 +206,7 @@ def generate_fat_outputs(distro, vinca_conf):
     outputs = []
     output = {
         'name': vinca_conf['name'],
+        'script': 'bld_colcon_merge.bat',
         'requirements': {
             'build': [
                 "{{ compiler('cxx') }}",
@@ -322,8 +326,10 @@ def main():
     from .template import generate_bld_ament_python
     from .template import generate_bld_catkin
     from .template import generate_activate_hook
+    from .template import generate_bld_colcon_merge
     generate_bld_ament_cmake()
     generate_bld_ament_python()
     generate_bld_catkin()
+    generate_bld_colcon_merge()
     generate_activate_hook()
     print('build scripts are created successfully.')

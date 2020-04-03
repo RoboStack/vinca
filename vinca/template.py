@@ -74,6 +74,13 @@ def generate_bld_catkin():
     generate_template(template_in, open('bld_catkin.bat', 'w'))
 
 
+def generate_bld_colcon_merge():
+    import pkg_resources
+    template_in = pkg_resources.resource_filename(
+      'vinca', 'templates/bld_colcon_merge.bat.in')
+    generate_template(template_in, open('bld_colcon_merge.bat', 'w'))
+
+
 def generate_activate_hook():
     import pkg_resources
     template_in = pkg_resources.resource_filename(
