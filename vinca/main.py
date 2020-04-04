@@ -28,7 +28,7 @@ def parse_command_line(argv):
     example = textwrap.dedent("""
       Examples:
         {0} -d ./examples/
-      See: https://github.com/seanyen/vinca
+      See: https://github.com/ros-forge/vinca
     """).format(os.path.basename(argv[0]))
     formatter_class = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(

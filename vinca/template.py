@@ -23,7 +23,7 @@ about:
 
 extra:
   recipe-maintainers:
-    - seanyen
+    - ros-forge
 """
 
 
