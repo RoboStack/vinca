@@ -24,6 +24,10 @@ class Distro(object):
             self._distro,
             evaluate_condition_context=os.environ)
 
+        # cache distribution type
+        self._distribution_type = index.distributions[distro_name]['distribution_type']
+        self._python_version = index.distributions[distro_name]['python_version']
+
     def get_depends(self, pkg):
         dependencies = set()
         dependencies |= self._walker.get_recursive_depends(
@@ -52,3 +56,9 @@ class Distro(object):
 
     def get_release_package_xml(self, pkg_name):
         return self._distro.get_release_package_xml(pkg_name)
+
+    def check_ros1(self):
+        return self._distribution_type == "ros1"
+
+    def get_python_version(self):
+        return self._python_version

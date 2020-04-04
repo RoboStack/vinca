@@ -156,16 +156,18 @@ def generate_fat_output(pkg_shortname, vinca_conf, distro):
     pkg.evaluate_conditions(os.environ)
     resolved_python = resolve_pkgname_from_indexes(
         'python', vinca_conf['_conda_indexes'])
-    resolved_setuptools = resolve_pkgname_from_indexes(
-        'setuptools', vinca_conf['_conda_indexes'])
-    resolved_colcon = resolve_pkgname_from_indexes(
-        'colcon-common-extensions', vinca_conf['_conda_indexes'])
     host_requirements = []
     run_requirements = []
     run_requirements.extend(resolved_python)
     host_requirements.extend(resolved_python)
-    host_requirements.extend(resolved_setuptools)
-    host_requirements.extend(resolved_colcon)
+    if distro.get_python_version() == 3:
+        resolved_setuptools = resolve_pkgname_from_indexes(
+            'setuptools', vinca_conf['_conda_indexes'])
+        host_requirements.extend(resolved_setuptools)
+    if not distro.check_ros1():
+        resolved_colcon = resolve_pkgname_from_indexes(
+            'colcon-common-extensions', vinca_conf['_conda_indexes'])
+        host_requirements.extend(resolved_colcon)
 
     build_deps = pkg.build_depends
     build_deps += pkg.buildtool_depends
@@ -209,7 +211,6 @@ def generate_fat_outputs(distro, vinca_conf):
     outputs = []
     output = {
         'name': vinca_conf['name'],
-        'script': 'bld_colcon_merge.bat',
         'requirements': {
             'build': [
                 "{{ compiler('cxx') }}",
@@ -221,6 +222,13 @@ def generate_fat_outputs(distro, vinca_conf):
             'run': []
         }
     }
+
+    # use catkin for ros1
+    if distro.check_ros1():
+        output['script'] = 'bld_catkin_merge.bat'
+    else:
+        output['script'] = 'bld_colcon_merge.bat'
+
     for pkg_shortname in vinca_conf['_selected_pkgs']:
         host_requirements, run_requirements = generate_fat_output(
             pkg_shortname, vinca_conf, distro)
@@ -330,9 +338,11 @@ def main():
     from .template import generate_bld_catkin
     from .template import generate_activate_hook
     from .template import generate_bld_colcon_merge
+    from .template import generate_bld_catkin_merge
     generate_bld_ament_cmake()
     generate_bld_ament_python()
     generate_bld_catkin()
     generate_bld_colcon_merge()
+    generate_bld_catkin_merge()
     generate_activate_hook()
     print('build scripts are created successfully.')

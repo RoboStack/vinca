@@ -6,15 +6,14 @@ setlocal
 set CC=cl.exe
 set CXX=cl.exe
 
-colcon build ^
-    --event-handlers console_cohesion+ ^
-    --merge-install ^
-    --install-base %LIBRARY_PREFIX% ^
-    --cmake-args ^
-     -G Ninja ^
-     -DCMAKE_BUILD_TYPE=Release ^
-     -DBUILD_TESTING=OFF ^
-     -DPYTHON_EXECUTABLE=%PYTHON%
+%PYTHON% src\catkin\bin\catkin_make_isolated.py ^
+    --install-space %LIBRARY_PREFIX% ^
+    --use-ninja ^
+    --install ^
+    -DCMAKE_BUILD_TYPE=Release ^
+    -DBUILD_SHARED_LIBS=ON ^
+    -DPYTHON_EXECUTABLE=%PYTHON% ^
+    -DCATKIN_SKIP_TESTING=ON
 if errorlevel 1 exit 1
 
 :: Copy the [de]activate scripts to %PREFIX%\etc\conda\[de]activate.d.
