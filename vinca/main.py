@@ -54,7 +54,10 @@ def read_vinca_yaml(filepath):
     # normalize paths to absolute paths
     conda_index = []
     for i in vinca_conf['conda_index']:
-        conda_index.append(os.path.abspath(i))
+        if os.path.isfile(i):
+            conda_index.append(os.path.abspath(i))
+        else:
+            conda_index.append(i)
     vinca_conf['conda_index'] = conda_index
     vinca_conf['_patch_dir'] = os.path.abspath(vinca_conf['patch_dir'])
     return vinca_conf

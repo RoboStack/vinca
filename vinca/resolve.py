@@ -1,10 +1,18 @@
+import os
+from urllib.request import urlopen
+
+
 def get_conda_index(vinca_conf):
     import ruamel.yaml
 
     yaml = ruamel.yaml.YAML()
     conda_index = []
     for i in vinca_conf['conda_index']:
-        conda_index.append(yaml.load(open(i, 'r')))
+        if os.path.isfile(i):
+            rawdata = yaml.load(open(i, 'r'))
+        else:
+            rawdata = yaml.load(urlopen(i))
+        conda_index.append(rawdata)
     return conda_index
 
 
