@@ -174,6 +174,8 @@ def generate_fat_output(pkg_shortname, vinca_conf, distro):
     build_deps += pkg.build_export_depends
     build_deps += pkg.buildtool_export_depends
     build_deps += pkg.test_depends
+    build_deps += pkg.run_depends
+    build_deps += pkg.exec_depends
     build_deps = [d.name for d in build_deps if d.evaluated_condition]
     build_deps = set(build_deps)
 
