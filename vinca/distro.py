@@ -7,13 +7,15 @@ from rosdistro.manifest_provider import get_release_tag
 
 class Distro(object):
 
-    def __init__(self, distro_name):
+    def __init__(self, distro_name, python_version=None):
         index = get_index(get_index_url())
         self._distro = get_cached_distribution(index, distro_name)
 
         # set up ROS environments
+        if python_version is None:
+            python_version = index.distributions[distro_name]['python_version']
         os.environ['ROS_PYTHON_VERSION'] = '{0}'.format(
-            index.distributions[distro_name]['python_version'])
+            python_version)
         os.environ['ROS_DISTRO'] = '{0}'.format(
             distro_name)
         if 'ROS_ROOT' in os.environ:

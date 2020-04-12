@@ -180,7 +180,8 @@ def generate_fat_output(pkg_shortname, vinca_conf, distro):
     build_deps = set(build_deps)
 
     for dep in build_deps:
-        if distro.check_package(dep):
+        if dep in vinca_conf['_selected_pkgs']:
+            # don't repeat the selected pkgs in the reqs.
             continue
         resolved_dep = resolve_pkgname_from_indexes(
             dep, vinca_conf['_conda_indexes'])
@@ -197,7 +198,8 @@ def generate_fat_output(pkg_shortname, vinca_conf, distro):
     run_deps = set(run_deps)
 
     for dep in run_deps:
-        if distro.check_package(dep):
+        if dep in vinca_conf['_selected_pkgs']:
+            # don't repeat the selected pkgs in the reqs.
             continue
         resolved_dep = resolve_pkgname_from_indexes(
             dep, vinca_conf['_conda_indexes'])
@@ -296,7 +298,7 @@ def get_selected_packages(distro, vinca_conf):
             selected_packages = selected_packages.union([i])
             pkgs = distro.get_depends(i)
             selected_packages = selected_packages.union(pkgs)
-    if vinca_conf['packages_skip_by_deps']:
+    if 'packages_skip_by_deps' in vinca_conf:
         for i in vinca_conf['packages_skip_by_deps']:
             skipped_packages = skipped_packages.union([i])
             pkgs = distro.get_depends(i)
@@ -315,7 +317,11 @@ def main():
     vinca_conf = read_vinca_yaml(vinca_yaml)
     vinca_conf['_conda_indexes'] = get_conda_index(vinca_conf)
 
-    distro = Distro(vinca_conf['ros_distro'])
+    python_version = None
+    if 'python_version' in vinca_conf:
+        python_version = vinca_conf['python_version']
+
+    distro = Distro(vinca_conf['ros_distro'], python_version)
 
     selected_pkgs = get_selected_packages(distro, vinca_conf)
     # print(selected_pkgs)
