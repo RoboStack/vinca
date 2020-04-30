@@ -25,8 +25,7 @@ name: ros-eloquent-fat-ament-cmake
 # mapping of rosdep keys
 # it can be also used to shadow the unwanted packages.
 conda_index:
-  - conda-forge.yaml
-  - packages-ignore.yaml
+  - 'https://raw.githubusercontent.com/ros-forge/rosdep-conda-forge/master/rosdep/conda-forge.yaml'
 
 # packages to skip
 packages_skip_by_deps:
