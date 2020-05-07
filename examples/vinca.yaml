@@ -1,13 +1,15 @@
-ros_distro: eloquent
+ros_distro: melodic
 
 # mapping for package keys
 conda_index:
   - conda-forge.yaml
   - packages-ignore.yaml
 
+skip_all_deps: false
+
 packages_skip_by_deps:
 
 packages_select_by_deps:
-  - ament_cmake
+  - rviz
 
 patch_dir: patch

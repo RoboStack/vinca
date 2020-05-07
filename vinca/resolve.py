@@ -1,5 +1,13 @@
 import os
 from urllib.request import urlopen
+import platform
+
+
+map_platform_python_to_conda = {
+    'Linux': 'linux',
+    'Darwin': 'osx',
+    'Windows': 'win64'
+}
 
 
 def get_conda_index(vinca_conf):
@@ -19,8 +27,16 @@ def get_conda_index(vinca_conf):
 def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
     for i in conda_index:
         if pkg_shortname in i:
-            # TODO: replace with platform variable.
-            return i[pkg_shortname]['conda-forge']
+            sys_platform = map_platform_python_to_conda[platform.system()]
+            if 'conda-forge' in i[pkg_shortname].keys():
+                if sys_platform in i[pkg_shortname]['conda-forge']:
+                    return i[pkg_shortname]['conda-forge'][sys_platform]
+                elif 'unix' in i[pkg_shortname]['conda-forge'] and sys_platform in ['linux', 'osx']:
+                    return i[pkg_shortname]['conda-forge']['unix']
+                else:
+                    return i[pkg_shortname]['conda-forge']
+            raise KeyError("Missing package for platform {}: {}\nCheck your conda metadata!".format(sys_platform, pkg_shortname))
+
     return None
 
 

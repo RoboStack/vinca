@@ -1,0 +1,47 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1628eab..418a9ff 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -101,7 +101,7 @@ if(APPLE)
+   add_definitions(-D__ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES=0)
+ endif()
+ 
+-find_package(OpenGL REQUIRED)
++# find_package(OpenGL REQUIRED)
+ 
+ set(CMAKE_AUTOMOC ON)
+ set(CMAKE_INCLUDE_CURRENT_DIR ON)
+diff --git a/src/python_bindings/CMakeLists.txt b/src/python_bindings/CMakeLists.txt
+index aedb7ad..1f5d1a0 100644
+--- a/src/python_bindings/CMakeLists.txt
++++ b/src/python_bindings/CMakeLists.txt
+@@ -2,9 +2,9 @@ set(rviz_BINDINGS "")
+ 
+ # TODO(wjwwood): re-enabled PySide2 support when it is fixed.
+ # add_subdirectory(shiboken)
+-add_subdirectory(sip)
++# add_subdirectory(sip)
+ 
+ message(STATUS "Python binding generators: ${rviz_BINDINGS}")
+-if(NOT rviz_BINDINGS)
+-  message(FATAL_ERROR "No Python binding generator found.")
+-endif()
++# if(NOT rviz_BINDINGS)
++#   message(FATAL_ERROR "No Python binding generator found.")
++# endif()
+diff --git a/src/rviz/ogre_helpers/render_system.cpp b/src/rviz/ogre_helpers/render_system.cpp
+index eb01767..f71d83e 100644
+--- a/src/rviz/ogre_helpers/render_system.cpp
++++ b/src/rviz/ogre_helpers/render_system.cpp
+@@ -177,10 +177,7 @@ void RenderSystem::setupDummyWindowId()
+ 
+ void RenderSystem::loadOgrePlugins()
+ {
+-  std::string plugin_prefix = get_ogre_plugin_path() + "/";
+-#ifdef Q_OS_MAC
+-  plugin_prefix += "lib";
+-#endif
++  std::string plugin_prefix = std::string(std::getenv("CONDA_PREFIX")) + "/lib/OGRE/";
+   ogre_root_->loadPlugin( plugin_prefix + "RenderSystem_GL" );
+   ogre_root_->loadPlugin( plugin_prefix + "Plugin_OctreeSceneManager" );
+   ogre_root_->loadPlugin( plugin_prefix + "Plugin_ParticleFX" );

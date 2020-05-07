@@ -4,6 +4,7 @@ import argparse
 import catkin_pkg
 import sys
 import os
+import json
 from vinca import __version__
 from .resolve import get_conda_index
 from .resolve import resolve_pkgname
@@ -41,6 +42,9 @@ def parse_command_line(argv):
     parser.add_argument(
         "-d", "--dir", dest="dir", default=default_dir,
         help="The directory to process (default: {}).".format(default_dir))
+    parser.add_argument(
+        "-s", "--skip", dest="skip_already_built_repodata", default=[],
+        help="Skip already built from repodata.")
     arguments = parser.parse_args(argv[1:])
     return arguments
 
@@ -67,7 +71,7 @@ def generate_output(pkg_shortname, vinca_conf, distro):
     if pkg_shortname not in vinca_conf['_selected_pkgs']:
         return None
     pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-    if not pkg_names:
+    if not pkg_names or pkg_names[0] in vinca_conf['skip_built_packages']:
         return None
     output = {
         'name': pkg_names[0],
@@ -77,7 +81,8 @@ def generate_output(pkg_shortname, vinca_conf, distro):
                 "{{ compiler('cxx') }}",
                 "{{ compiler('c') }}",
                 "ninja",
-                "cmake"
+                "cmake",
+                "catkin_pkg"
             ],
             'host': [],
             'run': []
@@ -90,7 +95,13 @@ def generate_output(pkg_shortname, vinca_conf, distro):
     output['requirements']['run'].extend(resolved_python)
     output['requirements']['host'].extend(resolved_python)
     if pkg.get_build_type() in ['cmake', 'catkin']:
-        output['script'] = 'bld_catkin.bat'
+        # TODO find a way to get the conda "comments" with ruamel
+        # output['script'] = ['bld_catkin.bat  # [win]', 'build_catkin.sh  # [unix]']
+        if sys.platform.startswith('win'):
+            output['script'] = 'bld_catkin.bat'
+        else:
+            output['script'] = 'build_catkin.sh'
+
     elif pkg.get_build_type() in ['ament_cmake']:
         output['script'] = 'bld_ament_cmake.bat'
     elif pkg.get_build_type() in ['ament_python']:
@@ -132,6 +143,30 @@ def generate_output(pkg_shortname, vinca_conf, distro):
     output['requirements']['host'] = list(set(output['requirements']['host']))
     output['requirements']['run'] = sorted(output['requirements']['run'])
     output['requirements']['host'] = sorted(output['requirements']['host'])
+
+    # fix up OPENGL support for Unix
+    if 'REQUIRE_OPENGL' in output['requirements']['run'] or 'REQUIRE_OPENGL' in output['requirements']['host']:
+        # add requirements for opengl
+        if 'REQUIRE_OPENGL' in output['requirements']['run']:
+            output['requirements']['run'].remove('REQUIRE_OPENGL')
+        if 'REQUIRE_OPENGL' in output['requirements']['host']:
+            output['requirements']['host'].remove('REQUIRE_OPENGL')
+
+        output['requirements']['build'] += [
+            "{{ cdt('mesa-libgl-devel') }}  [unix]",
+            "{{ cdt('mesa-dri-drivers') }}  [unix]",
+            "{{ cdt('libselinux') }}  [linux]",
+            "{{ cdt('libxdamage') }}  [linux]",
+            "{{ cdt('libxxf86vm') }}  [linux]"
+        ]
+        output['requirements']['host'] += [
+            'xorg-libxfixes  [unix]',
+            'xorg-libxext  [unix]'
+        ]
+        output['requirements']['run'] += [
+            'xorg-libxfixes  [unix]',
+            'xorg-libxext  [unix]'
+        ]
 
     return output
 
@@ -256,7 +291,7 @@ def generate_source(distro, vinca_conf):
         entry['git_url'] = url
         entry['git_rev'] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-        if not pkg_names:
+        if not pkg_names or pkg_names[0] in vinca_conf['skip_built_packages']:
             continue
         pkg_name = pkg_names[0]
         entry['folder'] = '%s/src/work' % pkg_name
@@ -293,16 +328,19 @@ def generate_fat_source(distro, vinca_conf):
 def get_selected_packages(distro, vinca_conf):
     selected_packages = set()
     skipped_packages = set()
+
     if vinca_conf['packages_select_by_deps']:
         for i in vinca_conf['packages_select_by_deps']:
             selected_packages = selected_packages.union([i])
+
             pkgs = distro.get_depends(i)
             selected_packages = selected_packages.union(pkgs)
-    if 'packages_skip_by_deps' in vinca_conf:
+    if 'packages_skip_by_deps' in vinca_conf and vinca_conf['packages_skip_by_deps'] is not None:
         for i in vinca_conf['packages_skip_by_deps']:
             skipped_packages = skipped_packages.union([i])
             pkgs = distro.get_depends(i)
             skipped_packages = skipped_packages.union(pkgs)
+
     result = selected_packages.difference(skipped_packages)
     result = sorted(list(result))
     return result
@@ -316,6 +354,16 @@ def main():
     vinca_yaml = os.path.join(base_dir, 'vinca.yaml')
     vinca_conf = read_vinca_yaml(vinca_yaml)
     vinca_conf['_conda_indexes'] = get_conda_index(vinca_conf)
+    if arguments.skip_already_built_repodata:
+        skip_built_packages = set()
+        fn = arguments.skip_already_built_repodata
+        with open(fn) as fi:
+            repodata = json.load(fi)
+            for _, pkg in repodata.get('packages').items():
+                skip_built_packages.add(pkg['name'])
+        vinca_conf['skip_built_packages'] = skip_built_packages
+    else:
+        vinca_conf['skip_built_packages'] = []
 
     python_version = None
     if 'python_version' in vinca_conf:

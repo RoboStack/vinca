@@ -11,7 +11,6 @@ source:
 
 build:
   number: 0
-  skip: true  # [not win64]
 
 outputs:
 
@@ -72,6 +71,9 @@ def generate_bld_catkin():
     template_in = pkg_resources.resource_filename(
       'vinca', 'templates/bld_catkin.bat.in')
     generate_template(template_in, open('bld_catkin.bat', 'w'))
+    template_in = pkg_resources.resource_filename(
+      'vinca', 'templates/build_catkin.sh.in')
+    generate_template(template_in, open('build_catkin.sh', 'w'))
 
 
 def generate_bld_colcon_merge():
@@ -96,3 +98,9 @@ def generate_activate_hook():
     template_in = pkg_resources.resource_filename(
       'vinca', 'templates/deactivate.bat.in')
     generate_template(template_in, open('deactivate.bat', 'w'))
+    template_in = pkg_resources.resource_filename(
+      'vinca', 'templates/activate.sh.in')
+    generate_template(template_in, open('activate.sh', 'w'))
+    template_in = pkg_resources.resource_filename(
+      'vinca', 'templates/deactivate.sh.in')
+    generate_template(template_in, open('deactivate.sh', 'w'))

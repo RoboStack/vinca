@@ -54,10 +54,16 @@ python-yaml:
   conda-forge: [pyyaml]
 python3-yaml:
   conda-forge: [pyyaml]
+python-setuptools:
+  conda-forge: [setuptools]
 python3-setuptools:
   conda-forge: [setuptools]
+python-catkin-pkg-modules:
+  conda-forge: [catkin_pkg]
 python3-catkin-pkg-modules:
   conda-forge: [catkin_pkg]
+python-rosdep-modules:
+  conda-forge: ['rosdep']
 python3-rosdep-modules:
   conda-forge: [rosdep]
 libboost-system-dev:
@@ -91,13 +97,21 @@ python3-netifaces:
 python-paramiko:
   conda-forge: [paramiko]
 sbcl:
-  conda-forge: []
+  conda-forge:
+    win64: []
+    unix: [sbcl]
 lz4:
   conda-forge: [lz4]
 python-defusedxml:
   conda-forge: [defusedxml]
 python-numpy:
-  conda-forge: [numpy]
+  conda-forge:
+    win64: ['numpy']
+    unix: ['numpy', 'openblas']
+python3-numpy:
+  conda-forge:
+    win64: ['numpy']
+    unix: ['numpy', 'openblas']
 python3-pytest:
   conda-forge: [pytest]
 python3-rosdistro-modules:
@@ -114,8 +128,6 @@ python3-pkg-resources:
   conda-forge: []
 python3-cryptography:
   conda-forge: [cryptography]
-python3-numpy:
-  conda-forge: [numpy]
 python3-ifcfg:
   conda-forge: [ifcfg]
 python3-flake8:
@@ -140,24 +152,40 @@ libcunit-dev:
   conda-forge: []
 uncrustify:
   conda-forge: [uncrustify]
+python-lxml:
+  conda-forge: [lxml]
 python3-lxml:
   conda-forge: [lxml]
 openssl:
   conda-forge: [openssl]
 eigen:
-  conda-forge: [eigen]
+  conda-forge:
+    win64: [eigen]
+    unix: ['eigen', 'openblas']
 assimp:
   conda-forge: [assimp]
+assimp-dev:
+  conda-forge: [assimp]
 libqt5-opengl:
-  conda-forge: [qt]
+  conda-forge:
+    win64: [qt]
+    unix: [qt, REQUIRE_OPENGL]
+libqt5-opengl-dev:
+  conda-forge:
+    win64: [qt]
+    unix: [qt, REQUIRE_OPENGL]
 libqt5-widgets:
-  conda-forge: [qt]
+  conda-forge:
+    win64: [qt]
+    unix: [qt, REQUIRE_OPENGL]
 curl:
   conda-forge: [libcurl]
 qtbase5-dev:
   conda-forge: [qt]
 libqt5-gui:
-  conda-forge: [qt]
+  conda-forge:
+    win64: [qt]
+    unix: [qt, REQUIRE_OPENGL]
 libqt5-core:
   conda-forge: [qt]
 libfreetype6-dev:
@@ -165,23 +193,41 @@ libfreetype6-dev:
 libfreetype6:
   conda-forge: [freetype]
 opengl:
-  conda-forge: []
+  conda-forge:
+    win64: []
+    unix: [REQUIRE_OPENGL]
 libxaw:
-  conda-forge: []
+  conda-forge:
+    win64: []
+    unix: ['xorg-libxaw']
 libx11-dev:
   conda-forge: []
 libxrandr:
-  conda-forge: []
+  conda-forge:
+    win64: []
+    unix: [xorg-libxrandr]
 libopencv-dev:
+  conda-forge: [opencv 3*]
+python-opencv:
+  conda-forge: [opencv 3*]
+python3-opencv:
   conda-forge: [opencv 3*]
 qt5-qmake:
   conda-forge: [qt]
+python-pydot:
+  conda-forge: [pydot]
 python3-pydot:
   conda-forge: [pydot]
+python-matplotlib:
+  conda-forge: [matplotlib-base]
 python3-matplotlib:
-  conda-forge: [matplotlib]
+  conda-forge: [matplotlib-base]
+python-qt5-bindings:
+  conda-forge: [pyqt]
 python3-qt5-bindings:
   conda-forge: [pyqt]
+python-psutil:
+  conda-forge: [psutil]
 python3-psutil:
   conda-forge: [psutil]
 sdl-image:
@@ -195,4 +241,74 @@ sdl:
 libzmq3-dev:
   conda-forge: [zeromq]
 libboost-program-options-dev:
-  conda-forge: [boost]
+  conda-forge:
+    win64: [boost]
+    unix: ['boost-cpp']
+libboost-filesystem-dev:
+  conda-forge: ['boost-cpp']
+python-cairo:
+  conda-forge: [pycairo]
+python3-cairo:
+  conda-forge: [pycairo]
+python-pygraphviz:
+  conda-forge:
+    win64: []
+    unix: [pygraphviz]
+python3-pygraphviz:
+  conda-forge:
+    win64: []
+    unix: [pygraphviz]
+python-opengl:
+  conda-forge: [pyopengl]
+python3-opengl:
+  conda-forge: [pyopengl]
+libogre-dev:
+  conda-forge:
+    # ogre has to be pinned here exactly, otherwise GL is missing
+    # can't do this in conda_build_config unfortunately
+    unix: [ogre 1.10.12 h6508522_3]
+    win64: [ogre 1.10]
+liburdfdom-dev:
+  conda-forge: ['urdfdom']
+liburdfdom-tools:
+  conda-forge: ['urdfdom']
+liburdfdom-headers-dev:
+  conda-forge: ['urdfdom_headers']
+yaml-cpp:
+  conda-forge: ['yaml-cpp']
+python-wxtools:
+  conda-forge: ['wxpython']
+python-pycryptodome:
+  conda-forge: ['pycryptodome', 'pycryptodomex']
+graphviz:
+  conda-forge: ['graphviz']
+uuid:
+  conda-forge:
+    win64: []
+    unix: [libuuid]
+python-sip:
+  conda-forge: [sip]
+cppunit:
+  conda-forge:
+    win64: []
+    unix: [cppunit]
+libfcl-dev:
+  conda-forge:
+    win64: []
+    unix: [fcl]
+libqhull:
+  conda-forge: [qhull]
+lcov:
+  conda-forge: [lcov]
+glut:
+  conda-forge: [freeglut]
+doxygen:
+  conda-forge: [doxygen]
+libglew-dev:
+  conda-forge: [glew]
+python-pyassimp:
+  conda-forge: [assimp]
+python3-pyassimp:
+  conda-forge: [assimp]
+libpcl-all-dev:
+  conda-forge: [pcl]
