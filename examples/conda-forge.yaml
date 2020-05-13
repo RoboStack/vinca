@@ -85,7 +85,9 @@ bzip2:
 libssl-dev:
   conda-forge: [openssl]
 libgpgme-dev:
-  conda-forge: []
+  conda-forge:
+    win64: []
+    unix: [gpgme]
 log4cxx:
   conda-forge: [log4cxx]
 apr:
