@@ -10,9 +10,9 @@ skip_all_deps: false
 packages_skip_by_deps:
 
 packages_select_by_deps:
-  #  - rviz
-  - ros_core
-  - actionlib
-  - dynamic_reconfigure
+   - rviz
+  # - ros_core
+  # - actionlib
+  # - dynamic_reconfigure
 
 patch_dir: patch
