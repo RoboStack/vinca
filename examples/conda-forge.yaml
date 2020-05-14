@@ -283,7 +283,9 @@ python-wxtools:
 python-pycryptodome:
   conda-forge: ['pycryptodome', 'pycryptodomex']
 graphviz:
-  conda-forge: ['graphviz']
+  # disabling graphviz for now, to make tf build without conflicts
+  # conda-forge: ['graphviz']
+  conda-forge: []
 uuid:
   conda-forge:
     win64: []
