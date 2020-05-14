@@ -14,14 +14,22 @@ export PYTHONUNBUFFERED=1
 
 cat >~/.condarc <<CONDARC
 conda-build:
- root-dir: ${FEEDSTOCK_ROOT}/build_artifacts
+    root-dir: ${FEEDSTOCK_ROOT}/build_artifacts
 CONDARC
 
-conda install --yes --quiet conda-forge-ci-setup=3 conda-build pip -c conda-forge
+conda install --yes --quiet conda-build pip anaconda-client -c conda-forge
 # setup_conda_rc "${FEEDSTOCK_ROOT}" "${RECIPE_ROOT}" "${CONFIG_FILE}"
 # export PATH="$HOME/miniconda/bin:$PATH"
+conda config --set anaconda_upload yes
+conda config --set show_channel_urls true
+conda config --set auto_update_conda false
+conda config --set add_pip_as_python_dependency false
 
-source run_conda_forge_build_setup
+export "CONDA_BLD_PATH=${FEEDSTOCK_ROOT}/build_artifacts"
+
+conda info
+conda config --show-sources
+conda list --show-channel-urls
 
 pwd
 

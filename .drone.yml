@@ -5,8 +5,12 @@ name: greeting
 steps:
 - name: vinca install
   image: condaforge/linux-anvil-cos7-x86_64
+  environment:
+    ANACONDA_API_TOKEN:
+      from_secret: ANACONDA_UPLOAD
   commands:
     - export FEEDSTOCK_ROOT="$DRONE_WORKSPACE"
+    - export ANACONDA_API_TOKEN="$ANACONDA_API_TOKEN"
     - export RECIPE_ROOT="$FEEDSTOCK_ROOT/recipe"
     - export CI=drone
     - export GIT_BRANCH="$DRONE_BRANCH"
