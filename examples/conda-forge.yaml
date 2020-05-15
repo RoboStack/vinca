@@ -271,11 +271,11 @@ libogre-dev:
     unix: [ogre 1.10.12 h6508522_3]
     win64: [ogre 1.10]
 liburdfdom-dev:
-  conda-forge: ['urdfdom']
+  conda-forge: ['urdfdom 1.0.4']
 liburdfdom-tools:
-  conda-forge: ['urdfdom']
+  conda-forge: ['urdfdom 1.0.4']
 liburdfdom-headers-dev:
-  conda-forge: ['urdfdom_headers']
+  conda-forge: ['urdfdom_headers 1.0.4']
 yaml-cpp:
   conda-forge: ['yaml-cpp']
 python-wxtools:

@@ -328,12 +328,13 @@ def get_selected_packages(distro, vinca_conf):
     selected_packages = set()
     skipped_packages = set()
 
+
     if vinca_conf['packages_select_by_deps']:
         for i in vinca_conf['packages_select_by_deps']:
             selected_packages = selected_packages.union([i])
-
-            pkgs = distro.get_depends(i)
-            selected_packages = selected_packages.union(pkgs)
+            if 'skip_all_deps' not in vinca_conf and not vinca_conf['skip_all_deps']:
+                pkgs = distro.get_depends(i)
+                selected_packages = selected_packages.union(pkgs)
     if 'packages_skip_by_deps' in vinca_conf and vinca_conf['packages_skip_by_deps'] is not None:
         for i in vinca_conf['packages_skip_by_deps']:
             skipped_packages = skipped_packages.union([i])

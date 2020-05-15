@@ -5,12 +5,14 @@ conda_index:
   - conda-forge.yaml
   - packages-ignore.yaml
 
-skip_all_deps: false
+skip_all_deps: true
 
 packages_skip_by_deps:
 
 packages_select_by_deps:
-   - rviz
+  - rviz
+  - urdf_parser_plugin
+  - urdf
   # - ros_core
   # - actionlib
   # - dynamic_reconfigure
