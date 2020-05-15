@@ -29,6 +29,19 @@ index aedb7ad0..1f5d1a08 100644
 +# if(NOT rviz_BINDINGS)
 +#   message(FATAL_ERROR "No Python binding generator found.")
 +# endif()
+diff --git a/src/rviz/ogre_helpers/movable_text.h b/src/rviz/ogre_helpers/movable_text.h
+index 19d1c31a..4417ef98 100644
+--- a/src/rviz/ogre_helpers/movable_text.h
++++ b/src/rviz/ogre_helpers/movable_text.h
+@@ -203,7 +203,7 @@ protected:
+     return mAABB;
+   }
+ 
+-  const Ogre::String& getName() const override
++  const Ogre::String& getName() const
+   {
+     return mName;
+   }
 diff --git a/src/rviz/ogre_helpers/render_system.cpp b/src/rviz/ogre_helpers/render_system.cpp
 index e04bfa74..56a2a8ae 100644
 --- a/src/rviz/ogre_helpers/render_system.cpp

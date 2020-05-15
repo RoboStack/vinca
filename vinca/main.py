@@ -156,15 +156,17 @@ def generate_output(pkg_shortname, vinca_conf, distro):
             "{{ cdt('mesa-dri-drivers') }}  [unix]",
             "{{ cdt('libselinux') }}  [linux]",
             "{{ cdt('libxdamage') }}  [linux]",
-            "{{ cdt('libxxf86vm') }}  [linux]"
+            "{{ cdt('libxxf86vm') }}  [linux]",
+            "{{ cdt('libxfixes') }}  [linux]",
+            "{{ cdt('libxext') }}  [linux]"
         ]
         output['requirements']['host'] += [
-            'xorg-libxfixes  [unix]',
-            'xorg-libxext  [unix]'
+            # 'xorg-libxfixes  [unix]',
+            # 'xorg-libxext  [unix]'
         ]
         output['requirements']['run'] += [
-            'xorg-libxfixes  [unix]',
-            'xorg-libxext  [unix]'
+            # 'xorg-libxfixes  [unix]',
+            # 'xorg-libxext  [unix]'
         ]
 
     return output

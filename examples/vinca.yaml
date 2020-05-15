@@ -11,8 +11,8 @@ packages_skip_by_deps:
 
 packages_select_by_deps:
   - rviz
-  - urdf_parser_plugin
-  - urdf
+  # - urdf_parser_plugin
+  # - urdf
   # - ros_core
   # - actionlib
   # - dynamic_reconfigure
