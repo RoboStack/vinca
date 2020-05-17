@@ -334,7 +334,7 @@ def get_selected_packages(distro, vinca_conf):
     if vinca_conf['packages_select_by_deps']:
         for i in vinca_conf['packages_select_by_deps']:
             selected_packages = selected_packages.union([i])
-            if 'skip_all_deps' not in vinca_conf and not vinca_conf['skip_all_deps']:
+            if 'skip_all_deps' not in vinca_conf or not vinca_conf['skip_all_deps']:
                 pkgs = distro.get_depends(i)
                 selected_packages = selected_packages.union(pkgs)
     if 'packages_skip_by_deps' in vinca_conf and vinca_conf['packages_skip_by_deps'] is not None:
