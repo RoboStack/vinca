@@ -158,7 +158,8 @@ def generate_output(pkg_shortname, vinca_conf, distro):
             "{{ cdt('libxdamage') }}  [linux]",
             "{{ cdt('libxxf86vm') }}  [linux]",
             "{{ cdt('libxfixes') }}  [linux]",
-            "{{ cdt('libxext') }}  [linux]"
+            "{{ cdt('libxext') }}  [linux]",
+            "{{ cdt('libxau') }}  [linux]"
         ]
         output['requirements']['host'] += [
             # 'xorg-libxfixes  [unix]',

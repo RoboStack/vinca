@@ -179,25 +179,29 @@ assimp-dev:
 libqt5-opengl:
   conda-forge:
     win64: [qt]
-    unix: [qt, REQUIRE_OPENGL]
+    unix: [qt 5.9.7, REQUIRE_OPENGL]
 libqt5-opengl-dev:
   conda-forge:
     win64: [qt]
-    unix: [qt, REQUIRE_OPENGL]
+    unix: [qt 5.9.7, REQUIRE_OPENGL]
 libqt5-widgets:
   conda-forge:
     win64: [qt]
-    unix: [qt, REQUIRE_OPENGL]
+    unix: [qt 5.9.7, REQUIRE_OPENGL]
 curl:
   conda-forge: [libcurl]
 qtbase5-dev:
-  conda-forge: [qt]
+  conda-forge:
+    win64: [qt]
+    unix: [qt 5.9.7]
 libqt5-gui:
   conda-forge:
     win64: [qt]
-    unix: [qt, REQUIRE_OPENGL]
+    unix: [qt 5.9.7, REQUIRE_OPENGL]
 libqt5-core:
-  conda-forge: [qt]
+  conda-forge:
+    win64: [qt]
+    unix: [qt 5.9.7]
 libfreetype6-dev:
   conda-forge: [freetype]
 libfreetype6:
@@ -223,7 +227,7 @@ python-opencv:
 python3-opencv:
   conda-forge: [opencv 3*]
 qt5-qmake:
-  conda-forge: [qt]
+  conda-forge: [qt 5.9.7]
 python-pydot:
   conda-forge: [pydot]
 python3-pydot:
@@ -233,9 +237,13 @@ python-matplotlib:
 python3-matplotlib:
   conda-forge: [matplotlib-base]
 python-qt5-bindings:
-  conda-forge: [pyqt]
+  conda-forge:
+    win64: [pyqt]
+    unix: [pyqt 5.9.2]
 python3-qt5-bindings:
-  conda-forge: [pyqt]
+  conda-forge:
+    win64: [pyqt]
+    unix: [pyqt 5.9.2]
 python-psutil:
   conda-forge: [psutil]
 python3-psutil:
