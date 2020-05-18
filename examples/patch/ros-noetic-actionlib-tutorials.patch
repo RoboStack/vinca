@@ -1,0 +1,37 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index b57958c..e997f15 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -24,26 +24,26 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+ 
+ ## Averaging server
+ add_executable(averaging_server src/averaging_server.cpp)
+-target_link_libraries(averaging_server ${catkin_LIBRARIES})
++target_link_libraries(averaging_server ${catkin_LIBRARIES} rt)
+ add_dependencies(averaging_server ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+ 
+ ## Averaging client
+ add_executable(averaging_client src/averaging_client.cpp)
+-target_link_libraries(averaging_client ${catkin_LIBRARIES} ${Boost_LIBRARIES})
++target_link_libraries(averaging_client ${catkin_LIBRARIES} ${Boost_LIBRARIES} rt)
+ add_dependencies(averaging_client ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+ 
+ ## Fibonacci server
+ add_executable(fibonacci_server src/fibonacci_server.cpp)
+-target_link_libraries(fibonacci_server ${catkin_LIBRARIES})
++target_link_libraries(fibonacci_server ${catkin_LIBRARIES} rt)
+ add_dependencies(fibonacci_server ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+ 
+ ## Fibonacci clients
+ add_executable(fibonacci_client src/fibonacci_client.cpp)
+ add_executable(fibonacci_callback_client src/fibonacci_callback_client.cpp)
+ add_executable(fibonacci_class_client src/fibonacci_class_client.cpp)
+-target_link_libraries(fibonacci_client ${catkin_LIBRARIES})
+-target_link_libraries(fibonacci_callback_client ${catkin_LIBRARIES})
+-target_link_libraries(fibonacci_class_client ${catkin_LIBRARIES})
++target_link_libraries(fibonacci_client ${catkin_LIBRARIES} rt)
++target_link_libraries(fibonacci_callback_client ${catkin_LIBRARIES} rt)
++target_link_libraries(fibonacci_class_client ${catkin_LIBRARIES} rt)
+ if(catkin_EXPORTED_TARGETS)
+   add_dependencies(fibonacci_client ${catkin_EXPORTED_TARGETS})
+   add_dependencies(fibonacci_callback_client ${catkin_EXPORTED_TARGETS})
