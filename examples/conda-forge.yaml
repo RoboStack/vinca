@@ -289,13 +289,14 @@ libogre-dev:
     # ogre has to be pinned here exactly, otherwise GL is missing
     # can't do this in conda_build_config unfortunately
     linux: [ogre 1.10.12 h6508522_3]
-    osx: [ogre 1.10.12]
+    osx: [ogre 1.12.6]
     win64: [ogre 1.10]
 libogre:
   conda-forge:
     # ogre has to be pinned here exactly, otherwise GL is missing
     # can't do this in conda_build_config unfortunately
     unix: [ogre 1.10.12 h6508522_3]
+    osx: [ogre 1.12.6]
     win64: [ogre 1.10]
 liburdfdom-dev:
   conda-forge: ['urdfdom 1.0.4']
