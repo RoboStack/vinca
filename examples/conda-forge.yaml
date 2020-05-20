@@ -4,6 +4,8 @@ python-rospkg:
   conda-forge: [rospkg]
 python3-rospkg:
   conda-forge: [rospkg]
+python3-rospkg-modules:
+  conda-forge: [rospkg]
 boost:
   conda-forge: [boost]
 python-argparse:
@@ -233,6 +235,7 @@ python-opencv:
 python3-opencv:
   conda-forge: [opencv 3*]
 qt5-qmake:
+  conda-forge:
     win64: [qt]
     linux: [qt 5.12.5 hd8c4c69_1]
     osx: [qt 5.9.7]
@@ -250,6 +253,16 @@ python-qt5-bindings:
     osx: [pyqt 5.9.2]
     linux: [pyqt 5.12.3 py36haa643ae_3]
 python3-qt5-bindings:
+  conda-forge:
+    win64: [pyqt]
+    osx: [pyqt 5.9.2]
+    linux: [pyqt 5.12.3 py36haa643ae_3]
+python3-qt5-bindings-webkit:
+  conda-forge:
+    win64: [pyqt]
+    osx: [pyqt 5.9.2]
+    linux: [pyqt 5.12.3 py36haa643ae_3]
+python3-qt5-bindings-gl:
   conda-forge:
     win64: [pyqt]
     osx: [pyqt 5.9.2]

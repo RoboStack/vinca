@@ -1,21 +1,3 @@
-diff --git a/cv_bridge/CMakeLists.txt b/cv_bridge/CMakeLists.txt
-index 997bef3..a87799f 100644
---- a/cv_bridge/CMakeLists.txt
-+++ b/cv_bridge/CMakeLists.txt
-@@ -5,11 +5,7 @@ find_package(catkin REQUIRED COMPONENTS rosconsole sensor_msgs)
- 
- if(NOT ANDROID)
-   find_package(PythonLibs)
--  if(PYTHONLIBS_VERSION_STRING VERSION_LESS 3)
--    find_package(Boost REQUIRED python)
--  else()
--    find_package(Boost REQUIRED python3)
--  endif()
-+  find_package(Boost REQUIRED)
- else()
- find_package(Boost REQUIRED)
- endif()
-
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
 index bddf90f..d104692 100644
 --- a/src/CMakeLists.txt
