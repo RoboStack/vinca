@@ -1,4 +1,4 @@
-ros_distro: melodic
+ros_distro: noetic
 
 # mapping for package keys
 conda_index:
@@ -11,9 +11,10 @@ packages_skip_by_deps:
 
 packages_select_by_deps:
   - rviz
+  # - python_qt_binding
   # - urdf_parser_plugin
   # - urdf
-  # - ros_core
+  # - ros-core
   # - actionlib
   # - dynamic_reconfigure
 

@@ -179,29 +179,35 @@ assimp-dev:
 libqt5-opengl:
   conda-forge:
     win64: [qt]
-    unix: [qt 5.9.7, REQUIRE_OPENGL]
+    linux: [qt 5.12.5 hd8c4c69_1, REQUIRE_OPENGL]
+    osx: [qt 5.9.7, REQUIRE_OPENGL]
 libqt5-opengl-dev:
   conda-forge:
     win64: [qt]
-    unix: [qt 5.9.7, REQUIRE_OPENGL]
+    linux: [qt 5.12.5 hd8c4c69_1, REQUIRE_OPENGL]
+    osx: [qt 5.9.7, REQUIRE_OPENGL]
 libqt5-widgets:
   conda-forge:
     win64: [qt]
-    unix: [qt 5.9.7, REQUIRE_OPENGL]
+    linux: [qt 5.12.5 hd8c4c69_1, REQUIRE_OPENGL]
+    osx: [qt 5.9.7, REQUIRE_OPENGL]
 curl:
   conda-forge: [libcurl]
 qtbase5-dev:
   conda-forge:
     win64: [qt]
-    unix: [qt 5.9.7]
+    linux: [qt 5.12.5 hd8c4c69_1, REQUIRE_OPENGL]
+    osx: [qt 5.9.7, REQUIRE_OPENGL]
 libqt5-gui:
   conda-forge:
     win64: [qt]
-    unix: [qt 5.9.7, REQUIRE_OPENGL]
+    linux: [qt 5.12.5 hd8c4c69_1, REQUIRE_OPENGL]
+    osx: [qt 5.9.7, REQUIRE_OPENGL]
 libqt5-core:
   conda-forge:
     win64: [qt]
-    unix: [qt 5.9.7]
+    linux: [qt 5.12.5 hd8c4c69_1]
+    osx: [qt 5.9.7]
 libfreetype6-dev:
   conda-forge: [freetype]
 libfreetype6:
@@ -227,7 +233,9 @@ python-opencv:
 python3-opencv:
   conda-forge: [opencv 3*]
 qt5-qmake:
-  conda-forge: [qt 5.9.7]
+    win64: [qt]
+    linux: [qt 5.12.5 hd8c4c69_1]
+    osx: [qt 5.9.7]
 python-pydot:
   conda-forge: [pydot]
 python3-pydot:
@@ -239,11 +247,13 @@ python3-matplotlib:
 python-qt5-bindings:
   conda-forge:
     win64: [pyqt]
-    unix: [pyqt 5.9.2]
+    osx: [pyqt 5.9.2]
+    linux: [pyqt 5.12.3 py36haa643ae_3]
 python3-qt5-bindings:
   conda-forge:
     win64: [pyqt]
-    unix: [pyqt 5.9.2]
+    osx: [pyqt 5.9.2]
+    linux: [pyqt 5.12.3 py36haa643ae_3]
 python-psutil:
   conda-forge: [psutil]
 python3-psutil:
@@ -288,15 +298,13 @@ libogre-dev:
   conda-forge:
     # ogre has to be pinned here exactly, otherwise GL is missing
     # can't do this in conda_build_config unfortunately
-    linux: [ogre 1.10.12 h6508522_3]
-    osx: [ogre 1.12.6]
+    unix: [ogre 1.12.6]
     win64: [ogre 1.10]
 libogre:
   conda-forge:
     # ogre has to be pinned here exactly, otherwise GL is missing
     # can't do this in conda_build_config unfortunately
-    unix: [ogre 1.10.12 h6508522_3]
-    osx: [ogre 1.12.6]
+    unix: [ogre 1.12.6]
     win64: [ogre 1.10]
 liburdfdom-dev:
   conda-forge: ['urdfdom 1.0.4']
