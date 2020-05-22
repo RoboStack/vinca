@@ -229,11 +229,11 @@ libxrandr:
     win64: []
     unix: [xorg-libxrandr]
 libopencv-dev:
-  conda-forge: [opencv 3*]
+  conda-forge: [opencv 4.2]
 python-opencv:
-  conda-forge: [opencv 3*]
+  conda-forge: [opencv 4.2]
 python3-opencv:
-  conda-forge: [opencv 3*]
+  conda-forge: [opencv 4.2]
 qt5-qmake:
   conda-forge:
     win64: [qt]
@@ -367,3 +367,15 @@ python3-pyassimp:
   conda-forge: [assimp]
 libpcl-all-dev:
   conda-forge: [pcl]
+libogg:
+  conda-forge: [libogg]
+gtk3:
+  conda-forge: [gtk3]
+libtheora:
+  conda-forge: [libtheora]
+liborocos-kdl:
+  conda-forge: [orocos-kdl]
+liborocos-kdl-dev:
+  conda-forge: [orocos-kdl]
+python3-pykdl:
+  conda-forge: [python-orocos-kdl]

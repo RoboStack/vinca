@@ -81,7 +81,8 @@ def generate_output(pkg_shortname, vinca_conf, distro):
                 "{{ compiler('cxx') }}",
                 "{{ compiler('c') }}",
                 "ninja",
-                "cmake"
+                "cmake",
+                "python {{ python }}"
             ],
             'host': [],
             'run': []
@@ -331,9 +332,9 @@ def get_selected_packages(distro, vinca_conf):
     selected_packages = set()
     skipped_packages = set()
 
-
     if vinca_conf['packages_select_by_deps']:
         for i in vinca_conf['packages_select_by_deps']:
+            i = i.replace('-', '_')
             selected_packages = selected_packages.union([i])
             if 'skip_all_deps' not in vinca_conf or not vinca_conf['skip_all_deps']:
                 pkgs = distro.get_depends(i)
@@ -341,6 +342,7 @@ def get_selected_packages(distro, vinca_conf):
 
     if 'packages_skip_by_deps' in vinca_conf and vinca_conf['packages_skip_by_deps'] is not None:
         for i in vinca_conf['packages_skip_by_deps']:
+            i = i.replace('-', '_')
             skipped_packages = skipped_packages.union([i])
             pkgs = distro.get_depends(i)
             skipped_packages = skipped_packages.union(pkgs)
