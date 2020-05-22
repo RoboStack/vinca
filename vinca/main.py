@@ -133,7 +133,7 @@ def generate_output(pkg_shortname, vinca_conf, distro):
     run_deps = set(run_deps)
 
     for dep in run_deps:
-        resolved_dep = resolve_pkgname(dep, vinca_conf, distro)
+        resolved_dep = resolve_pkgname(dep, vinca_conf, distro, is_rundep=True)
         if not resolved_dep:
             unsatisfied_deps.add(dep)
             continue

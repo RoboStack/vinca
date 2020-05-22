@@ -1,8 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bdf24450..c458af09 100644
+index bdf24450..24b8a707 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -89,15 +89,25 @@ if(APPLE)
+@@ -89,14 +89,14 @@ if(APPLE)
  endif()
  
  # Prefer newer vender-specific OpenGL library
@@ -17,23 +17,12 @@ index bdf24450..c458af09 100644
  
  set(CMAKE_AUTOMOC ON)
  
- find_package(Qt5 REQUIRED COMPONENTS Core Widgets OpenGL)
--set(QT_LIBRARIES Qt5::Widgets)
-+
-+get_target_property(QT5_CORELIBRARY_LOCATION Qt5::Core LOCATION)
-+get_target_property(QT5_WIDGETSLIBRARY_LOCATION Qt5::Widgets LOCATION)
-+
-+get_filename_component(QT5_WIDGETSLIBRARYPATH ${QT5_WIDGETSLIBRARY_LOCATION} PATH)
-+get_filename_component(QT5_CORELIBRARYPATH ${QT5_CORELIBRARY_LOCATION} PATH)
-+
-+find_library(QTWIDGETLIB NAMES libQt5Widgets.so PATHS ${QT5_WIDGETSLIBRARYPATH})
-+find_library(QTCORELIB NAMES libQt5Core.so PATHS ${QT5_CORELIBRARYPATH})
-+
-+set(QT_LIBRARIES ${QTWIDGETLIB} ${QTCORELIB})
+-find_package(Qt5 REQUIRED COMPONENTS Core Widgets OpenGL)
++find_package(Qt5 REQUIRED COMPONENTS Core Widgets OpenGL)
+ set(QT_LIBRARIES Qt5::Widgets)
  set(QTVERSION ${Qt5Widgets_VERSION})
  add_definitions(-DQT_NO_KEYWORDS)
- 
-@@ -204,11 +214,7 @@ catkin_package(
+@@ -204,11 +204,7 @@ catkin_package(
      visualization_msgs
  )
  
@@ -46,7 +35,7 @@ index bdf24450..c458af09 100644
    ${EIGEN3_INCLUDE_DIRS}
    ${OGRE_INCLUDE_DIRS}
    ${OPENGL_INCLUDE_DIR}
-@@ -218,7 +224,7 @@ include_directories(${SYSTEM}
+@@ -218,7 +214,7 @@ include_directories(${SYSTEM}
  )
  #catkin_lint: ignore_once external_directory
  include_directories(src ${EXPORT_HEADER_DIR})
@@ -55,30 +44,6 @@ index bdf24450..c458af09 100644
  
  #### If gtk ends up being the best way to get the correct window
  #### position under X11, this is how to compile it in.
-
-diff --git a/src/image_view/CMakeLists.txt b/src/image_view/CMakeLists.txt
-index 1c864616..f3dd43f2 100644
---- a/src/image_view/CMakeLists.txt
-+++ b/src/image_view/CMakeLists.txt
-@@ -1,3 +1,5 @@
-+include_directories(${Qt5Widgets_INCLUDE_DIRS})
-+
- add_executable(rviz_image_view
-   image_view.cpp
-   main.cpp
-
-diff --git a/src/rviz/CMakeLists.txt b/src/rviz/CMakeLists.txt
-index d5941099..89a5f61f 100644
---- a/src/rviz/CMakeLists.txt
-+++ b/src/rviz/CMakeLists.txt
-@@ -1,6 +1,7 @@
- find_package(yaml-cpp REQUIRED)
- 
- include_directories(${YAML_CPP_INCLUDE_DIR})
-+include_directories(${Qt5Widgets_INCLUDE_DIRS})
- 
- if(UNIX AND NOT APPLE)
-   find_package(X11 REQUIRED)
 
 diff --git a/src/python_bindings/CMakeLists.txt b/src/python_bindings/CMakeLists.txt
 index aedb7ad0..1f5d1a08 100644

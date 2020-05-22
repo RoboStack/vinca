@@ -40,7 +40,7 @@ def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
     return None
 
 
-def resolve_pkgname(pkg_shortname, vinca_conf, distro):
+def resolve_pkgname(pkg_shortname, vinca_conf, distro, is_rundep=False):
     pkg_names = resolve_pkgname_from_indexes(
         pkg_shortname, vinca_conf['_conda_indexes'])
     if pkg_names is None:
@@ -51,4 +51,15 @@ def resolve_pkgname(pkg_shortname, vinca_conf, distro):
                     (vinca_conf['ros_distro'],
                      pkg_shortname.replace('_', '-'))]
     else:
-        return pkg_names
+        if is_rundep:  # for run dependencies, remove the version
+            pkg_names_pinned = []
+
+            for pkg_name in pkg_names:
+                if ' ' in pkg_name:
+                    pkg_name_raw = pkg_name.split(' ')[0]
+                    pkg_names_pinned.append(pkg_name_raw)
+                else:
+                    pkg_names_pinned.append(pkg_name)
+            return pkg_names_pinned
+        else:
+            return pkg_names

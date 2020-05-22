@@ -181,34 +181,35 @@ assimp-dev:
 libqt5-opengl:
   conda-forge:
     win64: [qt]
-    linux: [qt 5.12.5 hd8c4c69_1, REQUIRE_OPENGL]
+    linux: [qt 5.12, REQUIRE_OPENGL]
     osx: [qt 5.9.7, REQUIRE_OPENGL]
 libqt5-opengl-dev:
   conda-forge:
     win64: [qt]
-    linux: [qt 5.12.5 hd8c4c69_1, REQUIRE_OPENGL]
+    linux: [qt 5.12, REQUIRE_OPENGL]
     osx: [qt 5.9.7, REQUIRE_OPENGL]
 libqt5-widgets:
   conda-forge:
     win64: [qt]
-    linux: [qt 5.12.5 hd8c4c69_1, REQUIRE_OPENGL]
+    linux: [qt 5.12, REQUIRE_OPENGL]
     osx: [qt 5.9.7, REQUIRE_OPENGL]
 curl:
   conda-forge: [libcurl]
 qtbase5-dev:
   conda-forge:
     win64: [qt]
-    linux: [qt 5.12.5 hd8c4c69_1, REQUIRE_OPENGL]
+    linux: [qt 5.12, REQUIRE_OPENGL]
     osx: [qt 5.9.7, REQUIRE_OPENGL]
 libqt5-gui:
   conda-forge:
     win64: [qt]
-    linux: [qt 5.12.5 hd8c4c69_1, REQUIRE_OPENGL]
+    linux: [qt 5.12, REQUIRE_OPENGL]
     osx: [qt 5.9.7, REQUIRE_OPENGL]
 libqt5-core:
   conda-forge:
     win64: [qt]
-    linux: [qt 5.12.5 hd8c4c69_1]
+#     linux: [qt 5.12.5 hd8c4c69_1]
+    linux: [qt 5.12]
     osx: [qt 5.9.7]
 libfreetype6-dev:
   conda-forge: [freetype]
@@ -229,15 +230,15 @@ libxrandr:
     win64: []
     unix: [xorg-libxrandr]
 libopencv-dev:
-  conda-forge: [opencv 4.2]
+  conda-forge: [opencv 4.2, libopencv 4.2]
 python-opencv:
-  conda-forge: [opencv 4.2]
+  conda-forge: [opencv 4.2, libopencv 4.2]
 python3-opencv:
-  conda-forge: [opencv 4.2]
+  conda-forge: [opencv 4.2, libopencv 4.2]
 qt5-qmake:
   conda-forge:
     win64: [qt]
-    linux: [qt 5.12.5 hd8c4c69_1]
+    linux: [qt 5.12]
     osx: [qt 5.9.7]
 python-pydot:
   conda-forge: [pydot]
@@ -251,22 +252,22 @@ python-qt5-bindings:
   conda-forge:
     win64: [pyqt]
     osx: [pyqt 5.9.2]
-    linux: [pyqt 5.12.3 py36haa643ae_3]
+    linux: [pyqt 5.12]
 python3-qt5-bindings:
   conda-forge:
     win64: [pyqt]
     osx: [pyqt 5.9.2]
-    linux: [pyqt 5.12.3 py36haa643ae_3]
+    linux: [pyqt 5.12]
 python3-qt5-bindings-webkit:
   conda-forge:
     win64: [pyqt]
     osx: [pyqt 5.9.2]
-    linux: [pyqt 5.12.3 py36haa643ae_3]
+    linux: [pyqt 5.12]
 python3-qt5-bindings-gl:
   conda-forge:
     win64: [pyqt]
     osx: [pyqt 5.9.2]
-    linux: [pyqt 5.12.3 py36haa643ae_3]
+    linux: [pyqt 5.12]
 python-psutil:
   conda-forge: [psutil]
 python3-psutil:
@@ -290,6 +291,8 @@ libboost-filesystem-dev:
 libboost-regex-dev:
   conda-forge: ['boost-cpp']
 libboost-chrono-dev:
+  conda-forge: ['boost-cpp']
+libboost-dev:
   conda-forge: ['boost-cpp']
 python-cairo:
   conda-forge: [pycairo]
