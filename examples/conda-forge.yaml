@@ -69,11 +69,11 @@ python-rosdep-modules:
 python3-rosdep-modules:
   conda-forge: [rosdep]
 libboost-system-dev:
-  conda-forge: [boost]
+  conda-forge: [boost-cpp]
 libboost-date-time-dev:
-  conda-forge: [boost]
+  conda-forge: [boost-cpp]
 libboost-thread-dev:
-  conda-forge: [boost]
+  conda-forge: [boost-cpp]
 libpoco-dev:
   conda-forge: [poco]
 python-gnupg:
@@ -119,11 +119,11 @@ python3-defusedxml:
 python-numpy:
   conda-forge:
     win64: ['numpy']
-    unix: ['numpy', 'openblas']
+    unix: ['numpy']
 python3-numpy:
   conda-forge:
     win64: ['numpy']
-    unix: ['numpy', 'openblas']
+    unix: ['numpy']
 python3-pytest:
   conda-forge: [pytest]
 python3-rosdistro-modules:
@@ -173,7 +173,7 @@ openssl:
 eigen:
   conda-forge:
     win64: [eigen]
-    unix: ['eigen', 'openblas']
+    unix: ['eigen']
 assimp:
   conda-forge: [assimp]
 assimp-dev:
@@ -230,11 +230,11 @@ libxrandr:
     win64: []
     unix: [xorg-libxrandr]
 libopencv-dev:
-  conda-forge: [opencv 4.2, libopencv 4.2]
+  conda-forge: [py-opencv 4.2, libopencv 4.2]
 python-opencv:
-  conda-forge: [opencv 4.2, libopencv 4.2]
+  conda-forge: [py-opencv 4.2, libopencv 4.2]
 python3-opencv:
-  conda-forge: [opencv 4.2, libopencv 4.2]
+  conda-forge: [py-opencv 4.2, libopencv 4.2]
 qt5-qmake:
   conda-forge:
     win64: [qt]
@@ -277,7 +277,7 @@ sdl-image:
 graphicsmagick:
   conda-forge: [graphicsmagick]
 libboost-program-options:
-  conda-forge: [boost]
+  conda-forge: [boost-cpp]
 sdl:
   conda-forge: [sdl2]
 libzmq3-dev:

@@ -57,9 +57,12 @@ def resolve_pkgname(pkg_shortname, vinca_conf, distro, is_rundep=False):
             for pkg_name in pkg_names:
                 if ' ' in pkg_name:
                     pkg_name_raw = pkg_name.split(' ')[0]
-                    pkg_names_pinned.append(pkg_name_raw)
                 else:
-                    pkg_names_pinned.append(pkg_name)
+                    pkg_name_raw = pkg_name
+
+                if pkg_name_raw != 'python':
+                    pkg_names_pinned.append(pkg_name_raw)
+
             return pkg_names_pinned
-        else:
+        else:  # for host deps
             return pkg_names
