@@ -171,6 +171,30 @@ def generate_output(pkg_shortname, vinca_conf, distro):
             # 'xorg-libxext  [unix]'
         ]
 
+    # fix up GL support for Unix
+    if 'REQUIRE_GL' in output['requirements']['run'] or 'REQUIRE_GL' in output['requirements']['host']:
+        # add requirements for gl
+        if 'REQUIRE_GL' in output['requirements']['run']:
+            output['requirements']['run'].remove('REQUIRE_GL')
+        if 'REQUIRE_GL' in output['requirements']['host']:
+            output['requirements']['host'].remove('REQUIRE_GL')
+
+        output['requirements']['build'] += [
+            "{{ cdt('mesa-libgl-devel') }}  [unix]",
+            "{{ cdt('mesa-dri-drivers') }}  [unix]",
+            "{{ cdt('libselinux') }}  [linux]",
+            "{{ cdt('libxxf86vm') }}  [linux]",
+            # "{{ cdt('libxrandr') }}  [linux]",
+            # "{{ cdt('libxau') }}  [linux]",
+            # "{{ cdt('libxi') }}  [linux]",
+            # "{{ cdt('libxinerama') }}  [linux]",
+            # "{{ cdt('libxcursor') }}  [linux]",
+            # "{{ cdt('libxcomposite') }}  [linux]",
+            # "{{ cdt('libxdamage') }}  [linux]",
+            # "{{ cdt('libxtst') }}  [linux]",
+            # "{{ cdt('libxcb') }}  [linux]",
+        ]
+
     return output
 
 
