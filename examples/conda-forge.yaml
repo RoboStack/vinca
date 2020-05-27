@@ -346,7 +346,8 @@ graphviz:
 uuid:
   conda-forge:
     win64: []
-    unix: [libuuid]
+    linux: [libuuid]
+    osx: []  # see https://github.com/regro/cf-scripts/issues/417
 python-sip:
   conda-forge: [sip]
 cppunit:
