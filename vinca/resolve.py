@@ -47,9 +47,12 @@ def resolve_pkgname(pkg_shortname, vinca_conf, distro, is_rundep=False):
         if not distro.check_package(pkg_shortname):
             return []
         else:
-            return ['ros-%s-%s' %
-                    (vinca_conf['ros_distro'],
-                     pkg_shortname.replace('_', '-'))]
+            if 'packages_remove_from_deps' in vinca_conf and vinca_conf['packages_remove_from_deps'] is not None and pkg_shortname.replace('_', '-') not in vinca_conf['packages_remove_from_deps']:
+                return ['ros-%s-%s' %
+                        (vinca_conf['ros_distro'],
+                         pkg_shortname.replace('_', '-'))]
+            else:
+                return []
     else:
         if is_rundep:  # for run dependencies, remove the version
             pkg_names_pinned = []
