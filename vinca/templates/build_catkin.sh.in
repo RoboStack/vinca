@@ -49,4 +49,12 @@ if [ "${PKG_NAME}" == "ros-@(ros_distro)-catkin" ]; then
         mkdir -p "${PREFIX}/etc/conda/${CHANGE}.d"
         cp "${RECIPE_DIR}/${CHANGE}.sh" "${PREFIX}/etc/conda/${CHANGE}.d/${PKG_NAME}_${CHANGE}.sh"
     done
+
+   if [ "${PKG_NAME}" == "ros-@(ros_distro)-environment" ]; then
+       for SCRIPT in "1.ros_distro.sh" "1.ros_etc_dir.sh" "1.ros_package_path.sh" "1.ros_python_version.sh" "1.ros_version.sh"
+       do
+           cp "${PREFIX}/etc/catkin/profile.d/${SCRIPT}" "${PREFIX}/etc/conda/activate.d/${SCRIPT}"
+       done
+   fi
 fi
+
