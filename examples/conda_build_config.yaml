@@ -303,8 +303,6 @@ libarchive:
   - 3.3
 libblitz:
   - 0.10
-libcurl:
-  - 7
 libcrc32c:
   - 1.1
 libdap4:
@@ -389,8 +387,6 @@ ntl:
   - '11.4.3'
 occt:
   - 7.4
-ogre:
-  - 1.12.6
 openblas:
   - 0.3.6
 openjpeg:
@@ -421,8 +417,6 @@ poppler:
   - 0.67.0
 proj:
   - 7.0.0
-qt:
-  - 5.12
 re2:
   - "2020.05.01"
 readline:
@@ -474,6 +468,12 @@ zstd:
   - 1.4.4
 
 # project overrides
+libcurl:
+  - 7.67  # see https://github.com/conda-forge/libcups-feedstock/pull/5
+ogre:
+  - 1.10.12  # see https://github.com/conda-forge/gazebo-feedstock/issues/15
+gazebo:
+  - 11
 boost:
   - 1.72.0
 boost_cpp:
@@ -484,6 +484,8 @@ opencv:
   - 4.2
 libopencv:
   - 4.2
+qt:
+  - 5.12
 pyqt:
   - 5.12
 python:

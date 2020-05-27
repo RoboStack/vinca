@@ -5,17 +5,16 @@ conda_index:
   - conda-forge.yaml
   - packages-ignore.yaml
 
-skip_all_deps: true
+skip_all_deps: false
 
 packages_skip_by_deps:
 
+packages_remove_from_deps:
+  - stage-ros
+  - stage
+
 packages_select_by_deps:
-  - rviz
-  # - python_qt_binding
-  # - urdf_parser_plugin
-  # - urdf
-  # - ros-core
-  # - actionlib
-  # - dynamic_reconfigure
+  - desktop-full
 
 patch_dir: patch
+
