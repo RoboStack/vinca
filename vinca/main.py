@@ -163,12 +163,14 @@ def generate_output(pkg_shortname, vinca_conf, distro):
             "{{ cdt('libxau') }}  [linux]"
         ]
         output['requirements']['host'] += [
+            'xorg-libx11  [unix]',
+            'xorg-libxext  [unix]',
             # 'xorg-libxfixes  [unix]',
-            # 'xorg-libxext  [unix]'
         ]
         output['requirements']['run'] += [
+            'xorg-libx11  [unix]',
+            'xorg-libxext  [unix]',
             # 'xorg-libxfixes  [unix]',
-            # 'xorg-libxext  [unix]'
         ]
 
     # fix up GL support for Unix
@@ -184,15 +186,6 @@ def generate_output(pkg_shortname, vinca_conf, distro):
             "{{ cdt('mesa-dri-drivers') }}  [unix]",
             "{{ cdt('libselinux') }}  [linux]",
             "{{ cdt('libxxf86vm') }}  [linux]",
-            # "{{ cdt('libxrandr') }}  [linux]",
-            # "{{ cdt('libxau') }}  [linux]",
-            # "{{ cdt('libxi') }}  [linux]",
-            # "{{ cdt('libxinerama') }}  [linux]",
-            # "{{ cdt('libxcursor') }}  [linux]",
-            # "{{ cdt('libxcomposite') }}  [linux]",
-            # "{{ cdt('libxdamage') }}  [linux]",
-            # "{{ cdt('libxtst') }}  [linux]",
-            # "{{ cdt('libxcb') }}  [linux]",
         ]
 
     return output
