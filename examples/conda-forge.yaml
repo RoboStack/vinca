@@ -403,4 +403,11 @@ libjpeg:
 libtool:
   conda-forge:
     - libtool
-
+python-autobahn:
+  conda-forge: [autobahn]
+python-tornado:
+  conda-forge: [tornado]
+python-bson:
+  conda-forge: [pymongo]
+python-twisted-core:
+  conda-forge: [twisted]

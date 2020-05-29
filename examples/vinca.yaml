@@ -1,4 +1,4 @@
-ros_distro: noetic
+ros_distro: melodic
 
 # mapping for package keys
 conda_index:
@@ -14,7 +14,10 @@ packages_remove_from_deps:
   - stage
 
 packages_select_by_deps:
-  - desktop-full
+  - ros_core
+  - rosbridge_suite
+  - tf2_web_republisher
+  # - desktop-full
 
 patch_dir: patch
 
