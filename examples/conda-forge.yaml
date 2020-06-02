@@ -15,11 +15,11 @@ python-catkin-pkg:
 python3-catkin-pkg:
   conda-forge: [catkin_pkg]
 python:
-  conda-forge: ['python {{ python }}']
+  conda-forge: [python]
 python3:
-  conda-forge: ['python {{ python }}']
+  conda-forge: [python]
 python3-dev:
-  conda-forge: ['python {{ python }}']
+  conda-forge: [python]
 python-rosdep:
   conda-forge: [rosdep]
 python3-rosdep:

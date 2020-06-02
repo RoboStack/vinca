@@ -304,7 +304,7 @@ def generate_fat_outputs(distro, vinca_conf):
 
 
 def generate_source(distro, vinca_conf):
-    source = []
+    source = {}
     for pkg_shortname in vinca_conf['_selected_pkgs']:
         url, version = distro.get_released_repo(pkg_shortname)
         entry = {}
@@ -320,7 +320,7 @@ def generate_source(distro, vinca_conf):
         if os.path.exists(patch_path):
             entry['patches'] = ['%s/%s' % (
                 vinca_conf['patch_dir'], '%s.patch' % pkg_name)]
-        source.append(entry)
+        source[pkg_name] = entry
     return source
 
 

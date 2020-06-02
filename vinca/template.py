@@ -12,8 +12,6 @@ source:
 build:
   number: 0
 
-outputs:
-
 about:
   home: https://www.ros.org/
   license: BSD-3-Clause
@@ -26,18 +24,36 @@ extra:
 """
 
 
-def write_recipe(source, outputs):
-    yaml = ruamel.yaml.YAML()
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    meta = yaml.load(TEMPLATE)
+def write_recipe(source, outputs, single_file=True):
+    # single_file = False
+    if single_file:
+        yaml = ruamel.yaml.YAML()
+        yaml.indent(mapping=2, sequence=4, offset=2)
+        meta = yaml.load(TEMPLATE)
 
-    meta['source'] = source
-    meta['outputs'] = outputs
-    meta['package']['version'] = f"{datetime.datetime.now():%Y.%m.%d}"
+        meta['source'] = [source[k] for k in source]
+        meta['outputs'] = outputs
+        meta['package']['version'] = f"{datetime.datetime.now():%Y.%m.%d}"
 
-    with open("meta.yaml", 'w') as stream:
-        yaml.dump(meta, stream)
+        with open("meta.yaml", 'w') as stream:
+            yaml.dump(meta, stream)
+    else:
+        for o in outputs:
+            yaml = ruamel.yaml.YAML()
+            yaml.indent(mapping=2, sequence=4, offset=2)
+            meta = yaml.load(TEMPLATE)
 
+            meta['source'] = source[o['name']]
+            for k, v in o.items():
+                meta[k] = v
+
+            meta['package']['name'] = o['name']
+            meta['package']['version'] = o['version']
+
+            if not os.path.isdir("recipes"):
+                os.makedirs("recipes")
+            with open(os.path.join("recipes", f"{o['name']}.yaml"), 'w') as stream:
+                yaml.dump(meta, stream)
 
 def generate_template(template_in, template_out):
     import em

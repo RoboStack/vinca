@@ -8,16 +8,19 @@ conda_index:
 skip_all_deps: false
 
 packages_skip_by_deps:
+  - ros_core
+  - rosbridge_suite
+  - tf2_web_republisher
 
 packages_remove_from_deps:
   - stage-ros
   - stage
 
 packages_select_by_deps:
-  - ros_core
-  - rosbridge_suite
-  - tf2_web_republisher
+  - moveit
+  # - ros_core
+  # - rosbridge_suite
+  # - tf2_web_republisher
   # - desktop-full
 
 patch_dir: patch
-
