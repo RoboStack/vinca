@@ -17,10 +17,11 @@ packages_remove_from_deps:
   - stage
 
 packages_select_by_deps:
-  - moveit
+  # - moveit
   # - ros_core
   # - rosbridge_suite
   # - tf2_web_republisher
   # - desktop-full
+  - franka_ros
 
 patch_dir: patch

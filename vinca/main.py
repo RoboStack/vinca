@@ -74,18 +74,22 @@ def generate_output(pkg_shortname, vinca_conf, distro):
     if not pkg_names or pkg_names[0] in vinca_conf['skip_built_packages']:
         return None
     output = {
-        'name': pkg_names[0],
-        'version': distro.get_version(pkg_shortname),
+        'package': {
+            'name': pkg_names[0],
+            'version': distro.get_version(pkg_shortname),
+        },
         'requirements': {
             'build': [
                 "{{ compiler('cxx') }}",
                 "{{ compiler('c') }}",
                 "ninja",
-                "cmake",
-                "python {{ python }}"
+                "cmake"
             ],
             'host': [],
             'run': []
+        },
+        'build': {
+            'script': ""
         }
     }
     pkg = catkin_pkg.package.parse_package_string(
@@ -98,14 +102,14 @@ def generate_output(pkg_shortname, vinca_conf, distro):
         # TODO find a way to get the conda "comments" with ruamel
         # output['script'] = ['bld_catkin.bat  # [win]', 'build_catkin.sh  # [unix]']
         if sys.platform.startswith('win'):
-            output['script'] = 'bld_catkin.bat'
+            output['build']['script'] = 'bld_catkin.bat'
         else:
-            output['script'] = 'build_catkin.sh'
+            output['build']['script'] = 'build_catkin.sh'
 
     elif pkg.get_build_type() in ['ament_cmake']:
-        output['script'] = 'bld_ament_cmake.bat'
+        output['build']['script'] = 'bld_ament_cmake.bat'
     elif pkg.get_build_type() in ['ament_python']:
-        output['script'] = 'bld_ament_python.bat'
+        output['build']['script'] = 'bld_ament_python.bat'
         resolved_setuptools = resolve_pkgname('setuptools', vinca_conf, distro)
         output['requirements']['host'].extend(resolved_setuptools)
     else:
