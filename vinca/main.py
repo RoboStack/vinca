@@ -157,23 +157,23 @@ def generate_output(pkg_shortname, vinca_conf, distro):
             output['requirements']['host'].remove('REQUIRE_OPENGL')
 
         output['requirements']['build'] += [
-            "{{ cdt('mesa-libgl-devel') }}  [unix]",
-            "{{ cdt('mesa-dri-drivers') }}  [unix]",
-            "{{ cdt('libselinux') }}  [linux]",
-            "{{ cdt('libxdamage') }}  [linux]",
-            "{{ cdt('libxxf86vm') }}  [linux]",
-            "{{ cdt('libxfixes') }}  [linux]",
-            "{{ cdt('libxext') }}  [linux]",
-            "{{ cdt('libxau') }}  [linux]"
+            {"sel(unix)": "{{ cdt('mesa-libgl-devel') }}"},
+            {"sel(unix)": "{{ cdt('mesa-dri-drivers') }}"},
+            {"sel(linux)": "{{ cdt('libselinux') }}"},
+            {"sel(linux)": "{{ cdt('libxdamage') }}"},
+            {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
+            {"sel(linux)": "{{ cdt('libxfixes') }}"},
+            {"sel(linux)": "{{ cdt('libxext') }}"},
+            {"sel(linux)": "{{ cdt('libxau') }}"}
         ]
         output['requirements']['host'] += [
-            'xorg-libx11  [unix]',
-            'xorg-libxext  [unix]',
+            {"sel(unix)": "xorg-libx11"},
+            {"sel(unix)": "xorg-libxext"},
             # 'xorg-libxfixes  [unix]',
         ]
         output['requirements']['run'] += [
-            'xorg-libx11  [unix]',
-            'xorg-libxext  [unix]',
+            {"sel(unix)": "xorg-libx11"},
+            {"sel(unix)": "xorg-libxext"},
             # 'xorg-libxfixes  [unix]',
         ]
 
@@ -186,10 +186,10 @@ def generate_output(pkg_shortname, vinca_conf, distro):
             output['requirements']['host'].remove('REQUIRE_GL')
 
         output['requirements']['build'] += [
-            "{{ cdt('mesa-libgl-devel') }}  [unix]",
-            "{{ cdt('mesa-dri-drivers') }}  [unix]",
-            "{{ cdt('libselinux') }}  [linux]",
-            "{{ cdt('libxxf86vm') }}  [linux]",
+            {"sel(unix)": "{{ cdt('mesa-libgl-devel') }}"},
+            {"sel(unix)": "{{ cdt('mesa-dri-drivers') }}"},
+            {"sel(linux)": "{{ cdt('libselinux') }}"},
+            {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
         ]
 
     return output

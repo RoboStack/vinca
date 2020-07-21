@@ -8,9 +8,9 @@ conda_index:
 skip_all_deps: false
 
 packages_skip_by_deps:
-  - ros_core
-  - rosbridge_suite
-  - tf2_web_republisher
+  # - ros_core
+  # - rosbridge_suite
+  # - tf2_web_republisher
 
 packages_remove_from_deps:
   - stage-ros
@@ -20,8 +20,16 @@ packages_select_by_deps:
   # - moveit
   # - ros_core
   # - rosbridge_suite
-  # - tf2_web_republisher
+  - tf2_web_republisher
+  # - rostime
   # - desktop-full
-  - franka_ros
+  # - libfranka
+  # - python_orocos_kdl
+  # - python_qt_binding
+  # - franka_ros
+  # - eigenpy
+  # - franka_gripper
+  # - franka_control
+  # - resource_retriever
 
 patch_dir: patch

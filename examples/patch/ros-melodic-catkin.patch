@@ -93,13 +93,13 @@ index 07e52769..a562e09c 100644
  
  # detect if running on Darwin platform
 diff --git a/cmake/tools/rt.cmake b/cmake/tools/rt.cmake
-index 3e5b708d..6f472e65 100644
+index da5ed7db..5fb71d58 100644
 --- a/cmake/tools/rt.cmake
 +++ b/cmake/tools/rt.cmake
-@@ -32,14 +32,5 @@
- # message("CMAKE_VERSION=${CMAKE_VERSION}")
- 
- if(NOT (APPLE OR WIN32 OR MINGW OR ANDROID))
+@@ -34,14 +34,5 @@
+ get_property(ENABLED_LANGUAGES_LIST GLOBAL PROPERTY ENABLED_LANGUAGES)
+ list(FIND ENABLED_LANGUAGES_LIST "CXX" _cxx_index)
+ if(NOT (APPLE OR WIN32 OR MINGW OR ANDROID) AND "${_cxx_index}" GREATER -1)
 -  if (${CMAKE_VERSION} VERSION_LESS 2.8.4)
 -    # cmake later than 2.8.0 appears to have a better find_library
 -    # that knows about the ABI of the compiler.  For lucid we just
