@@ -20,7 +20,8 @@ packages_select_by_deps:
   # - moveit
   # - ros_core
   # - rosbridge_suite
-  - tf2_web_republisher
+  # - tf2_web_republisher
+  - rviz_visual_tools
   # - rostime
   # - desktop-full
   # - libfranka
