@@ -17,11 +17,12 @@ packages_remove_from_deps:
   - stage
 
 packages_select_by_deps:
+  - message_runtime
   # - moveit
   # - ros_core
   # - rosbridge_suite
   # - tf2_web_republisher
-  - rviz_visual_tools
+  # - rviz_visual_tools
   # - rostime
   # - desktop-full
   # - libfranka
@@ -32,5 +33,6 @@ packages_select_by_deps:
   # - franka_gripper
   # - franka_control
   # - resource_retriever
+  # - rviz
 
 patch_dir: patch
