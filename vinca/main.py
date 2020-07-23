@@ -92,6 +92,9 @@ def generate_output(pkg_shortname, vinca_conf, distro):
             'script': ""
         }
     }
+    if pkg_shortname == 'eigenpy':
+        output['requirements']['build'] += ["pkg-config"]
+
     pkg = catkin_pkg.package.parse_package_string(
         distro.get_release_package_xml(pkg_shortname))
     pkg.evaluate_conditions(os.environ)

@@ -17,7 +17,7 @@ conda-build:
     root-dir: ${FEEDSTOCK_ROOT}/build_artifacts
 CONDARC
 
-conda install --yes --quiet conda-build pip anaconda-client -c conda-forge
+conda install --yes --quiet boa conda-build pip anaconda-client -c conda-forge/label/boa_dev  -c conda-forge
 # setup_conda_rc "${FEEDSTOCK_ROOT}" "${RECIPE_ROOT}" "${CONFIG_FILE}"
 # export PATH="$HOME/miniconda/bin:$PATH"
 conda config --set anaconda_upload yes
@@ -45,7 +45,9 @@ pip install -e .
 cd examples
 vinca
 
-conda build .
+cp meta.yaml recipe.yaml
+
+boa build .
 # # set up the condarc
 
 # source run_conda_forge_build_setup

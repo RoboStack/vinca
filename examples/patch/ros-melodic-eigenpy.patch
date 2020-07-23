@@ -1,0 +1,32 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 68b65bb..34fbe81 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -65,7 +65,8 @@ ENDIF(WIN32)
+ # ----------------------------------------------------
+ # --- DEPENDENCIES -----------------------------------
+ # ----------------------------------------------------
+-ADD_REQUIRED_DEPENDENCY("eigen3 >= 3.0.5")
++# ADD_REQUIRED_DEPENDENCY("eigen3 >= 3.0.5")
++SET(EIGEN3_INCLUDE_DIRS "${CMAKE_INSTALL_PREFIX}/include/eigen3")
+ 
+ SET(BOOST_COMPONENTS python)
+ SEARCH_FOR_BOOST()
+@@ -180,7 +181,7 @@ ELSE()
+ ENDIF()
+ 
+ TARGET_LINK_BOOST_PYTHON(${PROJECT_NAME} PUBLIC)
+-PKG_CONFIG_USE_DEPENDENCY(${PROJECT_NAME} eigen3)
++# PKG_CONFIG_USE_DEPENDENCY(${PROJECT_NAME} eigen3)
+ INSTALL(TARGETS ${PROJECT_NAME}
+   EXPORT ${TARGETS_EXPORT_NAME}
+   PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}
+@@ -203,7 +204,7 @@ ADD_SUBDIRECTORY(python)
+ # ----------------------------------------------------
+ # --- UNIT TEST --------------------------------------
+ # ----------------------------------------------------
+-ADD_SUBDIRECTORY(unittest)
++# ADD_SUBDIRECTORY(unittest)
+ 
+ PKG_CONFIG_APPEND_LIBS(${PROJECT_NAME})
+ PKG_CONFIG_APPEND_CFLAGS("-I${PYTHON_INCLUDE_DIRS}")
