@@ -8,9 +8,15 @@ steps:
   environment:
     ANACONDA_API_TOKEN:
       from_secret: ANACONDA_UPLOAD
+    QUETZ_URL:
+      from_secret: QUETZ_URL
+    QUETZ_API_KEY:
+      from_secret: QUETZ_API_KEY
   commands:
     - export FEEDSTOCK_ROOT="$DRONE_WORKSPACE"
     - export ANACONDA_API_TOKEN="$ANACONDA_API_TOKEN"
+    - export QUETZ_URL="$QUETZ_URL"
+    - export QUETZ_API_KEY="$QUETZ_API_KEY"
     - export RECIPE_ROOT="$FEEDSTOCK_ROOT/recipe"
     - export CI=drone
     - export GIT_BRANCH="$DRONE_BRANCH"

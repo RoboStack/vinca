@@ -17,7 +17,7 @@ conda-build:
     root-dir: /opt/conda/build_artifacts
 CONDARC
 
-conda install --yes --quiet boa conda-build pip anaconda-client -c conda-forge/label/boa_dev  -c conda-forge
+conda install --yes --quiet boa quetz-client conda-build pip anaconda-client -c conda-forge/label/boa_dev  -c conda-forge
 # setup_conda_rc "${FEEDSTOCK_ROOT}" "${RECIPE_ROOT}" "${CONFIG_FILE}"
 # export PATH="$HOME/miniconda/bin:$PATH"
 conda config --set anaconda_upload yes
@@ -48,7 +48,11 @@ vinca
 cp meta.yaml recipe.yaml
 
 boa build .
-# # set up the condarc
+
+anaconda upload -t "${ANACONDA_API_TOKEN}" /opt/conda/build_artifacts/
+quetz-client "${QUETZ_URL}" /opt/conda/build_artifacts
+
+# set up the condarc
 
 # source run_conda_forge_build_setup
 
