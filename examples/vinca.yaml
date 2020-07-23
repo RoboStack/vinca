@@ -21,9 +21,9 @@ packages_select_by_deps:
   # - tf2_web_republisher
   # - franka_ros
   # - rviz_visual_tools
-  - catkin
-  - eigenpy
-  # - ros_comm
+  # - catkin
+  # - eigenpy
+  - ros_comm
   # - message_runtime
   # - moveit
   # - ros_core
