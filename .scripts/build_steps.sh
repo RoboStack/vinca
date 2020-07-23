@@ -51,7 +51,7 @@ boa build .
 
 find /opt/conda/build_artifacts
 quetz-client "${QUETZ_URL}" /opt/conda/build_artifacts --force
-anaconda upload -t ${ANACONDA_API_TOKEN} /opt/conda/build_artifacts/linux-64/*.tar.bz2
+anaconda -t ${ANACONDA_API_TOKEN} upload /opt/conda/build_artifacts/linux-64/*.tar.bz2 --force
 
 # set up the condarc
 
