@@ -49,7 +49,7 @@ cp meta.yaml recipe.yaml
 
 boa build .
 
-anaconda upload -t "${ANACONDA_API_TOKEN}" /opt/conda/build_artifacts/
+anaconda upload -t "${ANACONDA_API_TOKEN}" /opt/conda/build_artifacts/*.tar.bz2
 quetz-client "${QUETZ_URL}" /opt/conda/build_artifacts
 
 # set up the condarc

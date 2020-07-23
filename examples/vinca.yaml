@@ -22,7 +22,7 @@ packages_select_by_deps:
   # - franka_ros
   # - rviz_visual_tools
   - catkin
-  - eigenpy
+  # - eigenpy
   # - ros_comm
   # - message_runtime
   # - moveit
