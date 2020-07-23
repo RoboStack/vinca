@@ -49,7 +49,6 @@ cp meta.yaml recipe.yaml
 
 boa build .
 
-find /opt/conda/build_artifacts
 quetz-client "${QUETZ_URL}" /opt/conda/build_artifacts --force
 anaconda -t ${ANACONDA_API_TOKEN} upload /opt/conda/build_artifacts/linux-64/*.tar.bz2 --force
 

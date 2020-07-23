@@ -17,11 +17,10 @@ packages_remove_from_deps:
   - stage
 
 packages_select_by_deps:
-  # - rosbridge_suite
-  # - tf2_web_republisher
-  # - franka_ros
+  - rosbridge_suite
+  - tf2_web_republisher
+  - franka_ros
   # - rviz_visual_tools
-  - catkin
   # - eigenpy
   # - ros_comm
   # - message_runtime
