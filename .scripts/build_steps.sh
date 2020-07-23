@@ -14,7 +14,7 @@ export PYTHONUNBUFFERED=1
 
 cat >~/.condarc <<CONDARC
 conda-build:
-    root-dir: ${FEEDSTOCK_ROOT}/build_artifacts
+    root-dir: /opt/conda/build_artifacts
 CONDARC
 
 conda install --yes --quiet boa conda-build pip anaconda-client -c conda-forge/label/boa_dev  -c conda-forge
@@ -30,7 +30,7 @@ conda config --add channels conda-forge
 conda config --add channels robostack
 conda config --set channel_priority strict
 
-export "CONDA_BLD_PATH=${FEEDSTOCK_ROOT}/build_artifacts"
+export "CONDA_BLD_PATH=/opt/conda/build_artifacts"
 
 conda info
 conda config --show-sources
