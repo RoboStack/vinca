@@ -1,0 +1,193 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 67f8b8b..0f187ba 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -178,7 +178,7 @@ include_directories(
+   ${EXTERNAL_INCLUDE_DIRS}
+   ${catkin_INCLUDE_DIRS}
+ )
+-
++link_directories(${SUITESPARSE_LIBRARY_DIRS})
+ ## Build the teb_local_planner library
+ 
+ add_library(teb_local_planner
+diff --git a/cmake_modules/FindSUITESPARSE.cmake b/cmake_modules/FindSUITESPARSE.cmake
+index 101b79b..8e698f6 100644
+--- a/cmake_modules/FindSUITESPARSE.cmake
++++ b/cmake_modules/FindSUITESPARSE.cmake
+@@ -1,6 +1,6 @@
+ # - Try to find SUITESPARSE
+ # Once done this will define
+-#  
++#
+ #  SUITESPARSE_FOUND            - system has SUITESPARSE
+ #  SUITESPARSE_INCLUDE_DIRS     - the SUITESPARSE include directory
+ #  SUITESPARSE_LIBRARIES        - Link these to use SUITESPARSE
+@@ -19,45 +19,55 @@ if( WIN32 )
+    # Find cholmod part of the suitesparse library collection
+ 
+    FIND_PATH( CHOLMOD_INCLUDE_DIR cholmod.h
+-              PATHS "C:\\libs\\win32\\SuiteSparse\\Include"  )
++              PATHS
++                ${CMAKE_INSTALL_PREFIX}/include
++                "C:\\libs\\win32\\SuiteSparse\\Include"  )
+ 
+    # Add cholmod include directory to collection include directories
+    IF ( CHOLMOD_INCLUDE_DIR )
+-	list ( APPEND SUITESPARSE_INCLUDE_DIRS ${CHOLMOD_INCLUDE_DIR} )
++  list ( APPEND SUITESPARSE_INCLUDE_DIRS ${CHOLMOD_INCLUDE_DIR} )
+    ENDIF( CHOLMOD_INCLUDE_DIR )
+ 
+ 
+    # find path suitesparse library
+-   FIND_PATH( SUITESPARSE_LIBRARY_DIRS 
+-	         amd.lib
+-               PATHS "C:\\libs\\win32\\SuiteSparse\\libs" )
++   FIND_PATH( SUITESPARSE_LIBRARY_DIRS
++           amd.lib
++               PATHS
++                ${CMAKE_INSTALL_PREFIX}/lib
++               "C:\\libs\\win32\\SuiteSparse\\libs" )
+ 
+    # if we found the library, add it to the defined libraries
+    IF ( SUITESPARSE_LIBRARY_DIRS )
+-	list ( APPEND SUITESPARSE_LIBRARIES optimized;amd;optimized;camd;optimized;ccolamd;optimized;cholmod;optimized;colamd;optimized;metis;optimized;spqr;optimized;umfpack;debug;amdd;debug;camdd;debug;ccolamdd;debug;cholmodd;debug;spqrd;debug;umfpackd;debug;colamdd;debug;metisd;optimized;blas;optimized;libf2c;optimized;lapack;debug;blasd;debug;libf2cd;debug;lapackd )
+-   ENDIF( SUITESPARSE_LIBRARY_DIRS )  
++  list ( APPEND SUITESPARSE_LIBRARIES optimized;amd;optimized;camd;optimized;ccolamd;optimized;cholmod;optimized;colamd;optimized;metis;optimized;spqr;optimized;umfpack;debug;amdd;debug;camdd;debug;ccolamdd;debug;cholmodd;debug;spqrd;debug;umfpackd;debug;colamdd;debug;metisd;optimized;blas;optimized;libf2c;optimized;lapack;debug;blasd;debug;libf2cd;debug;lapackd )
++   ENDIF( SUITESPARSE_LIBRARY_DIRS )
+ 
+ else( WIN32 )
+    IF(APPLE)
+-	   FIND_PATH( CHOLMOD_INCLUDE_DIR cholmod.h
+-        	      PATHS /opt/local/include/ufsparse
+-			    /usr/local/include )
++     FIND_PATH( CHOLMOD_INCLUDE_DIR cholmod.h
++                PATHS
++                ${CMAKE_INSTALL_PREFIX}/include
++                /opt/local/include/ufsparse
++                /usr/local/include)
+ 
+            FIND_PATH( SUITESPARSE_LIBRARY_DIR
+                       NAMES libcholmod.a
+-                      PATHS /opt/local/lib
+-			    /usr/local/lib )
++                      PATHS
++                        ${CMAKE_INSTALL_PREFIX}/lib
++                        /opt/local/lib
++          /usr/local/lib )
+    ELSE(APPLE)
+-	   FIND_PATH( CHOLMOD_INCLUDE_DIR cholmod.h
+-        	      PATHS /usr/local/include 
+-        	            /usr/include 
+-        	            /usr/include/suitesparse/ 
+-        	            ${CMAKE_SOURCE_DIR}/MacOS/Libs/cholmod
+-              	      PATH_SUFFIXES cholmod/ CHOLMOD/ )
+-   	
++     FIND_PATH( CHOLMOD_INCLUDE_DIR cholmod.h
++                PATHS ${CMAKE_INSTALL_PREFIX}/include
++                      /usr/local/include
++                      /usr/include
++                      /usr/include/suitesparse/
++                      ${CMAKE_SOURCE_DIR}/MacOS/Libs/cholmod
++                      PATH_SUFFIXES cholmod/ CHOLMOD/ )
++
+            FIND_PATH( SUITESPARSE_LIBRARY_DIR
+                       NAMES libcholmod.so libcholmod.a
+-                      PATHS /usr/lib 
++                      PATHS ${CMAKE_INSTALL_PREFIX}/lib
++                            /usr/lib
+                             /usr/lib64
+                             /usr/lib/x86_64-linux-gnu
+                             /usr/lib/i386-linux-gnu
+@@ -70,53 +80,65 @@ else( WIN32 )
+ 
+    # Add cholmod include directory to collection include directories
+    IF ( CHOLMOD_INCLUDE_DIR )
+-	list ( APPEND SUITESPARSE_INCLUDE_DIRS ${CHOLMOD_INCLUDE_DIR} )
++  list ( APPEND SUITESPARSE_INCLUDE_DIRS ${CHOLMOD_INCLUDE_DIR} )
+    ENDIF( CHOLMOD_INCLUDE_DIR )
+ 
+    # if we found the library, add it to the defined libraries
+    IF ( SUITESPARSE_LIBRARY_DIR )
+ 
+-       list ( APPEND SUITESPARSE_LIBRARIES amd)
+-       list ( APPEND SUITESPARSE_LIBRARIES btf)
+-       list ( APPEND SUITESPARSE_LIBRARIES camd)
+-       list ( APPEND SUITESPARSE_LIBRARIES ccolamd)
+-       list ( APPEND SUITESPARSE_LIBRARIES cholmod)
+-       list ( APPEND SUITESPARSE_LIBRARIES colamd)
+- #     list ( APPEND SUITESPARSE_LIBRARIES csparse)
+-       list ( APPEND SUITESPARSE_LIBRARIES cxsparse)
+-       list ( APPEND SUITESPARSE_LIBRARIES klu)
+- #     list ( APPEND SUITESPARSE_LIBRARIES spqr)
+-       list ( APPEND SUITESPARSE_LIBRARIES umfpack)
++       set (LIBS "amd;btf;camd;ccolamd;cholmod;colamd;cxsparse;klu;umfpack")
++        message("SEARHCING IN ${SUITESPARSE_LIBRARY_DIR}")
++
++       foreach(LIB ${LIBS})
++          UNSET(TEMP_PATH CACHE)
++          message("LOOKING FOR ${LIB}")
++          FIND_LIBRARY(TEMP_PATH "${LIB}")
++          MESSAGE("FOUND ${TEMP_PATH}")
++          list(APPEND SUITESPARSE_LIBRARIES ${TEMP_PATH})
++       endforeach(LIB)
++ #       list ( APPEND SUITESPARSE_LIBRARIES amd)
++ #       list ( APPEND SUITESPARSE_LIBRARIES btf)
++ #       list ( APPEND SUITESPARSE_LIBRARIES camd)
++ #       list ( APPEND SUITESPARSE_LIBRARIES ccolamd)
++ #       list ( APPEND SUITESPARSE_LIBRARIES cholmod)
++ #       list ( APPEND SUITESPARSE_LIBRARIES colamd)
++ # #     list ( APPEND SUITESPARSE_LIBRARIES csparse)
++ #       list ( APPEND SUITESPARSE_LIBRARIES cxsparse)
++ #       list ( APPEND SUITESPARSE_LIBRARIES klu)
++ # #     list ( APPEND SUITESPARSE_LIBRARIES spqr)
++ #       list ( APPEND SUITESPARSE_LIBRARIES umfpack)
+ 
+        IF (APPLE)
+-           list ( APPEND SUITESPARSE_LIBRARIES suitesparseconfig)
++          UNSET(TEMP_PATH CACHE)
++          FIND_LIBRARY(TEMP_PATH suitesparseconfig)
++          MESSAGE("FOUND ${TEMP_PATH}")
++          list(APPEND SUITESPARSE_LIBRARIES ${TEMP_PATH})
++         # list ( APPEND SUITESPARSE_LIBRARIES suitesparseconfig)
+        ENDIF (APPLE)
+ 
+        # Metis and spqr are optional
+        FIND_LIBRARY( SUITESPARSE_METIS_LIBRARY
+                      NAMES metis
+                      PATHS ${SUITESPARSE_LIBRARY_DIR} )
+-       IF (SUITESPARSE_METIS_LIBRARY)			
+-	  list ( APPEND SUITESPARSE_LIBRARIES metis)
++       IF (SUITESPARSE_METIS_LIBRARY)
++    list ( APPEND SUITESPARSE_LIBRARIES ${SUITESPARSE_METIS_LIBRARY})
+        ENDIF(SUITESPARSE_METIS_LIBRARY)
+ 
+        if(EXISTS  "${CHOLMOD_INCLUDE_DIR}/SuiteSparseQR.hpp")
+-	  SET(SUITESPARSE_SPQR_VALID TRUE CACHE BOOL "SuiteSparseSPQR valid")
++    SET(SUITESPARSE_SPQR_VALID TRUE CACHE BOOL "SuiteSparseSPQR valid")
+        else()
+-	  SET(SUITESPARSE_SPQR_VALID false CACHE BOOL "SuiteSparseSPQR valid")
++    SET(SUITESPARSE_SPQR_VALID false CACHE BOOL "SuiteSparseSPQR valid")
+        endif()
+ 
+        if(SUITESPARSE_SPQR_VALID)
+-	  FIND_LIBRARY( SUITESPARSE_SPQR_LIBRARY
+-		      NAMES spqr
+-		      PATHS ${SUITESPARSE_LIBRARY_DIR} )
+-	  IF (SUITESPARSE_SPQR_LIBRARY)			
+-	    list ( APPEND SUITESPARSE_LIBRARIES spqr)
+-	  ENDIF (SUITESPARSE_SPQR_LIBRARY)
++        FIND_LIBRARY(SUITESPARSE_SPQR_LIBRARY
++              NAMES spqr
++              PATHS ${SUITESPARSE_LIBRARY_DIR} )
++        IF (SUITESPARSE_SPQR_LIBRARY)
++          list ( APPEND SUITESPARSE_LIBRARIES ${SUITESPARSE_SPQR_LIBRARY})
++        ENDIF (SUITESPARSE_SPQR_LIBRARY)
+        endif()
+-       
+-    ENDIF( SUITESPARSE_LIBRARY_DIR )  
+-   
++    ENDIF( SUITESPARSE_LIBRARY_DIR )
+ endif( WIN32 )
+ 
+ 
