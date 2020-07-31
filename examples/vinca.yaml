@@ -26,9 +26,9 @@ packages_select_by_deps:
   # - franka_ros
   # - rviz_visual_tools
   # - ros_core
-  - tf2
+  # - tf2
 
-  # - teb_local_planner
+  - teb_local_planner
 
 
   # - eigenpy
