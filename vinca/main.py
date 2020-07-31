@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import requests
 import catkin_pkg
 import sys
 import os
@@ -385,12 +386,24 @@ def main():
     vinca_yaml = os.path.join(base_dir, 'vinca.yaml')
     vinca_conf = read_vinca_yaml(vinca_yaml)
     vinca_conf['_conda_indexes'] = get_conda_index(vinca_conf)
-    if arguments.skip_already_built_repodata:
+    if arguments.skip_already_built_repodata or vinca_conf.get('skip_existing'):
         skip_built_packages = set()
         fn = arguments.skip_already_built_repodata
-        with open(fn) as fi:
-            repodata = json.load(fi)
-            for _, pkg in repodata.get('packages').items():
+        if not fn:
+            fn = vinca_conf.get('skip_existing')
+        if '://' in fn:
+            request = requests.get(fn)
+            print(f"Fetching repodata: {fn}")
+            repodata = request.json()
+        else:
+            with open(fn) as fi:
+                repodata = json.load(fi)
+        selected_bn = 0
+        for _, pkg in repodata.get('packages').items():
+            selected_bn = max(selected_bn, pkg['build_number'])
+        print(f"Selected build number: {selected_bn}")
+        for _, pkg in repodata.get('packages').items():
+            if pkg['build_number'] == selected_bn:
                 skip_built_packages.add(pkg['name'])
         vinca_conf['skip_built_packages'] = skip_built_packages
     else:

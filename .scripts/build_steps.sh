@@ -52,8 +52,6 @@ pip install -e .
 cd examples
 vinca
 
-cp meta.yaml recipe.yaml
-
 boa build .
 
 anaconda -t ${ANACONDA_API_TOKEN} upload /opt/conda/build_artifacts/linux-64/*.tar.bz2 --force
