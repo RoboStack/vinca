@@ -18,6 +18,13 @@ conda-build:
 CONDARC
 
 conda install --yes --quiet boa quetz-client conda-build pip anaconda-client -c conda-forge/label/boa_dev  -c conda-forge
+
+# install boa from master
+git clone https://github.com/thesnakepit/boa
+cd boa
+pip install -e .
+cd ..
+
 # setup_conda_rc "${FEEDSTOCK_ROOT}" "${RECIPE_ROOT}" "${CONFIG_FILE}"
 # export PATH="$HOME/miniconda/bin:$PATH"
 conda config --set anaconda_upload yes
@@ -27,7 +34,7 @@ conda config --set add_pip_as_python_dependency false
 
 conda config --append channels defaults
 conda config --add channels conda-forge
-conda config --add channels robostack
+# conda config --add channels robostack
 conda config --set channel_priority strict
 
 export "CONDA_BLD_PATH=/opt/conda/build_artifacts"
