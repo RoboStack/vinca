@@ -391,20 +391,26 @@ def main():
         fn = arguments.skip_already_built_repodata
         if not fn:
             fn = vinca_conf.get('skip_existing')
+        selected_bn = None
         if '://' in fn:
             request = requests.get(fn)
             print(f"Fetching repodata: {fn}")
             repodata = request.json()
+            selected_bn = 0
+            for _, pkg in repodata.get('packages').items():
+                selected_bn = max(selected_bn, pkg['build_number'])
         else:
             with open(fn) as fi:
                 repodata = json.load(fi)
-        selected_bn = 0
-        for _, pkg in repodata.get('packages').items():
-            selected_bn = max(selected_bn, pkg['build_number'])
         print(f"Selected build number: {selected_bn}")
+
         for _, pkg in repodata.get('packages').items():
-            if pkg['build_number'] == selected_bn:
+            if selected_bn is not None:
+                if pkg['build_number'] == selected_bn:
+                    skip_built_packages.add(pkg['name'])
+            else:
                 skip_built_packages.add(pkg['name'])
+
         vinca_conf['skip_built_packages'] = skip_built_packages
     else:
         vinca_conf['skip_built_packages'] = []
