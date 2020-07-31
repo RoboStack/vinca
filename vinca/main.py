@@ -416,7 +416,7 @@ def main():
     # print(source)
     # print(outputs)
 
-    write_recipe(source, outputs)
+    write_recipe(source, outputs, vinca_conf.get('build_number', 0))
     print(unsatisfied_deps)
 
     from .template import generate_bld_ament_cmake

@@ -272,13 +272,13 @@ python-psutil:
 python3-psutil:
   conda-forge: [psutil]
 sdl-image:
-  conda-forge: [sdl2_image]
+  conda-forge: [sdl_image]
 graphicsmagick:
   conda-forge: [graphicsmagick]
 libboost-program-options:
   conda-forge: [boost-cpp]
 sdl:
-  conda-forge: [sdl2]
+  conda-forge: [sdl]
 libzmq3-dev:
   conda-forge: [zeromq]
 libboost-program-options-dev:
@@ -411,3 +411,7 @@ python-bson:
   conda-forge: [pymongo]
 python-twisted-core:
   conda-forge: [twisted]
+bullet:
+  conda-forge: [bullet]
+suitesparse:
+  conda-forge: [suitesparse]

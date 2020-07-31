@@ -352,6 +352,8 @@ cfitsio:
   - 3.470
 cudnn:
   - 7.6.5
+console_bridge:
+  - 1.0
 curl:
   - 7
 dbus:

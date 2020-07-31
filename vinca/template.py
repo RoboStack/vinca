@@ -24,7 +24,7 @@ extra:
 """
 
 
-def write_recipe(source, outputs, single_file=True):
+def write_recipe(source, outputs, build_number=0, single_file=True):
     # single_file = False
     if single_file:
         yaml = ruamel.yaml.YAML()
@@ -34,7 +34,7 @@ def write_recipe(source, outputs, single_file=True):
         meta['source'] = [source[k] for k in source]
         meta['outputs'] = outputs
         meta['package']['version'] = f"{datetime.datetime.now():%Y.%m.%d}"
-
+        meta['build']['number'] = build_number
         with open("meta.yaml", 'w') as stream:
             yaml.dump(meta, stream)
     else:
@@ -49,6 +49,8 @@ def write_recipe(source, outputs, single_file=True):
 
             meta['package']['name'] = o['name']
             meta['package']['version'] = o['version']
+
+            meta['build']['number'] = build_number
 
             if not os.path.isdir("recipes"):
                 os.makedirs("recipes")
