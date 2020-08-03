@@ -41,7 +41,10 @@ packages_select_by_deps:
   # - urg_node  # works
 
   # - actionlib_tutorials
-  - desktop
+  # - desktop
+
+  - turtlebot3
+
   # - gazebo_dev
   # - gazebo_ros
   # PROBLEMS:
