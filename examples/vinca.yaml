@@ -32,13 +32,19 @@ packages_select_by_deps:
 
   # - teb_local_planner
 
-  - plotjuggler
-  - robot_localization  # works!
-  - slam_toolbox  # works now!
-  - imu_tools  # works
-  - velodyne  # works!
-  - perception_pcl  # works!
-  - urg_node  # works
+  # - plotjuggler
+  # - robot_localization  # works!
+  # - slam_toolbox  # works now!
+  # - imu_tools  # works
+  # - velodyne  # works!
+  # - perception_pcl  # works!
+  # - urg_node  # works
+
+  # - actionlib_tutorials
+  - desktop-full
+  # PROBLEMS:
+  # - lib/diagnostic_analysis/sparse_csv.py  # need to fix for Python 3 print statements
+  # - lib/diagnostic_common_diagnostics/sensors_monitor.py  # need to fix for Python 3 print statements
 
   # - rtabmap_ros  # openni is missing, and need to find names for
     # {'libfreenect-dev', 'libopenni-dev', 'tango-icon-theme', 'libvtk-qt'}
@@ -51,7 +57,6 @@ packages_select_by_deps:
   # - message_runtime
   # - moveit
   # - rostime
-  # - desktop-full
   # - libfranka
   # - python_orocos_kdl
   # - python_qt_binding

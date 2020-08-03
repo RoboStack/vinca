@@ -1,0 +1,13 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index fc009ede..6c98cec6 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -20,7 +20,7 @@ if( (${diagnostic_msgs_VERSION} VERSION_EQUAL "1.12.0") OR
+ endif()
+ 
+ find_package(Boost REQUIRED COMPONENTS system)
+-include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} gtest-1.7.0/include)
++include_directories(include gtest-1.7.0/include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+ 
+ add_library(${PROJECT_NAME}
+   src/status_item.cpp
