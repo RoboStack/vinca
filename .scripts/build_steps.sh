@@ -17,6 +17,8 @@ conda-build:
     root-dir: /opt/conda/build_artifacts
 CONDARC
 
+yum install mesa-libGL-devel
+
 conda install --yes --quiet boa quetz-client conda-build pip anaconda-client -c conda-forge/label/boa_dev  -c conda-forge
 
 # install boa from master
