@@ -84,6 +84,7 @@ def generate_output(pkg_shortname, vinca_conf, distro):
                 "{{ compiler('cxx') }}",
                 "{{ compiler('c') }}",
                 "ninja",
+                "make  # [unix]",
                 "cmake"
             ],
             'host': [],

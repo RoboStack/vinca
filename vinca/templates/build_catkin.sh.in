@@ -17,12 +17,6 @@ cd build
 # necessary for correctly linking SIP files (from python_qt_bindings)
 export LINK=$CXX
 
-export GENERATOR="Ninja"
-if [ "${PKG_NAME}" == "ros-@(ros_distro)-qt-gui-cpp" ]; then
-  # some SIP packages seem to have a problem to build with ninja
-  export GENERATOR="Unix Makefiles"
-fi
-
 export ROS_PYTHON_VERSION=`python -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
 echo "Using Python $ROS_PYTHON_VERSION"
 
@@ -43,7 +37,7 @@ cmake .. -DCMAKE_INSTALL_PREFIX=$PREFIX \
          -DSETUPTOOLS_DEB_LAYOUT=OFF \
          -DCATKIN_SKIP_TESTING=ON \
          -DCATKIN_BUILD_BINARY_PACKAGE=$CATKIN_BUILD_BINARY_PACKAGE \
-         -G "${GENERATOR}" \
+         -G "Ninja" \
          $SRC_DIR/$PKG_NAME/src/work
 
 cmake --build . --config Release --target install
