@@ -1,0 +1,66 @@
+diff --git a/build/.empty b/build/.empty
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/src/AddObjectDialog.cpp b/src/AddObjectDialog.cpp
+index a426086..fefbcf7 100644
+--- a/src/AddObjectDialog.cpp
++++ b/src/AddObjectDialog.cpp
+@@ -44,6 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ #include <opencv2/imgproc/imgproc.hpp>
+ #include <opencv2/highgui/highgui.hpp>
++#include <opencv2/imgproc/imgproc_c.h>
+ 
+ namespace find_object {
+ 
+diff --git a/src/Camera.cpp b/src/Camera.cpp
+index 406d414..6630b6b 100644
+--- a/src/Camera.cpp
++++ b/src/Camera.cpp
+@@ -32,6 +32,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ #include <stdio.h>
+ #include <opencv2/imgproc/imgproc.hpp>
++#if CV_MAJOR_VERSION > 3
++#include <opencv2/videoio/videoio_c.h>
++#endif
+ #include <QtCore/QFile>
+ #include "utilite/UDirectory.h"
+ #include "CameraTcpServer.h"
+diff --git a/src/FindObject.cpp b/src/FindObject.cpp
+index 03d0706..360a86c 100644
+--- a/src/FindObject.cpp
++++ b/src/FindObject.cpp
+@@ -42,6 +42,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <QGraphicsRectItem>
+ #include <stdio.h>
+ 
++#if CV_MAJOR_VERSION > 3
++#include <opencv2/core/types_c.h>
++#endif
++
+ namespace find_object {
+ 
+ FindObject::FindObject(bool keepImagesInRAM, QObject * parent) :
+diff --git a/src/Settings.cpp b/src/Settings.cpp
+index 05d3d26..ed96318 100644
+--- a/src/Settings.cpp
++++ b/src/Settings.cpp
+@@ -814,7 +814,7 @@ Feature2D * Settings::createKeypointDetector()
+ 								getFeature2D_ORB_edgeThreshold(),
+ 								getFeature2D_ORB_firstLevel(),
+ 								getFeature2D_ORB_WTA_K(),
+-								getFeature2D_ORB_scoreType(),
++								(cv::ORB::ScoreType)getFeature2D_ORB_scoreType(),
+ 								getFeature2D_ORB_patchSize(),
+ 								getFeature2D_Fast_threshold()));
+ #endif
+@@ -1058,7 +1058,7 @@ Feature2D * Settings::createDescriptorExtractor()
+ 								getFeature2D_ORB_edgeThreshold(),
+ 								getFeature2D_ORB_firstLevel(),
+ 								getFeature2D_ORB_WTA_K(),
+-								getFeature2D_ORB_scoreType(),
++								(cv::ORB::ScoreType)getFeature2D_ORB_scoreType(),
+ 								getFeature2D_ORB_patchSize(),
+ 								getFeature2D_Fast_threshold()));
+ #endif

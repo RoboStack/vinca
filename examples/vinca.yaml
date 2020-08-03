@@ -18,7 +18,9 @@ packages_remove_from_deps:
   - stage-ros
   - stage
 
-skip_existing: https://conda.anaconda.org/robostack/linux-64/repodata.json
+skip_existing:
+  - https://conda.anaconda.org/robostack/linux-64/repodata.json
+  # - /home/wolfv/miniconda3/conda-bld/linux-64/repodata.json
 
 packages_select_by_deps:
   # - rosbridge_suite
@@ -28,7 +30,20 @@ packages_select_by_deps:
   # - ros_core
   # - tf2
 
-  - teb_local_planner
+  # - teb_local_planner
+
+  - plotjuggler
+  - robot_localization  # works!
+  - slam_toolbox  # works now!
+  - imu_tools  # works
+  - velodyne  # works!
+  - perception_pcl  # works!
+  - urg_node  # works
+
+  # - rtabmap_ros  # openni is missing, and need to find names for
+    # {'libfreenect-dev', 'libopenni-dev', 'tango-icon-theme', 'libvtk-qt'}
+  # - behavior_tree  # isn't released?
+
 
 
   # - eigenpy

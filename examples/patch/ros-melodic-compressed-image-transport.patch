@@ -1,0 +1,22 @@
+diff --git a/src/compressed_publisher.cpp b/src/compressed_publisher.cpp
+index 026d6e95..f17104fb 100644
+--- a/src/compressed_publisher.cpp
++++ b/src/compressed_publisher.cpp
+@@ -97,7 +97,7 @@ void CompressedPublisher::publish(const sensor_msgs::Image& message, const Publi
+     // JPEG Compression
+     case JPEG:
+     {
+-      params[0] = CV_IMWRITE_JPEG_QUALITY;
++      params[0] = cv::IMWRITE_JPEG_QUALITY;
+       params[1] = config_.jpeg_quality;
+ 
+       // Update ros message format header
+@@ -154,7 +154,7 @@ void CompressedPublisher::publish(const sensor_msgs::Image& message, const Publi
+       // PNG Compression
+     case PNG:
+     {
+-      params[0] = CV_IMWRITE_PNG_COMPRESSION;
++      params[0] = cv::IMWRITE_PNG_COMPRESSION;
+       params[1] = config_.png_level;
+ 
+       // Update ros message format header

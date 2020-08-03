@@ -1,0 +1,38 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a941cfe..28bc9aa 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -9,7 +9,11 @@ find_package(catkin REQUIRED COMPONENTS roscpp)
+ find_package(Eigen3 REQUIRED)
+ find_package(suitesparse QUIET)
+ if(NOT SuiteSparse_FOUND)
+-  set(SuiteSparse_LIBRARIES blas lapack cholmod cxsparse)
++	find_library(BLAS_LIB blas)
++	find_library(LAPACK_LIB lapack)
++	find_library(CHOLMOD_LIB cholmod)
++	find_library(CXSPARSE_LIB cxsparse)
++	set(SuiteSparse_LIBRARIES ${BLAS_LIB} ${LAPACK_LIB} ${CHOLMOD_LIB} ${CXSPARSE_LIB})
+ endif()
+ 
+ include_directories(${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS} ${SuiteSparse_INCLUDE_DIRS})
+diff --git a/include/sparse_bundle_adjustment/csparse.h b/include/sparse_bundle_adjustment/csparse.h
+index 1f7d062..a23a1dc 100644
+--- a/include/sparse_bundle_adjustment/csparse.h
++++ b/include/sparse_bundle_adjustment/csparse.h
+@@ -52,14 +52,14 @@
+ 
+ // CSparse header
+ extern "C" {
+-#include "suitesparse/cs.h"
++#include "cs.h"
+ }
+ #include <vector>
+ #include <map>
+ 
+ // Cholmod header, other header files brought in
+ #ifdef SBA_CHOLMOD
+-#include "suitesparse/cholmod.h"
++#include "cholmod.h"
+ #endif
+ 
+ // these are for SparseLib and IML, testing the Delayed State Filter

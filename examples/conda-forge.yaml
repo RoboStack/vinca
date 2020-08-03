@@ -415,3 +415,25 @@ bullet:
   conda-forge: [bullet]
 suitesparse:
   conda-forge: [suitesparse]
+libpcap:
+  conda-forge: [libpcap]
+libblas-dev:
+  conda-forge: [libcblas]
+liblapack-dev:
+  conda-forge: [liblapack]
+libceres-dev:
+  conda-forge: [ceres-solver]
+tbb:
+  conda-forge: [tbb, tbb-devel]
+libsqlite3-dev:
+  conda-forge: ["sqlite 3.*"]
+proj:
+  conda-forge: [proj]
+libvtk-qt:
+  conda-forge: [vtk]
+libfreenect-dev:
+  conda-forge: []
+libopenni-dev:
+  conda-forge: []
+tango-icon-theme:
+  conda-forge: []

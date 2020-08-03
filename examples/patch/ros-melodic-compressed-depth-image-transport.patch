@@ -1,0 +1,13 @@
+diff --git a/src/codec.cpp b/src/codec.cpp
+index 27d2038a..ea72efc7 100644
+--- a/src/codec.cpp
++++ b/src/codec.cpp
+@@ -135,7 +135,7 @@ sensor_msgs::Image::Ptr decodeCompressedDepthImage(const sensor_msgs::Compressed
+       // Decode raw image
+       try
+       {
+-        cv_ptr->image = cv::imdecode(imageData, CV_LOAD_IMAGE_UNCHANGED);
++        cv_ptr->image = cv::imdecode(imageData, cv::IMREAD_UNCHANGED);
+       }
+       catch (cv::Exception& e)
+       {

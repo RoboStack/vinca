@@ -1,0 +1,13 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e8901f2..b7c8f59 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -15,7 +15,7 @@ find_package(catkin REQUIRED COMPONENTS ${${PROJECT_NAME}_CATKIN_DEPS})
+ find_package(Boost REQUIRED COMPONENTS thread)
+ 
+ # libpcap provides no pkg-config or find_package module:
+-set(libpcap_LIBRARIES -lpcap)
++find_library(libpcap_LIBRARIES pcap)
+ 
+ include_directories(include ${Boost_INCLUDE_DIR} ${catkin_INCLUDE_DIRS})
+ 
