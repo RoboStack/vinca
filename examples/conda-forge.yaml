@@ -4,6 +4,8 @@ python-rospkg:
   conda-forge: [rospkg]
 python3-rospkg:
   conda-forge: [rospkg]
+python-rospkg-modules:
+  conda-forge: [rospkg]
 python3-rospkg-modules:
   conda-forge: [rospkg]
 boost:
@@ -394,6 +396,12 @@ gazebo11:
 libgazebo11-dev:
   conda-forge:
     - "gazebo 11.*"
+gazebo9:
+  conda-forge:
+    - "gazebo 9.*"
+libgazebo9-dev:
+  conda-forge:
+    - "gazebo 9.*"
 libfltk-dev:
   conda-forge:
     - fltk

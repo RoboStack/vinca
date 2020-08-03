@@ -41,7 +41,9 @@ packages_select_by_deps:
   # - urg_node  # works
 
   # - actionlib_tutorials
-  - desktop-full
+  - desktop
+  # - gazebo_dev
+  # - gazebo_ros
   # PROBLEMS:
   # - lib/diagnostic_analysis/sparse_csv.py  # need to fix for Python 3 print statements
   # - lib/diagnostic_common_diagnostics/sensors_monitor.py  # need to fix for Python 3 print statements
