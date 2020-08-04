@@ -6,6 +6,7 @@ import catkin_pkg
 import sys
 import os
 import json
+import glob
 from vinca import __version__
 from .resolve import get_conda_index
 from .resolve import resolve_pkgname
@@ -15,6 +16,16 @@ from .distro import Distro
 
 unsatisfied_deps = set()
 distro = None
+
+
+def get_conda_subdir():
+    platform = sys.platform
+    if platform.startswith("linux"):
+        return 'linux-64'
+    elif platform == "darwin":
+        return 'osx-64'
+    elif platform == "win32":
+        return 'win-64'
 
 
 def parse_command_line(argv):
@@ -65,6 +76,18 @@ def read_vinca_yaml(filepath):
             conda_index.append(i)
     vinca_conf['conda_index'] = conda_index
     vinca_conf['_patch_dir'] = os.path.abspath(vinca_conf['patch_dir'])
+    patches = {}
+    for x in glob.glob(os.path.join(vinca_conf['_patch_dir'], '*.patch')):
+        splitted = os.path.basename(x).split('.')
+        if splitted[0] not in patches:
+            patches[splitted[0]] = {'any': [], 'osx': [], 'linux': [], 'win': []}
+        if len(splitted) == 3:
+            if splitted[1] in ('osx', 'linux', 'win'):
+                patches[splitted[0]][splitted[1]].append(x)
+                continue
+        patches[splitted[0]]['any'].append(x)
+    vinca_conf['_patches'] = patches
+    print(patches)
     return vinca_conf
 
 
@@ -326,12 +349,23 @@ def generate_source(distro, vinca_conf):
             continue
         pkg_name = pkg_names[0]
         entry['folder'] = '%s/src/work' % pkg_name
-        patch_path = os.path.join(
-            vinca_conf['_patch_dir'], '%s.patch' % pkg_name)
-        if os.path.exists(patch_path):
-            entry['patches'] = ['%s/%s' % (
-                vinca_conf['patch_dir'], '%s.patch' % pkg_name)]
-        source[pkg_name] = entry
+
+        patches = []
+        pd = vinca_conf['_patches'].get(pkg_name)
+        if pd:
+            patches.extend(pd['any'])
+
+            # find specific patches
+            plat = sys.platform
+            if plat == 'darwin':
+                plat = 'osx'
+            if plat.startswith('win'):
+                plat = 'win'
+            patches.extend(pd[plat])
+            if len(patches):
+                entry['patches'] = patches
+            source[pkg_name] = entry
+
     return source
 
 
@@ -397,6 +431,7 @@ def main():
         for fn in fns:
             selected_bn = None
             if '://' in fn:
+                fn += f"{get_conda_subdir()}/repodata.json"
                 request = requests.get(fn)
                 print(f"Fetching repodata: {fn}")
                 repodata = request.json()
@@ -436,6 +471,8 @@ def main():
     else:
         source = generate_source(distro, vinca_conf)
         outputs = generate_outputs(distro, vinca_conf)
+
+
 
     # print(source)
     # print(outputs)
