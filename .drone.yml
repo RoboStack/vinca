@@ -49,5 +49,6 @@ steps:
     - export CI=drone
     - export GIT_BRANCH="$DRONE_BRANCH"
     - echo "Whats up party people?"
+    - $FEEDSTOCK_ROOT/.scripts/build_osx.sh
     # - sed -i '$ichown -R conda:conda "$FEEDSTOCK_ROOT"' /opt/docker/bin/entrypoint
     # - /opt/docker/bin/entrypoint $FEEDSTOCK_ROOT/.scripts/build_steps.sh
