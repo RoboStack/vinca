@@ -28,9 +28,9 @@ packages_select_by_deps:
   # - roscpp
   - rosbridge_suite
   # - tf2_web_republisher
-  # - franka_ros
+  - franka_ros
   # - rviz_visual_tools
-  - ros_base
+  # - ros_base
   # - tf2
 
   # - teb_local_planner
