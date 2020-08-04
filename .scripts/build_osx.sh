@@ -32,12 +32,12 @@ echo -e "\n\nMangling homebrew in the CI to avoid conflicts."
 # /usr/bin/sudo -k
 
 echo -e "\n\nRunning the build setup script."
-source run_conda_forge_build_setup
+# source run_conda_forge_build_setup
 
 set -e
 
 echo -e "\n\nMaking the build clobber file and running the build."
-make_build_number ./ ./recipe ./.ci_support/${CONFIG}.yaml
+# make_build_number ./ ./recipe ./.ci_support/${CONFIG}.yaml
 
 cd examples
 vinca
