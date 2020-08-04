@@ -27,11 +27,11 @@ packages_select_by_deps:
   # - message_runtime
   # - roscpp
   # - rosbridge_suite
-  - tf2_web_republisher
+  # - tf2_web_republisher
   # - franka_ros
   # - rviz_visual_tools
   # - ros_base
-  - desktop
+  # - desktop
   # - tf2
   # - rviz
 
@@ -48,7 +48,8 @@ packages_select_by_deps:
   # - actionlib_tutorials
   # - desktop
 
-  # - turtlebot3
+  - turtlebot3
+  - turtlebot3_fake
 
   # - gazebo_dev
   # - gazebo_ros
