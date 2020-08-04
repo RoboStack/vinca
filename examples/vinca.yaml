@@ -31,7 +31,7 @@ packages_select_by_deps:
   # - franka_ros
   # - rviz_visual_tools
   # - ros_base
-  - ros_desktop
+  - desktop
   # - tf2
   # - rviz
 
