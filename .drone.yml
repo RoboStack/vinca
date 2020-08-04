@@ -29,7 +29,7 @@
 #     event:
 #       exclude:
 #       - pull_request
----
+# ---
 kind: pipeline
 type: exec
 name: osxbuilder
