@@ -364,7 +364,8 @@ def generate_source(distro, vinca_conf):
             patches.extend(pd[plat])
             if len(patches):
                 entry['patches'] = patches
-            source[pkg_name] = entry
+
+        source[pkg_name] = entry
 
     return source
 
