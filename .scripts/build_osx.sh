@@ -34,7 +34,7 @@ cd ..
 # echo -e "\n\nRunning the build setup script."
 # # source run_conda_forge_build_setup
 
-set -e
+# set -e
 
 export "CONDA_BLD_PATH=${FEEDSTOCK_ROOT}/build_artifacts/"
 
