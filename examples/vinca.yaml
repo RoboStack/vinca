@@ -27,12 +27,13 @@ packages_select_by_deps:
   # - message_runtime
   # - roscpp
   # - rosbridge_suite
-  # - tf2_web_republisher
+  - tf2_web_republisher
   # - franka_ros
   # - rviz_visual_tools
   # - ros_base
-  - tf2
-  - rviz
+  - ros_desktop
+  # - tf2
+  # - rviz
 
   # - teb_local_planner
 
