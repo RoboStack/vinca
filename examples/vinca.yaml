@@ -19,10 +19,12 @@ packages_remove_from_deps:
   - stage
 
 skip_existing:
-  - https://conda.anaconda.org/robostack/linux-64/repodata.json
+  - https://conda.anaconda.org/robostack/osx-64/repodata.json
   # - /home/wolfv/miniconda3/conda-bld/linux-64/repodata.json
 
 packages_select_by_deps:
+  - catkin
+
   # - rosbridge_suite
   # - tf2_web_republisher
   # - franka_ros
@@ -43,7 +45,7 @@ packages_select_by_deps:
   # - actionlib_tutorials
   # - desktop
 
-  - turtlebot3
+  # - turtlebot3
 
   # - gazebo_dev
   # - gazebo_ros

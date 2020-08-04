@@ -1,3 +1,4 @@
+---
 kind: pipeline
 type: docker
 name: greeting
@@ -20,5 +21,31 @@ steps:
     - export RECIPE_ROOT="$FEEDSTOCK_ROOT/recipe"
     - export CI=drone
     - export GIT_BRANCH="$DRONE_BRANCH"
-    - sed -i '$ichown -R conda:conda "$FEEDSTOCK_ROOT"' /opt/docker/bin/entrypoint
-    - /opt/docker/bin/entrypoint $FEEDSTOCK_ROOT/.scripts/build_steps.sh
+    # - sed -i '$ichown -R conda:conda "$FEEDSTOCK_ROOT"' /opt/docker/bin/entrypoint
+    # - /opt/docker/bin/entrypoint $FEEDSTOCK_ROOT/.scripts/build_steps.sh
+---
+kind: pipeline
+type: exec
+name: osxbuilder
+
+steps:
+- name: vinca install
+  environment:
+    ANACONDA_API_TOKEN:
+      from_secret: ANACONDA_UPLOAD
+    QUETZ_URL:
+      from_secret: QUETZ_URL
+    QUETZ_API_KEY:
+      from_secret: QUETZ_API_KEY
+  commands:
+    - export FEEDSTOCK_ROOT="$DRONE_WORKSPACE"
+    - export ANACONDA_API_TOKEN="$ANACONDA_API_TOKEN"
+    - export QUETZ_URL="$QUETZ_URL"
+    - export QUETZ_API_KEY="$QUETZ_API_KEY"
+    - export RECIPE_ROOT="$FEEDSTOCK_ROOT/recipe"
+    - export CI=drone
+    - export GIT_BRANCH="$DRONE_BRANCH"
+    - echo "Whats up party people?"
+    # - sed -i '$ichown -R conda:conda "$FEEDSTOCK_ROOT"' /opt/docker/bin/entrypoint
+    # - /opt/docker/bin/entrypoint $FEEDSTOCK_ROOT/.scripts/build_steps.sh
+---
