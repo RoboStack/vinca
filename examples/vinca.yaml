@@ -19,17 +19,17 @@ packages_remove_from_deps:
   - stage
 
 skip_existing:
-  # - https://conda.anaconda.org/robostack/osx-64/repodata.json
+  - https://conda.anaconda.org/robostack/osx-64/repodata.json
   # - /home/wolfv/miniconda3/conda-bld/linux-64/repodata.json
 
 packages_select_by_deps:
-  - catkin
+  # - catkin
   # - message_runtime
   # - rosbridge_suite
   # - tf2_web_republisher
   # - franka_ros
   # - rviz_visual_tools
-  # - ros_core
+  - ros_core
   # - tf2
 
   # - teb_local_planner
