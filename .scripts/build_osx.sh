@@ -17,29 +17,32 @@ echo -e "\n\nInstalling conda-forge-ci-setup=3 and conda-build."
 conda install -n base --quiet --yes conda-forge-ci-setup=3 conda-build pip boa quetz-client \
 			  -c conda-forge/label/boa_dev -c conda-forge
 
-# install boa
+# install boa from master
 git clone https://github.com/thesnakepit/boa
 cd boa
 pip install -e .
 cd ..
 
-echo -e "\n\nSetting up the condarc and mangling the compiler."
-# setup_conda_rc ./ ./recipe ./.ci_support/${CONFIG}.yaml
-# mangle_compiler ./ ./recipe .ci_support/${CONFIG}.yaml
+# echo -e "\n\nSetting up the condarc and mangling the compiler."
+# # setup_conda_rc ./ ./recipe ./.ci_support/${CONFIG}.yaml
+# # mangle_compiler ./ ./recipe .ci_support/${CONFIG}.yaml
 
-echo -e "\n\nMangling homebrew in the CI to avoid conflicts."
-# /usr/bin/sudo mangle_homebrew
-# /usr/bin/sudo -k
+# echo -e "\n\nMangling homebrew in the CI to avoid conflicts."
+# # /usr/bin/sudo mangle_homebrew
+# # /usr/bin/sudo -k
 
-echo -e "\n\nRunning the build setup script."
-# source run_conda_forge_build_setup
+# echo -e "\n\nRunning the build setup script."
+# # source run_conda_forge_build_setup
 
 set -e
 
-echo -e "\n\nMaking the build clobber file and running the build."
+# echo -e "\n\nMaking the build clobber file and running the build."
 # make_build_number ./ ./recipe ./.ci_support/${CONFIG}.yaml
 
-cd examples
+cd ${FEEDSTOCK_ROOT}
+pip install -e .
+
+cd ${FEEDSTOCK_ROOT}/examples
 vinca
 
 boa build .
