@@ -35,11 +35,19 @@ cd ..
 # # source run_conda_forge_build_setup
 
 # set -e
+conda config --append channels defaults
+conda config --add channels conda-forge
+conda config --add channels robostack
+conda config --set channel_priority strict
 
 export "CONDA_BLD_PATH=${FEEDSTOCK_ROOT}/build_artifacts/"
 
 # echo -e "\n\nMaking the build clobber file and running the build."
 # make_build_number ./ ./recipe ./.ci_support/${CONFIG}.yaml
+
+conda info
+conda config --show-sources
+conda list --show-channel-urls
 
 cd ${FEEDSTOCK_ROOT}
 pip install -e .

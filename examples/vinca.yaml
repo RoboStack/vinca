@@ -24,13 +24,13 @@ skip_existing:
 
 packages_select_by_deps:
   # - catkin
-
-  - rosbridge_suite
-  - tf2_web_republisher
-  - franka_ros
+  - message_runtime
+  # - rosbridge_suite
+  # - tf2_web_republisher
+  # - franka_ros
   # - rviz_visual_tools
-  - ros_core
-  - tf2
+  # - ros_core
+  # - tf2
 
   # - teb_local_planner
 
