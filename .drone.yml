@@ -28,6 +28,9 @@ kind: pipeline
 type: exec
 name: osxbuilder
 
+platform:
+  os: darwin
+
 steps:
 - name: vinca install
   environment:
@@ -48,4 +51,3 @@ steps:
     - echo "Whats up party people?"
     # - sed -i '$ichown -R conda:conda "$FEEDSTOCK_ROOT"' /opt/docker/bin/entrypoint
     # - /opt/docker/bin/entrypoint $FEEDSTOCK_ROOT/.scripts/build_steps.sh
----
