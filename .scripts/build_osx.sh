@@ -36,6 +36,8 @@ cd ..
 
 set -e
 
+export "CONDA_BLD_PATH=${FEEDSTOCK_ROOT}/build_artifacts/"
+
 # echo -e "\n\nMaking the build clobber file and running the build."
 # make_build_number ./ ./recipe ./.ci_support/${CONFIG}.yaml
 
@@ -46,6 +48,9 @@ cd ${FEEDSTOCK_ROOT}/examples
 vinca
 
 boa build .
+
+anaconda -t ${ANACONDA_API_TOKEN} upload ${CONDA_BLD_PATH}/osx-64/*.tar.bz2 --force
+quetz-client "${QUETZ_URL}" ${CONDA_BLD_PATH} --force
 
 # conda build ./recipe -m ./.ci_support/${CONFIG}.yaml --clobber-file ./.ci_support/clobber_${CONFIG}.yaml
 
