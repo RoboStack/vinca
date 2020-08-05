@@ -7,7 +7,7 @@ conda_index:
 
 build_number: 1
 
-skip_all_deps: false
+skip_all_deps: true
 
 packages_skip_by_deps:
   # - ros_core
@@ -19,7 +19,7 @@ packages_remove_from_deps:
   - stage
 
 skip_existing:
-  - https://conda.anaconda.org/robostack/
+  # - https://conda.anaconda.org/robostack/
   # - /home/wolfv/miniconda3/conda-bld/linux-64/repodata.json
 
 packages_select_by_deps:
@@ -35,6 +35,8 @@ packages_select_by_deps:
   # - tf2
   # - rviz
 
+  - cv_bridge
+
   # - teb_local_planner
 
   # - plotjuggler
@@ -48,8 +50,8 @@ packages_select_by_deps:
   # - actionlib_tutorials
   # - desktop
 
-  - turtlebot3
-  - turtlebot3_fake
+  # - turtlebot3
+  # - turtlebot3_fake
 
   # - gazebo_dev
   # - gazebo_ros
