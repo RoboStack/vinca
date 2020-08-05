@@ -26,15 +26,19 @@ packages_select_by_deps:
   # - catkin
   # - message_runtime
   # - roscpp
+  # - ros_core
+  # - ros_base
+  # - rviz_visual_tools
+  # - rviz
+  # - tf2
+  # - desktop
+
   # - rosbridge_suite
   # - tf2_web_republisher
-  # - franka_ros
-  # - rviz_visual_tools
-  # - ros_base
-  - desktop
-  # - tf2
-  # - rviz
 
+  - moveit
+
+  # - franka_ros # doesn't work on osx
   # - cv_bridge
 
   # - teb_local_planner
