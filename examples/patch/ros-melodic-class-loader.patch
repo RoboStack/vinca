@@ -1,0 +1,53 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index b656b69..ff6a153 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -53,7 +53,12 @@ set(${PROJECT_NAME}_HDRS
+   include/class_loader/multi_library_class_loader.hpp
+   include/class_loader/register_macro.hpp
+ )
+-add_library(${PROJECT_NAME} ${${PROJECT_NAME}_SRCS} ${${PROJECT_NAME}_HDRS})
++
++if(WIN32)
++  add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_SRCS} ${${PROJECT_NAME}_HDRS})
++else()
++  add_library(${PROJECT_NAME} ${${PROJECT_NAME}_SRCS} ${${PROJECT_NAME}_HDRS})
++endif()
+ target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES} ${console_bridge_LIBRARIES} ${Poco_LIBRARIES})
+ if(WIN32)
+   # Causes the visibility macros to use dllexport rather than dllimport
+diff --git a/include/class_loader/class_loader.hpp b/include/class_loader/class_loader.hpp
+index de79c63..b751f02 100644
+--- a/include/class_loader/class_loader.hpp
++++ b/include/class_loader/class_loader.hpp
+@@ -330,6 +330,8 @@ private:
+   boost::recursive_mutex load_ref_count_mutex_;
+   int plugin_ref_count_;
+   boost::recursive_mutex plugin_ref_count_mutex_;
++
++  CLASS_LOADER_PUBLIC
+   static bool has_unmananged_instance_been_created_;
+ };
+ 
+diff --git a/include/class_loader/meta_object.hpp b/include/class_loader/meta_object.hpp
+index ef658cd..457ea63 100644
+--- a/include/class_loader/meta_object.hpp
++++ b/include/class_loader/meta_object.hpp
+@@ -36,6 +36,8 @@
+ #define CLASS_LOADER__META_OBJECT_HPP_
+ 
+ #include <console_bridge/console.h>
++#include "class_loader/visibility_control.hpp" 
++
+ #include <typeinfo>
+ #include <string>
+ #include <vector>
+@@ -54,7 +56,7 @@ typedef std::vector<class_loader::ClassLoader *> ClassLoaderVector;
+  * @class AbstractMetaObjectBase
+  * @brief A base class for MetaObjects that excludes a polymorphic type parameter. Subclasses are class templates though.
+  */
+-class AbstractMetaObjectBase
++class CLASS_LOADER_PUBLIC AbstractMetaObjectBase
+ {
+ public:
+   /**

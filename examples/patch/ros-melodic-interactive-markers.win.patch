@@ -1,0 +1,15 @@
+diff --git a/include/interactive_markers/interactive_marker_client.h b/include/interactive_markers/interactive_marker_client.h
+index 01c22a3..220cd14 100644
+--- a/include/interactive_markers/interactive_marker_client.h
++++ b/include/interactive_markers/interactive_marker_client.h
+@@ -69,6 +69,10 @@ class InteractiveMarkerClient : boost::noncopyable
+ {
+ public:
+ 
++#ifdef ERROR
++#undef ERROR
++#endif
++
+   enum StatusT {
+     OK = 0,
+     WARN = 1,

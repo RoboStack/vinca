@@ -1,0 +1,49 @@
+diff --git a/include/pluginlib/class_loader.hpp b/include/pluginlib/class_loader.hpp
+index bab830b..7ba3284 100644
+--- a/include/pluginlib/class_loader.hpp
++++ b/include/pluginlib/class_loader.hpp
+@@ -41,6 +41,7 @@
+ #include "pluginlib/exceptions.hpp"
+ #include "ros/console.h"
+ #include "ros/package.h"
++#include "ros/macros.h"
+ #include "tinyxml2.h"  // NOLINT
+ 
+ // Note: pluginlib has traditionally utilized a "lookup name" for classes that does not match its
+@@ -90,7 +91,7 @@ public:
+    * \return An instance of the class
+    * \deprecated use either createInstance() or createUnmanagedInstance()
+    */
+-  __attribute__((deprecated)) T * createClassInstance(
++  ROS_DEPRECATED T * createClassInstance(
+     const std::string & lookup_name,
+     bool auto_load = true);
+ 
+diff --git a/include/pluginlib/class_loader_imp.hpp b/include/pluginlib/class_loader_imp.hpp
+index 43b3a65..677aa4f 100644
+--- a/include/pluginlib/class_loader_imp.hpp
++++ b/include/pluginlib/class_loader_imp.hpp
+@@ -310,6 +310,10 @@ std::vector<std::string> ClassLoader<T>::getCatkinLibraryPaths()
+     boost::split(catkin_prefix_paths, env_catkin_prefix_paths, boost::is_any_of(os_pathsep));
+     BOOST_FOREACH(std::string catkin_prefix_path, catkin_prefix_paths) {
+       boost::filesystem::path path(catkin_prefix_path);
++#if _WIN32
++      boost::filesystem::path bin("bin");
++      lib_paths.push_back((path / bin).string());
++#endif
+       boost::filesystem::path lib("lib");
+       lib_paths.push_back((path / lib).string());
+     }
+@@ -547,7 +551,11 @@ std::string ClassLoader<T>::getPathSeparator()
+ /***************************************************************************/
+ {
+ #if BOOST_FILESYSTEM_VERSION >= 3
+-  return boost::filesystem::path("/").native();
++#  ifdef _WIN32
++     return boost::filesystem::path("/").string();
++#  else
++     return boost::filesystem::path("/").native();
++#  endif
+ #else
+   return boost::filesystem::path("/").external_file_string();
+ #endif

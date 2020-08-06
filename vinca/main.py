@@ -87,7 +87,6 @@ def read_vinca_yaml(filepath):
                 continue
         patches[splitted[0]]['any'].append(x)
     vinca_conf['_patches'] = patches
-    print(patches)
     return vinca_conf
 
 
@@ -107,7 +106,7 @@ def generate_output(pkg_shortname, vinca_conf, distro):
                 "{{ compiler('cxx') }}",
                 "{{ compiler('c') }}",
                 "ninja",
-                "make  # [unix]",
+                {"sel(unix)": "make"},
                 "cmake"
             ],
             'host': [],

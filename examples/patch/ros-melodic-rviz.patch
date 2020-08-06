@@ -42,22 +42,6 @@ index 19d1c31a..4417ef98 100644
    {
      return mName;
    }
-diff --git a/src/rviz/ogre_helpers/render_system.cpp b/src/rviz/ogre_helpers/render_system.cpp
-index e04bfa74..56a2a8ae 100644
---- a/src/rviz/ogre_helpers/render_system.cpp
-+++ b/src/rviz/ogre_helpers/render_system.cpp
-@@ -160,10 +160,7 @@ void RenderSystem::setupDummyWindowId()
- 
- void RenderSystem::loadOgrePlugins()
- {
--  std::string plugin_prefix = get_ogre_plugin_path() + "/";
--#ifdef Q_OS_MAC
--  plugin_prefix += "lib";
--#endif
-+  std::string plugin_prefix = std::string(std::getenv("CONDA_PREFIX")) + "/lib/OGRE/";
-   ogre_root_->loadPlugin(plugin_prefix + "RenderSystem_GL");
-   ogre_root_->loadPlugin(plugin_prefix + "Plugin_OctreeSceneManager");
-   ogre_root_->loadPlugin(plugin_prefix + "Plugin_ParticleFX");
 diff --git a/src/rviz/selection/selection_manager.cpp b/src/rviz/selection/selection_manager.cpp
 index 954ceded..3ade4df6 100644
 --- a/src/rviz/selection/selection_manager.cpp

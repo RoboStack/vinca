@@ -20,9 +20,14 @@ packages_remove_from_deps:
 
 skip_existing:
   - https://conda.anaconda.org/robostack/
+  - C:/Users/wolfv/Miniconda3/conda-bld/win-64/repodata.json
   # - /home/wolfv/miniconda3/conda-bld/linux-64/repodata.json
 
 packages_select_by_deps:
+  # - pluginlib
+  # - class_loader
+  # - rosbag_storage
+  # - rosbag
   # - catkin
   # - message_runtime
   # - roscpp
@@ -30,13 +35,15 @@ packages_select_by_deps:
   # - ros_base
   # - rviz_visual_tools
   # - rviz
-  # - tf2
-  # - desktop
+  # - tf2_ros
+  - desktop
+
+  # - pluginlib
 
   # - rosbridge_suite
   # - tf2_web_republisher
 
-  - moveit
+  # - moveit
 
   # - franka_ros # doesn't work on osx
   # - cv_bridge
