@@ -35,10 +35,11 @@ packages_select_by_deps:
   # - ros_base
   # - rviz_visual_tools
   # - rviz
-  # - tf2_ros
+  - tf2
+  - tf2_ros
   # - desktop
 
-  - rviz
+  # - rviz
 
   # - rosbridge_suite
   # - tf2_web_republisher
