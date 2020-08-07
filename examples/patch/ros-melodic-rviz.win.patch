@@ -15,7 +15,7 @@ index 7c367c9e..2b775f37 100644
  
  find_package(PkgConfig REQUIRED)
  
-+set(MSVC_TOOLSET_VERSION "140")
++set(MSVC_TOOLSET_VERSION "141")
  find_package(ASSIMP QUIET)
 +unset(MSVC_TOOLSET_VERSION)
 +

@@ -38,9 +38,6 @@ packages_select_by_deps:
   # - tf2_ros
   # - desktop
 
-  - pluginlib
-  - image_transport
-  - rosbag_storage
   - rviz
 
   # - rosbridge_suite
