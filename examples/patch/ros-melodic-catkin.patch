@@ -21,7 +21,7 @@ index df36e236..475eb975 100644
    catkin_replace_imported_library_targets(_PKG_CONFIG_LIBRARIES ${_PKG_CONFIG_LIBRARIES})
  
 diff --git a/cmake/templates/_setup_util.py.in b/cmake/templates/_setup_util.py.in
-index 0b0d6dda..fcdac7de 100755
+index 0b0d6dda..33ac6d47 100755
 --- a/cmake/templates/_setup_util.py.in
 +++ b/cmake/templates/_setup_util.py.in
 @@ -1,4 +1,4 @@
@@ -30,7 +30,7 @@ index 0b0d6dda..fcdac7de 100755
  # -*- coding: utf-8 -*-
  
  # Software License Agreement (BSD License)
-@@ -59,10 +59,10 @@ if IS_WINDOWS:
+@@ -59,12 +59,14 @@ if IS_WINDOWS:
  # subfolder of workspace prepended to CMAKE_PREFIX_PATH
  ENV_VAR_SUBFOLDERS = {
      'CMAKE_PREFIX_PATH': '',
@@ -42,8 +42,12 @@ index 0b0d6dda..fcdac7de 100755
 +    # 'PYTHONPATH': '@PYTHON_INSTALL_DIR@',
  }
  
++if IS_WINDOWS:
++    ENV_VAR_SUBFOLDERS['PYTHONPATH'] = '@PYTHON_INSTALL_DIR@'
  
-@@ -268,7 +268,7 @@ if __name__ == '__main__':
+ def rollback_env_variables(environ, env_var_subfolders):
+     """
+@@ -268,7 +270,7 @@ if __name__ == '__main__':
  
          if not args.local:
              # environment at generation time

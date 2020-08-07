@@ -24,19 +24,14 @@ skip_existing:
   # - /home/wolfv/miniconda3/conda-bld/linux-64/repodata.json
 
 packages_select_by_deps:
-  # - pluginlib
-  # - class_loader
-  # - rosbag_storage
-  # - rosbag
-  # - catkin
+  - catkin
   # - message_runtime
   # - roscpp
   # - ros_core
   # - ros_base
   # - rviz_visual_tools
   # - rviz
-  - tf2
-  - tf2_ros
+  # - tf2
   # - desktop
 
   # - rviz
