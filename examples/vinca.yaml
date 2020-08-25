@@ -22,9 +22,10 @@ skip_existing:
   # - https://conda.anaconda.org/robostack/
   # - C:/Users/wolfv/Miniconda3/conda-bld/win-64/repodata.json
   # - /home/wolfv/miniconda3/conda-bld/linux-64/repodata.json
+  # - /home/ubuntu/miniconda3/conda-bld/linux-64/repodata.json
 
 packages_select_by_deps:
-  - catkin
+  # - catkin
   # - message_runtime
   # - roscpp
   # - ros_core
@@ -41,7 +42,12 @@ packages_select_by_deps:
 
   # - moveit
 
+  - class_loader
+
+  # - niryo_one_simulation
+  - libfranka
   # - franka_ros # doesn't work on osx
+
   # - cv_bridge
 
   # - teb_local_planner
@@ -70,8 +76,6 @@ packages_select_by_deps:
     # {'libfreenect-dev', 'libopenni-dev', 'tango-icon-theme', 'libvtk-qt'}
   # - behavior_tree  # isn't released?
 
-
-
   # - eigenpy
   # - ros_comm
   # - message_runtime
@@ -84,5 +88,9 @@ packages_select_by_deps:
   # - franka_control
   # - resource_retriever
   # - rviz
+
+  # - joy
+  # - ros_control
+  # - ros_controllers
 
 patch_dir: patch

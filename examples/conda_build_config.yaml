@@ -283,6 +283,8 @@ pin_run_as_build:
     max_pin: x.x.x
   pixman:
     max_pin: x.x
+  poco:
+    max_pin: x.x
   poppler:
     max_pin: x.x
   qt:
@@ -556,6 +558,8 @@ slepc4py:
   - 3.12
 pixman:
   - 0.38
+poco:
+  - 1.9
 poppler:
   - 0.67.0
 proj:
