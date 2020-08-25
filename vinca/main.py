@@ -57,6 +57,10 @@ def parse_command_line(argv):
     parser.add_argument(
         "-s", "--skip", dest="skip_already_built_repodata", default=[],
         help="Skip already built from repodata.")
+    parser.add_argument(
+        "-m", "--multiple", dest="multiple_file", action='store_const',
+        const=True, default=True,
+        help="Create one recipe for package.")
     arguments = parser.parse_args(argv[1:])
     return arguments
 
@@ -74,9 +78,11 @@ def read_vinca_yaml(filepath):
             conda_index.append(os.path.abspath(i))
         else:
             conda_index.append(i)
+
     vinca_conf['conda_index'] = conda_index
     vinca_conf['_patch_dir'] = os.path.abspath(vinca_conf['patch_dir'])
     patches = {}
+
     for x in glob.glob(os.path.join(vinca_conf['_patch_dir'], '*.patch')):
         splitted = os.path.basename(x).split('.')
         if splitted[0] not in patches:
@@ -86,6 +92,7 @@ def read_vinca_yaml(filepath):
                 patches[splitted[0]][splitted[1]].append(x)
                 continue
         patches[splitted[0]]['any'].append(x)
+
     vinca_conf['_patches'] = patches
     return vinca_conf
 
@@ -93,9 +100,11 @@ def read_vinca_yaml(filepath):
 def generate_output(pkg_shortname, vinca_conf, distro):
     if pkg_shortname not in vinca_conf['_selected_pkgs']:
         return None
+
     pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
     if not pkg_names or pkg_names[0] in vinca_conf['skip_built_packages']:
         return None
+
     output = {
         'package': {
             'name': pkg_names[0],
@@ -415,18 +424,20 @@ def get_selected_packages(distro, vinca_conf):
 
 
 def main():
-    global distro
-    global unsatisfied_deps
+    global distro, unsatisfied_deps
+
     arguments = parse_command_line(sys.argv)
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, 'vinca.yaml')
     vinca_conf = read_vinca_yaml(vinca_yaml)
     vinca_conf['_conda_indexes'] = get_conda_index(vinca_conf)
+
     if arguments.skip_already_built_repodata or vinca_conf.get('skip_existing'):
         skip_built_packages = set()
         fn = arguments.skip_already_built_repodata
         if not fn:
             fn = vinca_conf.get('skip_existing')
+        
         fns = list(fn)
         for fn in fns:
             selected_bn = None
@@ -472,12 +483,15 @@ def main():
         source = generate_source(distro, vinca_conf)
         outputs = generate_outputs(distro, vinca_conf)
 
-
-
     # print(source)
     # print(outputs)
 
-    write_recipe(source, outputs, vinca_conf.get('build_number', 0))
+    if arguments.multiple_file :
+        write_recipe(source, outputs, vinca_conf.get('build_number', 0), False)
+    
+    else:
+        write_recipe(source, outputs, vinca_conf.get('build_number', 0))
+
     print(unsatisfied_deps)
 
     from .template import generate_bld_ament_cmake

@@ -3,9 +3,16 @@ package:
   version: 2020.08.25
 
 source:
-  - git_url: https://github.com/ros-gbp/joystick_drivers-release.git
-    git_rev: release/melodic/joy/1.14.0-1
-    folder: ros-melodic-joy/src/work
+  - git_url: https://github.com/ros-gbp/class_loader-release.git
+    git_rev: release/melodic/class_loader/0.4.1-0
+    folder: ros-melodic-class-loader/src/work
+    patches:
+      - /home/ubuntu/projects/thesnakepit/vinca/examples/patch/ros-melodic-class-loader.patch
+  - git_url: https://github.com/frankaemika/libfranka-release.git
+    git_rev: release/melodic/libfranka/0.8.0-1
+    folder: ros-melodic-libfranka/src/work
+    patches:
+      - /home/ubuntu/projects/thesnakepit/vinca/examples/patch/ros-melodic-libfranka.patch
 
 build:
   number: 1
@@ -21,8 +28,8 @@ extra:
     - ros-forge
 outputs:
   - package:
-      name: ros-melodic-joy
-      version: 1.14.0
+      name: ros-melodic-class-loader
+      version: 0.4.1
     requirements:
       build:
         - "{{ compiler('cxx') }}"
@@ -31,17 +38,37 @@ outputs:
         - sel(unix): make
         - cmake
       host:
+        - boost
+        - console_bridge
+        - poco
         - python
         - ros-melodic-catkin
-        - ros-melodic-diagnostic-updater
-        - ros-melodic-rosbag
-        - ros-melodic-roscpp
-        - ros-melodic-roslint
-        - ros-melodic-sensor-msgs
+        - ros-melodic-cmake-modules
       run:
+        - boost
+        - console_bridge
+        - poco
         - python
-        - ros-melodic-diagnostic-updater
-        - ros-melodic-roscpp
-        - ros-melodic-sensor-msgs
+    build:
+      script: build_catkin.sh
+  - package:
+      name: ros-melodic-libfranka
+      version: 0.8.0
+    requirements:
+      build:
+        - "{{ compiler('cxx') }}"
+        - "{{ compiler('c') }}"
+        - ninja
+        - sel(unix): make
+        - cmake
+      host:
+        - cmake
+        - eigen
+        - poco
+        - python
+      run:
+        - poco
+        - python
+        - ros-melodic-catkin
     build:
       script: build_catkin.sh

@@ -21,6 +21,7 @@ about:
 extra:
   recipe-maintainers:
     - ros-forge
+
 """
 
 
@@ -38,23 +39,23 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
         with open("recipe.yaml", 'w') as stream:
             yaml.dump(meta, stream)
     else:
-        for o in outputs:
+        for o in outputs:)
             yaml = ruamel.yaml.YAML()
             yaml.indent(mapping=2, sequence=4, offset=2)
             meta = yaml.load(TEMPLATE)
 
-            meta['source'] = source[o['name']]
+            meta['source'] = source[o['package']['name']]
             for k, v in o.items():
                 meta[k] = v
 
-            meta['package']['name'] = o['name']
-            meta['package']['version'] = o['version']
+            meta['package']['name'] = o['package']['name']
+            meta['package']['version'] = o['package']['version']
 
             meta['build']['number'] = build_number
 
             if not os.path.isdir("recipes"):
                 os.makedirs("recipes")
-            with open(os.path.join("recipes", f"{o['name']}.yaml"), 'w') as stream:
+            with open(os.path.join("recipes", f"{o['package']['name']}.yaml"), 'w') as stream:
                 yaml.dump(meta, stream)
 
 def generate_template(template_in, template_out):
