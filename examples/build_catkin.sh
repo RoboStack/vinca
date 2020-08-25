@@ -17,7 +17,7 @@ cd build
 # necessary for correctly linking SIP files (from python_qt_bindings)
 export LINK=$CXX
 
-export ROS_PYTHON_VERSION=`python -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
+export ROS_PYTHON_VERSION=`$PREFIX/bin/python -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
 echo "Using Python $ROS_PYTHON_VERSION"
 
 # NOTE: there might be undefined references occurring
