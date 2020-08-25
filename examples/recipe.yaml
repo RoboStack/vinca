@@ -7,12 +7,12 @@ source:
     git_rev: release/melodic/class_loader/0.4.1-0
     folder: ros-melodic-class-loader/src/work
     patches:
-      - /home/ubuntu/projects/thesnakepit/vinca/examples/patch/ros-melodic-class-loader.patch
+      - /home/wolfv/Programs/vinca/examples/patch/ros-melodic-class-loader.patch
   - git_url: https://github.com/frankaemika/libfranka-release.git
     git_rev: release/melodic/libfranka/0.8.0-1
     folder: ros-melodic-libfranka/src/work
     patches:
-      - /home/ubuntu/projects/thesnakepit/vinca/examples/patch/ros-melodic-libfranka.patch
+      - /home/wolfv/Programs/vinca/examples/patch/ros-melodic-libfranka.patch
 
 build:
   number: 1
