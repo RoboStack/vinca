@@ -24,7 +24,6 @@ extra:
 
 """
 
-
 def write_recipe(source, outputs, build_number=0, single_file=True):
     # single_file = False
     if single_file:
@@ -39,7 +38,7 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
         with open("recipe.yaml", 'w') as stream:
             yaml.dump(meta, stream)
     else:
-        for o in outputs:)
+        for o in outputs:
             yaml = ruamel.yaml.YAML()
             yaml.indent(mapping=2, sequence=4, offset=2)
             meta = yaml.load(TEMPLATE)

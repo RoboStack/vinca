@@ -59,7 +59,7 @@ def parse_command_line(argv):
         help="Skip already built from repodata.")
     parser.add_argument(
         "-m", "--multiple", dest="multiple_file", action='store_const',
-        const=True, default=True,
+        const=True, default=False,
         help="Create one recipe for package.")
     arguments = parser.parse_args(argv[1:])
     return arguments
@@ -486,9 +486,8 @@ def main():
     # print(source)
     # print(outputs)
 
-    if arguments.multiple_file :
+    if arguments.multiple_file:
         write_recipe(source, outputs, vinca_conf.get('build_number', 0), False)
-    
     else:
         write_recipe(source, outputs, vinca_conf.get('build_number', 0))
 
