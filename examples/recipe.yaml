@@ -1,18 +1,13 @@
 package:
   name: ros
-  version: 2020.08.25
+  version: 2020.08.31
 
 source:
-  - git_url: https://github.com/ros-gbp/class_loader-release.git
-    git_rev: release/melodic/class_loader/0.4.1-0
-    folder: ros-melodic-class-loader/src/work
+  - git_url: https://github.com/ros-visualization/rviz.git
+    git_rev: 1.13.13
+    folder: ros-melodic-rviz/src/work
     patches:
-      - /home/wolfv/Programs/vinca/examples/patch/ros-melodic-class-loader.patch
-  - git_url: https://github.com/frankaemika/libfranka-release.git
-    git_rev: release/melodic/libfranka/0.8.0-1
-    folder: ros-melodic-libfranka/src/work
-    patches:
-      - /home/wolfv/Programs/vinca/examples/patch/ros-melodic-libfranka.patch
+      - /home/ubuntu/projects/thesnakepit/vinca/examples/patch/ros-melodic-rviz.patch
 
 build:
   number: 1
@@ -26,10 +21,11 @@ about:
 extra:
   recipe-maintainers:
     - ros-forge
+
 outputs:
   - package:
-      name: ros-melodic-class-loader
-      version: 0.4.1
+      name: ros-melodic-rviz
+      version: 1.13.13
     requirements:
       build:
         - "{{ compiler('cxx') }}"
@@ -37,38 +33,83 @@ outputs:
         - ninja
         - sel(unix): make
         - cmake
+        - sel(unix): "{{ cdt('mesa-libgl-devel') }}"
+        - sel(unix): "{{ cdt('mesa-dri-drivers') }}"
+        - sel(linux): "{{ cdt('libselinux') }}"
+        - sel(linux): "{{ cdt('libxdamage') }}"
+        - sel(linux): "{{ cdt('libxxf86vm') }}"
+        - sel(linux): "{{ cdt('libxfixes') }}"
+        - sel(linux): "{{ cdt('libxext') }}"
+        - sel(linux): "{{ cdt('libxau') }}"
       host:
-        - boost
-        - console_bridge
-        - poco
+        - assimp
+        - eigen
+        - ogre 1.10.12 h6508522_5
         - python
+        - qt 5.12.5 hd8c4c69_1
         - ros-melodic-catkin
         - ros-melodic-cmake-modules
+        - ros-melodic-geometry-msgs
+        - ros-melodic-image-transport
+        - ros-melodic-interactive-markers
+        - ros-melodic-laser-geometry
+        - ros-melodic-map-msgs
+        - ros-melodic-message-filters
+        - ros-melodic-message-generation
+        - ros-melodic-nav-msgs
+        - ros-melodic-pluginlib
+        - ros-melodic-python-qt-binding
+        - ros-melodic-resource-retriever
+        - ros-melodic-rosbag
+        - ros-melodic-rosconsole
+        - ros-melodic-roscpp
+        - ros-melodic-roslib
+        - ros-melodic-rospy
+        - ros-melodic-rostest
+        - ros-melodic-rosunit
+        - ros-melodic-sensor-msgs
+        - ros-melodic-std-msgs
+        - ros-melodic-std-srvs
+        - ros-melodic-tf
+        - ros-melodic-urdf
+        - ros-melodic-visualization-msgs
+        - tinyxml2
+        - urdfdom 1.0.4
+        - urdfdom_headers 1.0.4
+        - yaml-cpp
+        - sel(unix): xorg-libx11
+        - sel(unix): xorg-libxext
       run:
-        - boost
-        - console_bridge
-        - poco
+        - assimp
+        - ogre
         - python
-    build:
-      script: build_catkin.sh
-  - package:
-      name: ros-melodic-libfranka
-      version: 0.8.0
-    requirements:
-      build:
-        - "{{ compiler('cxx') }}"
-        - "{{ compiler('c') }}"
-        - ninja
-        - sel(unix): make
-        - cmake
-      host:
-        - cmake
-        - eigen
-        - poco
-        - python
-      run:
-        - poco
-        - python
-        - ros-melodic-catkin
+        - qt
+        - ros-melodic-geometry-msgs
+        - ros-melodic-image-transport
+        - ros-melodic-interactive-markers
+        - ros-melodic-laser-geometry
+        - ros-melodic-map-msgs
+        - ros-melodic-media-export
+        - ros-melodic-message-filters
+        - ros-melodic-message-runtime
+        - ros-melodic-nav-msgs
+        - ros-melodic-pluginlib
+        - ros-melodic-python-qt-binding
+        - ros-melodic-resource-retriever
+        - ros-melodic-rosbag
+        - ros-melodic-rosconsole
+        - ros-melodic-roscpp
+        - ros-melodic-roslib
+        - ros-melodic-rospy
+        - ros-melodic-sensor-msgs
+        - ros-melodic-std-msgs
+        - ros-melodic-std-srvs
+        - ros-melodic-tf
+        - ros-melodic-urdf
+        - ros-melodic-visualization-msgs
+        - tinyxml2
+        - yaml-cpp
+        - sel(unix): xorg-libx11
+        - sel(unix): xorg-libxext
     build:
       script: build_catkin.sh

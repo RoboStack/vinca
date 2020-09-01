@@ -59,8 +59,12 @@ def parse_command_line(argv):
         help="Skip already built from repodata.")
     parser.add_argument(
         "-m", "--multiple", dest="multiple_file", action='store_const',
-        const=True, default=True,
+        const=True, default=False,
         help="Create one recipe for package.")
+    parser.add_argument(
+        "--source", dest="source", action='store_const',
+        const=True, default=False,
+        help="Create recipe with develop repo.")
     arguments = parser.parse_args(argv[1:])
     return arguments
 
@@ -97,7 +101,7 @@ def read_vinca_yaml(filepath):
     return vinca_conf
 
 
-def generate_output(pkg_shortname, vinca_conf, distro):
+def generate_output(pkg_shortname, vinca_conf, distro, version):
     if pkg_shortname not in vinca_conf['_selected_pkgs']:
         return None
 
@@ -108,7 +112,7 @@ def generate_output(pkg_shortname, vinca_conf, distro):
     output = {
         'package': {
             'name': pkg_names[0],
-            'version': distro.get_version(pkg_shortname),
+            'version': version,
         },
         'requirements': {
             'build': [
@@ -236,9 +240,22 @@ def generate_output(pkg_shortname, vinca_conf, distro):
 def generate_outputs(distro, vinca_conf):
     outputs = []
     for pkg_shortname in vinca_conf['_selected_pkgs']:
-        output = generate_output(pkg_shortname, vinca_conf, distro)
+        output = generate_output(pkg_shortname, vinca_conf, distro, distro.get_version(pkg_shortname))
         if output is not None:
             outputs.append(output)
+    return outputs
+
+def generate_outputs_version(distro, vinca_conf):
+    outputs = []
+    for pkg_shortname in vinca_conf['_selected_pkgs']:
+        version = distro.get_version(pkg_shortname)
+        if vinca_conf['package_version'] and vinca_conf['package_version'][pkg_shortname] :
+            version = vinca_conf['package_version'][pkg_shortname]['version']
+        
+        output = generate_output(pkg_shortname, vinca_conf, distro, version)
+        if output is not None:
+            outputs.append(output)
+    
     return outputs
 
 
@@ -377,6 +394,42 @@ def generate_source(distro, vinca_conf):
 
     return source
 
+def generate_source_version(distro, vinca_conf):
+    source = {}
+    for pkg_shortname in vinca_conf['_selected_pkgs']:
+        url, version = distro.get_released_repo(pkg_shortname)
+        if vinca_conf['package_version'] and vinca_conf['package_version'][pkg_shortname] :
+            url = vinca_conf['package_version'][pkg_shortname]['url']
+            version = vinca_conf['package_version'][pkg_shortname]['version']
+        
+        entry = {}
+        entry['git_url'] = url
+        entry['git_rev'] = version
+        pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
+        if not pkg_names or pkg_names[0] in vinca_conf['skip_built_packages']:
+            continue
+        pkg_name = pkg_names[0]
+        entry['folder'] = '%s/src/work' % pkg_name
+
+        patches = []
+        pd = vinca_conf['_patches'].get(pkg_name)
+        if pd:
+            patches.extend(pd['any'])
+
+            # find specific patches
+            plat = sys.platform
+            if plat == 'darwin':
+                plat = 'osx'
+            if plat.startswith('win'):
+                plat = 'win'
+            patches.extend(pd[plat])
+            if len(patches):
+                entry['patches'] = patches
+
+        source[pkg_name] = entry
+
+    return source
+
 
 def generate_fat_source(distro, vinca_conf):
     source = []
@@ -480,8 +533,12 @@ def main():
         source = generate_fat_source(distro, vinca_conf)
         outputs = generate_fat_outputs(distro, vinca_conf)
     else:
-        source = generate_source(distro, vinca_conf)
-        outputs = generate_outputs(distro, vinca_conf)
+        if arguments.source :
+            source = generate_source_version(distro, vinca_conf)
+            outputs = generate_outputs_version(distro, vinca_conf)
+        else :
+            source = generate_source(distro, vinca_conf)
+            outputs = generate_outputs(distro, vinca_conf)
 
     # print(source)
     # print(outputs)
@@ -490,6 +547,7 @@ def main():
         write_recipe(source, outputs, vinca_conf.get('build_number', 0), False)
     
     else:
+        print("Writing recipe")
         write_recipe(source, outputs, vinca_conf.get('build_number', 0))
 
     print(unsatisfied_deps)
