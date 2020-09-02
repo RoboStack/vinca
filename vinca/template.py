@@ -2,6 +2,8 @@ import datetime
 import ruamel
 import os
 
+from ruamel import yaml
+
 TEMPLATE = """\
 package:
   name: ros
@@ -24,25 +26,30 @@ extra:
 
 """
 
+def write_recipe_package(recipe):
+    file = yaml.YAML()
+    file.indent(mapping=2, sequence=4, offset=2)
+    with open(recipe['package']['name'] + '.yaml', 'w') as stream:
+        file.dump(recipe, stream)
 
 def write_recipe(source, outputs, build_number=0, single_file=True):
     # single_file = False
     if single_file:
-        yaml = ruamel.yaml.YAML()
-        yaml.indent(mapping=2, sequence=4, offset=2)
-        meta = yaml.load(TEMPLATE)
+        file = yaml.YAML()
+        file.indent(mapping=2, sequence=4, offset=2)
+        meta = file.load(TEMPLATE)
 
         meta['source'] = [source[k] for k in source]
         meta['outputs'] = outputs
         meta['package']['version'] = f"{datetime.datetime.now():%Y.%m.%d}"
         meta['build']['number'] = build_number
         with open("recipe.yaml", 'w') as stream:
-            yaml.dump(meta, stream)
+            file.dump(meta, stream)
     else:
         for o in outputs:
-            yaml = ruamel.yaml.YAML()
-            yaml.indent(mapping=2, sequence=4, offset=2)
-            meta = yaml.load(TEMPLATE)
+            file = yaml.YAML()
+            file.indent(mapping=2, sequence=4, offset=2)
+            meta = file.load(TEMPLATE)
 
             meta['source'] = source[o['package']['name']]
             for k, v in o.items():
@@ -56,12 +63,12 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
             if not os.path.isdir("recipes"):
                 os.makedirs("recipes")
             with open(os.path.join("recipes", f"{o['package']['name']}.yaml"), 'w') as stream:
-                yaml.dump(meta, stream)
+                file.dump(meta, stream)
 
 def generate_template(template_in, template_out):
     import em
     g = {
-      'ros_distro': os.environ['ROS_DISTRO']
+      'ros_distro': 'melodic' if not os.environ.get('ROS_DISTRO', None) else os.environ['ROS_DISTRO']
     }
     interpreter = em.Interpreter(
       output=template_out,

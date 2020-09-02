@@ -11,7 +11,7 @@ from vinca import __version__
 from .resolve import get_conda_index
 from .resolve import resolve_pkgname
 from .resolve import resolve_pkgname_from_indexes
-from .template import write_recipe
+from .template import write_recipe, write_recipe_package
 from .distro import Distro
 
 unsatisfied_deps = set()
@@ -65,6 +65,9 @@ def parse_command_line(argv):
         "--source", dest="source", action='store_const',
         const=True, default=False,
         help="Create recipe with develop repo.")
+    parser.add_argument(
+        "-p", "--package", dest="package", default=None,
+        help="The package.json path.")
     arguments = parser.parse_args(argv[1:])
     return arguments
 
@@ -475,82 +478,277 @@ def get_selected_packages(distro, vinca_conf):
     result = sorted(list(result))
     return result
 
+def parse_dep(dep):
+    res = dep.name
+
+    if dep.version_eq :
+        return res + " ==" + dep.version_eq
+    
+    if dep.version_gt :
+        res = res + " >" + dep.version_gt
+
+        if dep.version_lt :
+            res = res + ", <" + dep.version_lt
+
+        if dep.version_lte :
+            res = res + ", <=" + dep.version_lte
+        
+        return res
+
+    if dep.version_gte :
+        res = res + " >=" + dep.version_gte
+        
+        if dep.version_lt :
+            res = res + ", <" + dep.version_lt
+        
+        return res
+    
+    if dep.version_lt :
+        res = res + " <" + dep.version_lt
+        
+        if dep.version_gt :
+            res = res + ", >" + dep.version_gt
+        
+        if dep.version_gte :
+            res = res + ", >=" + dep.version_gte
+        
+        return res
+
+    if dep.version_lte :
+        res = res + " <=" + dep.version_lte
+
+        if dep.version_gt :
+            res = res + ", >" + dep.version_gt
+        
+        return res
+    
+    return res
+
+def parse_package(pkg, distro, path):
+
+    name = pkg['name'].replace('_', '-')
+
+    recipe = {
+        'package': {
+            'name': "ros-" + distro + "-" + name,
+            'version': pkg['version']
+        },
+        'about': {
+            'home': "https://www.ros.org/",
+            'license': [ str(l) for l in pkg['licenses'] ],
+            'summary': pkg['description'],
+            'maintainers' : []
+        },
+        'extra': {
+            'recipe-maintainers': ["RoboStack"]
+        },
+        'build': {
+            'number': 0,
+            'script': "build_catkin.sh"
+        },
+        'source': {},
+        'requirements': {
+            'build': [
+                "{{ compiler('cxx') }}",
+                "{{ compiler('c') }}",
+                "ninja",
+                {"sel(unix)": "make"},
+                "cmake"
+            ],
+            'host': [],
+            'run': []
+        }
+    }
+
+    for p in pkg['authors'] :
+        name = p.name + " (" + p.email + ")" if p.email else p.name
+        recipe['about']['maintainers'].append(name)
+    
+    for p in pkg['maintainers'] :
+        name = p.name + " (" + p.email + ")" if p.email else p.name
+        recipe['about']['maintainers'].append(name)
+    
+    for u in pkg['urls'] :
+        if u.type == 'repository' :
+            recipe['source']['git_url'] = u.url
+            recipe['source']['git_rev'] = recipe['package']['version']
+
+        if u.type == 'website' :
+            recipe['about']['home'] = u.url
+        
+        #if u.type == 'bugtracker' :
+        #    recipe['about']['url_issues'] = u.url
+    
+    if not recipe['source'].get('git_url', None) :
+        aux = path.split('/')
+        print(aux[:len(aux)-1])
+        recipe['source']['path'] = '/'.join(aux[:len(aux)-1])
+    
+    for d in pkg['buildtool_depends'] :
+        recipe['requirements']['build'].append(parse_dep(d))
+        recipe['requirements']['host'].append(parse_dep(d))
+    
+    for d in pkg['build_depends'] :
+        recipe['requirements']['build'].append(parse_dep(d))
+        recipe['requirements']['host'].append(parse_dep(d))
+    
+    for d in pkg['build_export_depends'] :
+        recipe['requirements']['build'].append(parse_dep(d))
+        recipe['requirements']['host'].append(parse_dep(d))
+        recipe['requirements']['run'].append(parse_dep(d))
+    
+    for d in pkg['buildtool_export_depends'] :
+        recipe['requirements']['build'].append(parse_dep(d))
+        recipe['requirements']['host'].append(parse_dep(d))
+        recipe['requirements']['run'].append(parse_dep(d))
+
+    for d in pkg['test_depends'] :
+        recipe['requirements']['build'].append(parse_dep(d))
+        recipe['requirements']['host'].append(parse_dep(d))
+        
+    for d in pkg['exec_depends'] :
+        recipe['requirements']['run'].append(parse_dep(d))
+
+    if name == 'eigenpy':
+        recipe['requirements']['build'] += ["pkg-config"]
+
+    if pkg.get_build_type() in ['cmake', 'catkin']:
+        # TODO find a way to get the conda "comments" with ruamel
+        # output['script'] = ['bld_catkin.bat  # [win]', 'build_catkin.sh  # [unix]']
+        if sys.platform.startswith('win'):
+            recipe['build']['script'] = 'bld_catkin.bat'
+        else:
+            recipe['build']['script'] = 'build_catkin.sh'
+
+    # fix up OPENGL support for Unix
+    if 'REQUIRE_OPENGL' in recipe['requirements']['run'] or 'REQUIRE_OPENGL' in recipe['requirements']['host']:
+        # add requirements for opengl
+        if 'REQUIRE_OPENGL' in recipe['requirements']['run']:
+            recipe['requirements']['run'].remove('REQUIRE_OPENGL')
+        if 'REQUIRE_OPENGL' in recipe['requirements']['host']:
+            recipe['requirements']['host'].remove('REQUIRE_OPENGL')
+
+        recipe['requirements']['build'] += [
+            {"sel(unix)": "{{ cdt('mesa-libgl-devel') }}"},
+            {"sel(unix)": "{{ cdt('mesa-dri-drivers') }}"},
+            {"sel(linux)": "{{ cdt('libselinux') }}"},
+            {"sel(linux)": "{{ cdt('libxdamage') }}"},
+            {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
+            {"sel(linux)": "{{ cdt('libxfixes') }}"},
+            {"sel(linux)": "{{ cdt('libxext') }}"},
+            {"sel(linux)": "{{ cdt('libxau') }}"}
+        ]
+        recipe['requirements']['host'] += [
+            {"sel(unix)": "xorg-libx11"},
+            {"sel(unix)": "xorg-libxext"},
+            # 'xorg-libxfixes  [unix]',
+        ]
+        recipe['requirements']['run'] += [
+            {"sel(unix)": "xorg-libx11"},
+            {"sel(unix)": "xorg-libxext"},
+            # 'xorg-libxfixes  [unix]',
+        ]
+
+    # fix up GL support for Unix
+    if 'REQUIRE_GL' in recipe['requirements']['run'] or 'REQUIRE_GL' in recipe['requirements']['host']:
+        # add requirements for gl
+        if 'REQUIRE_GL' in recipe['requirements']['run']:
+            recipe['requirements']['run'].remove('REQUIRE_GL')
+        if 'REQUIRE_GL' in recipe['requirements']['host']:
+            recipe['requirements']['host'].remove('REQUIRE_GL')
+
+        recipe['requirements']['build'] += [
+            {"sel(unix)": "{{ cdt('mesa-libgl-devel') }}"},
+            {"sel(unix)": "{{ cdt('mesa-dri-drivers') }}"},
+            {"sel(linux)": "{{ cdt('libselinux') }}"},
+            {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
+        ]
+
+    return recipe
+
 
 def main():
     global distro, unsatisfied_deps
 
     arguments = parse_command_line(sys.argv)
-    base_dir = os.path.abspath(arguments.dir)
-    vinca_yaml = os.path.join(base_dir, 'vinca.yaml')
-    vinca_conf = read_vinca_yaml(vinca_yaml)
-    vinca_conf['_conda_indexes'] = get_conda_index(vinca_conf)
 
-    if arguments.skip_already_built_repodata or vinca_conf.get('skip_existing'):
-        skip_built_packages = set()
-        fn = arguments.skip_already_built_repodata
-        if not fn:
-            fn = vinca_conf.get('skip_existing')
-        
-        fns = list(fn)
-        for fn in fns:
-            selected_bn = None
-            if '://' in fn:
-                fn += f"{get_conda_subdir()}/repodata.json"
-                request = requests.get(fn)
-                print(f"Fetching repodata: {fn}")
-                repodata = request.json()
-                selected_bn = 0
-                for _, pkg in repodata.get('packages').items():
-                    selected_bn = max(selected_bn, pkg['build_number'])
-            else:
-                with open(fn) as fi:
-                    repodata = json.load(fi)
-            print(f"Selected build number: {selected_bn}")
+    if arguments.package :
+        pkg = catkin_pkg.package.parse_package(arguments.package)
+        recipe = parse_package(pkg, 'melodic', arguments.package)
+        write_recipe_package(recipe)
 
-            for _, pkg in repodata.get('packages').items():
-                if selected_bn is not None:
-                    if pkg['build_number'] == selected_bn:
-                        skip_built_packages.add(pkg['name'])
+    else :
+        base_dir = os.path.abspath(arguments.dir)
+        vinca_yaml = os.path.join(base_dir, 'vinca.yaml')
+        vinca_conf = read_vinca_yaml(vinca_yaml)
+        vinca_conf['_conda_indexes'] = get_conda_index(vinca_conf)
+
+        if arguments.skip_already_built_repodata or vinca_conf.get('skip_existing'):
+            skip_built_packages = set()
+            fn = arguments.skip_already_built_repodata
+            if not fn:
+                fn = vinca_conf.get('skip_existing')
+            
+            fns = list(fn)
+            for fn in fns:
+                selected_bn = None
+                if '://' in fn:
+                    fn += f"{get_conda_subdir()}/repodata.json"
+                    request = requests.get(fn)
+                    print(f"Fetching repodata: {fn}")
+                    repodata = request.json()
+                    selected_bn = 0
+                    for _, pkg in repodata.get('packages').items():
+                        selected_bn = max(selected_bn, pkg['build_number'])
                 else:
-                    skip_built_packages.add(pkg['name'])
+                    with open(fn) as fi:
+                        repodata = json.load(fi)
+                print(f"Selected build number: {selected_bn}")
 
-            vinca_conf['skip_built_packages'] = skip_built_packages
-    else:
-        vinca_conf['skip_built_packages'] = []
+                for _, pkg in repodata.get('packages').items():
+                    if selected_bn is not None:
+                        if pkg['build_number'] == selected_bn:
+                            skip_built_packages.add(pkg['name'])
+                    else:
+                        skip_built_packages.add(pkg['name'])
 
-    python_version = None
-    if 'python_version' in vinca_conf:
-        python_version = vinca_conf['python_version']
+                vinca_conf['skip_built_packages'] = skip_built_packages
+        else:
+            vinca_conf['skip_built_packages'] = []
 
-    distro = Distro(vinca_conf['ros_distro'], python_version)
+        python_version = None
+        if 'python_version' in vinca_conf:
+            python_version = vinca_conf['python_version']
 
-    selected_pkgs = get_selected_packages(distro, vinca_conf)
-    # print(selected_pkgs)
+        distro = Distro(vinca_conf['ros_distro'], python_version)
 
-    vinca_conf['_selected_pkgs'] = selected_pkgs
+        selected_pkgs = get_selected_packages(distro, vinca_conf)
+        # print(selected_pkgs)
 
-    if 'fat_archive' in vinca_conf and vinca_conf['fat_archive']:
-        source = generate_fat_source(distro, vinca_conf)
-        outputs = generate_fat_outputs(distro, vinca_conf)
-    else:
-        if arguments.source :
-            source = generate_source_version(distro, vinca_conf)
-            outputs = generate_outputs_version(distro, vinca_conf)
-        else :
-            source = generate_source(distro, vinca_conf)
-            outputs = generate_outputs(distro, vinca_conf)
+        vinca_conf['_selected_pkgs'] = selected_pkgs
 
-    # print(source)
-    # print(outputs)
+        if 'fat_archive' in vinca_conf and vinca_conf['fat_archive']:
+            source = generate_fat_source(distro, vinca_conf)
+            outputs = generate_fat_outputs(distro, vinca_conf)
+        else:
+            if arguments.source :
+                source = generate_source_version(distro, vinca_conf)
+                outputs = generate_outputs_version(distro, vinca_conf)
+            else :
+                source = generate_source(distro, vinca_conf)
+                outputs = generate_outputs(distro, vinca_conf)
 
-    if arguments.multiple_file :
-        write_recipe(source, outputs, vinca_conf.get('build_number', 0), False)
-    
-    else:
-        print("Writing recipe")
-        write_recipe(source, outputs, vinca_conf.get('build_number', 0))
+        # print(source)
+        # print(outputs)
 
-    print(unsatisfied_deps)
+        if arguments.multiple_file :
+            write_recipe(source, outputs, vinca_conf.get('build_number', 0), False)
+        
+        else:
+            print("Writing recipe")
+            write_recipe(source, outputs, vinca_conf.get('build_number', 0))
+
+        print(unsatisfied_deps)
 
     from .template import generate_bld_ament_cmake
     from .template import generate_bld_ament_python
