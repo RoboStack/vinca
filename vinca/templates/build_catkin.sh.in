@@ -17,7 +17,7 @@ cd build
 # necessary for correctly linking SIP files (from python_qt_bindings)
 export LINK=$CXX
 
-export ROS_PYTHON_VERSION=`python -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
+export ROS_PYTHON_VERSION=`$PREFIX/bin/python -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
 echo "Using Python $ROS_PYTHON_VERSION"
 
 # NOTE: there might be undefined references occurring
@@ -33,7 +33,7 @@ cmake .. -DCMAKE_INSTALL_PREFIX=$PREFIX \
          -DCMAKE_NO_SYSTEM_FROM_IMPORTED=ON \
          -DCMAKE_FIND_FRAMEWORK=LAST \
          -DBUILD_SHARED_LIBS=ON \
-         -DPYTHON_EXECUTABLE=$PYTHON \
+         -DPYTHON_EXECUTABLE=$PREFIX/bin/python \
          -DSETUPTOOLS_DEB_LAYOUT=OFF \
          -DCATKIN_SKIP_TESTING=ON \
          -DCATKIN_BUILD_BINARY_PACKAGE=$CATKIN_BUILD_BINARY_PACKAGE \

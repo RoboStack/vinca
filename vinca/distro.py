@@ -10,7 +10,7 @@ class Distro(object):
     def __init__(self, distro_name, python_version=None):
         index = get_index(get_index_url())
         self._distro = get_cached_distribution(index, distro_name)
-
+        self.distro_name = distro_name
         # set up ROS environments
         if python_version is None:
             python_version = index.distributions[distro_name]['python_version']
@@ -32,6 +32,12 @@ class Distro(object):
 
         os.environ['ROS_VERSION'] = '1' if self.check_ros1() else '2'
 
+    @property
+    def name(self):
+        return self.distro_name
+
+    def add_packages(self, packages):
+        self.build_packages = set(packages)
 
     def get_depends(self, pkg):
         dependencies = set()
@@ -50,6 +56,8 @@ class Distro(object):
 
     def check_package(self, pkg_name):
         if pkg_name in self._distro.release_packages:
+            return True
+        elif pkg_name in self.build_packages:
             return True
         else:
             return False

@@ -67,10 +67,9 @@ def parse_command_line(argv):
         help="Create recipe with develop repo.")
     parser.add_argument(
         "-p", "--package", dest="package", default=None,
-        help="The package.json path.")
+        help="The package.xml path.")
     arguments = parser.parse_args(argv[1:])
     return arguments
-
 
 def read_vinca_yaml(filepath):
     import ruamel.yaml
@@ -254,11 +253,11 @@ def generate_outputs_version(distro, vinca_conf):
         version = distro.get_version(pkg_shortname)
         if vinca_conf['package_version'] and vinca_conf['package_version'][pkg_shortname] :
             version = vinca_conf['package_version'][pkg_shortname]['version']
-        
+
         output = generate_output(pkg_shortname, vinca_conf, distro, version)
         if output is not None:
             outputs.append(output)
-    
+
     return outputs
 
 
@@ -404,7 +403,7 @@ def generate_source_version(distro, vinca_conf):
         if vinca_conf['package_version'] and vinca_conf['package_version'][pkg_shortname] :
             url = vinca_conf['package_version'][pkg_shortname]['url']
             version = vinca_conf['package_version'][pkg_shortname]['version']
-        
+
         entry = {}
         entry['git_url'] = url
         entry['git_rev'] = version
@@ -478,59 +477,60 @@ def get_selected_packages(distro, vinca_conf):
     result = sorted(list(result))
     return result
 
-def parse_dep(dep):
-    res = dep.name
+# def parse_dep(dep, vinca_conf, distro):
+#     res = dep.name
+#     res = resolve_pkgname(res, vinca_conf, distro)
 
-    if dep.version_eq :
-        return res + " ==" + dep.version_eq
-    
-    if dep.version_gt :
-        res = res + " >" + dep.version_gt
+#     if dep.version_eq :
+#         return res + " ==" + dep.version_eq
 
-        if dep.version_lt :
-            res = res + ", <" + dep.version_lt
+#     if dep.version_gt :
+#         res = res + " >" + dep.version_gt
 
-        if dep.version_lte :
-            res = res + ", <=" + dep.version_lte
-        
-        return res
+#         if dep.version_lt :
+#             res = res + ", <" + dep.version_lt
 
-    if dep.version_gte :
-        res = res + " >=" + dep.version_gte
-        
-        if dep.version_lt :
-            res = res + ", <" + dep.version_lt
-        
-        return res
-    
-    if dep.version_lt :
-        res = res + " <" + dep.version_lt
-        
-        if dep.version_gt :
-            res = res + ", >" + dep.version_gt
-        
-        if dep.version_gte :
-            res = res + ", >=" + dep.version_gte
-        
-        return res
+#         if dep.version_lte :
+#             res = res + ", <=" + dep.version_lte
 
-    if dep.version_lte :
-        res = res + " <=" + dep.version_lte
+#         return res
 
-        if dep.version_gt :
-            res = res + ", >" + dep.version_gt
-        
-        return res
-    
-    return res
+#     if dep.version_gte :
+#         res = res + " >=" + dep.version_gte
 
-def parse_package(pkg, distro, path):
+#         if dep.version_lt :
+#             res = res + ", <" + dep.version_lt
+
+#         return res
+
+#     if dep.version_lt :
+#         res = res + " <" + dep.version_lt
+
+#         if dep.version_gt :
+#             res = res + ", >" + dep.version_gt
+
+#         if dep.version_gte :
+#             res = res + ", >=" + dep.version_gte
+
+#         return res
+
+#     if dep.version_lte :
+#         res = res + " <=" + dep.version_lte
+
+#         if dep.version_gt :
+#             res = res + ", >" + dep.version_gt
+
+#         return res
+
+#     return res
+
+def parse_package(pkg, distro, vinca_conf, path):
 
     name = pkg['name'].replace('_', '-')
-
+    final_name = f"ros-{distro.name}-{name}"
     recipe = {
         'package': {
-            'name': "ros-" + distro + "-" + name,
+            'name': final_name,
             'version': pkg['version']
         },
         'about': {
@@ -540,11 +540,14 @@ def parse_package(pkg, distro, path):
             'maintainers' : []
         },
         'extra': {
-            'recipe-maintainers': ["RoboStack"]
+            'recipe-maintainers': ["robostack"]
         },
         'build': {
             'number': 0,
-            'script': "build_catkin.sh"
+            'script': {
+                "sel(unix)": "build_catkin.sh",
+                "sel(win)": "build_catkin.bat"
+            }
         },
         'source': {},
         'requirements': {
@@ -563,62 +566,55 @@ def parse_package(pkg, distro, path):
     for p in pkg['authors'] :
         name = p.name + " (" + p.email + ")" if p.email else p.name
         recipe['about']['maintainers'].append(name)
-    
-    for p in pkg['maintainers'] :
-        name = p.name + " (" + p.email + ")" if p.email else p.name
-        recipe['about']['maintainers'].append(name)
-    
-    for u in pkg['urls'] :
-        if u.type == 'repository' :
-            recipe['source']['git_url'] = u.url
-            recipe['source']['git_rev'] = recipe['package']['version']
 
+    # for p in pkg['maintainers'] :
+    #     name = p.name + " (" + p.email + ")" if p.email else p.name
+    #     recipe['about']['maintainers'].append(name)
+
+    for u in pkg['urls'] :
+        # if u.type == 'repository' :
+        #     recipe['source']['git_url'] = u.url
+        #     recipe['source']['git_rev'] = recipe['package']['version']
         if u.type == 'website' :
             recipe['about']['home'] = u.url
-        
+
         #if u.type == 'bugtracker' :
         #    recipe['about']['url_issues'] = u.url
-    
+
     if not recipe['source'].get('git_url', None) :
         aux = path.split('/')
         print(aux[:len(aux)-1])
         recipe['source']['path'] = '/'.join(aux[:len(aux)-1])
-    
+        recipe['source']['folder'] = f"{final_name}/src/work"
+
     for d in pkg['buildtool_depends'] :
-        recipe['requirements']['build'].append(parse_dep(d))
-        recipe['requirements']['host'].append(parse_dep(d))
-    
+        recipe['requirements']['host'].extend(resolve_pkgname(d.name, vinca_conf, distro))
+
     for d in pkg['build_depends'] :
-        recipe['requirements']['build'].append(parse_dep(d))
-        recipe['requirements']['host'].append(parse_dep(d))
-    
+        recipe['requirements']['host'].extend(resolve_pkgname(d.name, vinca_conf, distro))
+
     for d in pkg['build_export_depends'] :
-        recipe['requirements']['build'].append(parse_dep(d))
-        recipe['requirements']['host'].append(parse_dep(d))
-        recipe['requirements']['run'].append(parse_dep(d))
-    
+        recipe['requirements']['host'].extend(resolve_pkgname(d.name, vinca_conf, distro))
+        recipe['requirements']['run'].extend(resolve_pkgname(d.name, vinca_conf, distro))
+
     for d in pkg['buildtool_export_depends'] :
-        recipe['requirements']['build'].append(parse_dep(d))
-        recipe['requirements']['host'].append(parse_dep(d))
-        recipe['requirements']['run'].append(parse_dep(d))
+        recipe['requirements']['host'].extend(resolve_pkgname(d.name, vinca_conf, distro))
+        recipe['requirements']['run'].extend(resolve_pkgname(d.name, vinca_conf, distro))
 
     for d in pkg['test_depends'] :
-        recipe['requirements']['build'].append(parse_dep(d))
-        recipe['requirements']['host'].append(parse_dep(d))
-        
+        recipe['requirements']['host'].extend(resolve_pkgname(d.name, vinca_conf, distro))
+
     for d in pkg['exec_depends'] :
-        recipe['requirements']['run'].append(parse_dep(d))
+        recipe['requirements']['run'].extend(resolve_pkgname(d.name, vinca_conf, distro))
 
     if name == 'eigenpy':
         recipe['requirements']['build'] += ["pkg-config"]
 
     if pkg.get_build_type() in ['cmake', 'catkin']:
-        # TODO find a way to get the conda "comments" with ruamel
-        # output['script'] = ['bld_catkin.bat  # [win]', 'build_catkin.sh  # [unix]']
-        if sys.platform.startswith('win'):
-            recipe['build']['script'] = 'bld_catkin.bat'
-        else:
-            recipe['build']['script'] = 'build_catkin.sh'
+        recipe['build']['script'] = {
+            'sel(win)': 'bld_catkin.bat',
+            'sel(unix)': 'build_catkin.sh'
+        }
 
     # fix up OPENGL support for Unix
     if 'REQUIRE_OPENGL' in recipe['requirements']['run'] or 'REQUIRE_OPENGL' in recipe['requirements']['host']:
@@ -641,12 +637,10 @@ def parse_package(pkg, distro, path):
         recipe['requirements']['host'] += [
             {"sel(unix)": "xorg-libx11"},
             {"sel(unix)": "xorg-libxext"},
-            # 'xorg-libxfixes  [unix]',
         ]
         recipe['requirements']['run'] += [
             {"sel(unix)": "xorg-libx11"},
             {"sel(unix)": "xorg-libxext"},
-            # 'xorg-libxfixes  [unix]',
         ]
 
     # fix up GL support for Unix
@@ -672,23 +666,51 @@ def main():
 
     arguments = parse_command_line(sys.argv)
 
-    if arguments.package :
-        pkg = catkin_pkg.package.parse_package(arguments.package)
-        recipe = parse_package(pkg, 'melodic', arguments.package)
-        write_recipe_package(recipe)
+    base_dir = os.path.abspath(arguments.dir)
+    vinca_yaml = os.path.join(base_dir, 'vinca.yaml')
+    vinca_conf = read_vinca_yaml(vinca_yaml)
+    vinca_conf['_conda_indexes'] = get_conda_index(vinca_conf, base_dir)
 
-    else :
-        base_dir = os.path.abspath(arguments.dir)
-        vinca_yaml = os.path.join(base_dir, 'vinca.yaml')
-        vinca_conf = read_vinca_yaml(vinca_yaml)
-        vinca_conf['_conda_indexes'] = get_conda_index(vinca_conf)
+    if arguments.package:
+        pkg_files = glob.glob(arguments.package)
 
+        python_version = None
+        if 'python_version' in vinca_conf:
+            python_version = vinca_conf['python_version']
+
+        distro = Distro(vinca_conf['ros_distro'], python_version)
+        additional_pkgs, parsed_pkgs = [], []
+        for f in pkg_files:
+            parsed_pkg = catkin_pkg.package.parse_package(f)
+            additional_pkgs.append(parsed_pkg.name)
+            parsed_pkgs.append(parsed_pkg)
+
+        distro.add_packages(additional_pkgs)
+
+        outputs = []
+        for f in pkg_files:
+            pkg = catkin_pkg.package.parse_package(f)
+            recipe = parse_package(pkg, distro, vinca_conf, f)
+
+            if arguments.multiple_file:
+                write_recipe_package(recipe)
+            else:
+                outputs.append(recipe)
+
+        if not arguments.multiple_file:
+            sources = {}
+            for o in outputs:
+                sources[o['package']['name']] = o['source']
+                del o['source']
+            write_recipe(sources, outputs)
+
+    else:
         if arguments.skip_already_built_repodata or vinca_conf.get('skip_existing'):
             skip_built_packages = set()
             fn = arguments.skip_already_built_repodata
             if not fn:
                 fn = vinca_conf.get('skip_existing')
-            
+
             fns = list(fn)
             for fn in fns:
                 selected_bn = None
@@ -696,6 +718,7 @@ def main():
                     fn += f"{get_conda_subdir()}/repodata.json"
                     request = requests.get(fn)
                     print(f"Fetching repodata: {fn}")
+
                     repodata = request.json()
                     selected_bn = 0
                     for _, pkg in repodata.get('packages').items():
@@ -723,7 +746,6 @@ def main():
         distro = Distro(vinca_conf['ros_distro'], python_version)
 
         selected_pkgs = get_selected_packages(distro, vinca_conf)
-        # print(selected_pkgs)
 
         vinca_conf['_selected_pkgs'] = selected_pkgs
 
@@ -738,12 +760,9 @@ def main():
                 source = generate_source(distro, vinca_conf)
                 outputs = generate_outputs(distro, vinca_conf)
 
-        # print(source)
-        # print(outputs)
-
-        if arguments.multiple_file :
+        if arguments.multiple_file:
             write_recipe(source, outputs, vinca_conf.get('build_number', 0), False)
-        
+
         else:
             print("Writing recipe")
             write_recipe(source, outputs, vinca_conf.get('build_number', 0))

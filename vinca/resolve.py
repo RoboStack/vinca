@@ -10,14 +10,15 @@ map_platform_python_to_conda = {
 }
 
 
-def get_conda_index(vinca_conf):
+def get_conda_index(vinca_conf, base_dir):
     import ruamel.yaml
 
     yaml = ruamel.yaml.YAML()
     conda_index = []
     for i in vinca_conf['conda_index']:
-        if os.path.isfile(i):
-            rawdata = yaml.load(open(i, 'r'))
+        ip = os.path.join(base_dir, i)
+        if os.path.isfile(ip):
+            rawdata = yaml.load(open(ip, 'r'))
         else:
             rawdata = yaml.load(urlopen(i))
         conda_index.append(rawdata)
