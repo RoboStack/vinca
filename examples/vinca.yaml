@@ -93,9 +93,9 @@ packages_select_by_deps:
   # - ros_control
   # - ros_controllers
 
-package_version:
-  rviz: 
-    url: https://github.com/ros-visualization/rviz.git
-    version: 1.13.13
+# package_version:
+#   rviz: 
+#     url: https://github.com/ros-visualization/rviz.git
+#     version: 1.13.13
 
 patch_dir: patch
