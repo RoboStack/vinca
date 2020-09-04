@@ -42,10 +42,11 @@ packages_select_by_deps:
 
   # - moveit
 
-  #- class_loader
-
   # - niryo_one_simulation
   # - libfranka
+  # - class_loader
+  # - libfranka
+
   # - franka_ros # doesn't work on osx
 
   # - cv_bridge
@@ -94,7 +95,7 @@ packages_select_by_deps:
   # - ros_controllers
 
 # package_version:
-#   rviz: 
+#   rviz:
 #     url: https://github.com/ros-visualization/rviz.git
 #     version: 1.13.13
 

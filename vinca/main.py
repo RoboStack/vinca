@@ -145,10 +145,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     if pkg.get_build_type() in ['cmake', 'catkin']:
         # TODO find a way to get the conda "comments" with ruamel
         # output['script'] = ['bld_catkin.bat  # [win]', 'build_catkin.sh  # [unix]']
-        if sys.platform.startswith('win'):
-            output['build']['script'] = 'bld_catkin.bat'
-        else:
-            output['build']['script'] = 'build_catkin.sh'
+        output['build']['script'] = {
+            'sel(win)': 'bld_catkin.bat',
+            'sel(unix)': 'build_catkin.sh'
+        }
 
     elif pkg.get_build_type() in ['ament_cmake']:
         output['build']['script'] = 'bld_ament_cmake.bat'
@@ -390,7 +390,10 @@ def generate_source(distro, vinca_conf):
                 plat = 'win'
             patches.extend(pd[plat])
             if len(patches):
-                entry['patches'] = patches
+                print(patches)
+                common_prefix = os.path.commonprefix((os.getcwd(), patches[0]))
+                print(common_prefix)
+                entry['patches'] = [os.path.relpath(p, common_prefix) for p in patches]
 
         source[pkg_name] = entry
 
@@ -762,9 +765,7 @@ def main():
 
         if arguments.multiple_file:
             write_recipe(source, outputs, vinca_conf.get('build_number', 0), False)
-
         else:
-            print("Writing recipe")
             write_recipe(source, outputs, vinca_conf.get('build_number', 0))
 
         print(unsatisfied_deps)
