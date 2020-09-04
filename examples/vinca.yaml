@@ -31,7 +31,7 @@ packages_select_by_deps:
   # - ros_core
   # - ros_base
   # - rviz_visual_tools
-  # - rviz
+  - rviz
   # - tf2
   # - desktop
 
@@ -42,8 +42,10 @@ packages_select_by_deps:
 
   # - moveit
 
-  - class_loader
-  - libfranka
+  # - niryo_one_simulation
+  # - libfranka
+  # - class_loader
+  # - libfranka
 
   # - franka_ros # doesn't work on osx
 
@@ -91,5 +93,10 @@ packages_select_by_deps:
   # - joy
   # - ros_control
   # - ros_controllers
+
+# package_version:
+#   rviz:
+#     url: https://github.com/ros-visualization/rviz.git
+#     version: 1.13.13
 
 patch_dir: patch
