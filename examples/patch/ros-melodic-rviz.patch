@@ -29,19 +29,39 @@ index aedb7ad0..1f5d1a08 100644
 +# if(NOT rviz_BINDINGS)
 +#   message(FATAL_ERROR "No Python binding generator found.")
 +# endif()
-diff --git a/src/rviz/ogre_helpers/render_system.cpp b/src/rviz/ogre_helpers/render_system.cpp
-index e04bfa74..56a2a8ae 100644
---- a/src/rviz/ogre_helpers/render_system.cpp
-+++ b/src/rviz/ogre_helpers/render_system.cpp
-@@ -160,10 +160,7 @@ void RenderSystem::setupDummyWindowId()
+diff --git a/src/rviz/ogre_helpers/movable_text.h b/src/rviz/ogre_helpers/movable_text.h
+index 19d1c31a..4417ef98 100644
+--- a/src/rviz/ogre_helpers/movable_text.h
++++ b/src/rviz/ogre_helpers/movable_text.h
+@@ -203,7 +203,7 @@ protected:
+     return mAABB;
+   }
  
- void RenderSystem::loadOgrePlugins()
- {
--  std::string plugin_prefix = get_ogre_plugin_path() + "/";
--#ifdef Q_OS_MAC
--  plugin_prefix += "lib";
--#endif
-+  std::string plugin_prefix = std::string(std::getenv("CONDA_PREFIX")) + "/lib/OGRE/";
-   ogre_root_->loadPlugin(plugin_prefix + "RenderSystem_GL");
-   ogre_root_->loadPlugin(plugin_prefix + "Plugin_OctreeSceneManager");
-   ogre_root_->loadPlugin(plugin_prefix + "Plugin_ParticleFX");
+-  const Ogre::String& getName() const override
++  const Ogre::String& getName() const
+   {
+     return mName;
+   }
+diff --git a/src/rviz/selection/selection_manager.cpp b/src/rviz/selection/selection_manager.cpp
+index 954ceded..3ade4df6 100644
+--- a/src/rviz/selection/selection_manager.cpp
++++ b/src/rviz/selection/selection_manager.cpp
+@@ -588,14 +588,10 @@ void SelectionManager::unpackColors(Ogre::PixelBox& box, V_CollObject& pixels)
+   {
+     for (int x = 0; x < w; x++)
+     {
+-      if (size == 4) // In case of a 4-byte color format, we can directly process the 32-bit values
+-      {
+-        uint32_t pos = (x + y * w) * 4;
+-        uint32_t pix_val = *(uint32_t*)((uint8_t*)box.data + pos);
+-        pixels.push_back(colorToHandle(box.format, pix_val));
+-      }
+-      else // otherwise perform "official" transformation into float-based Ogre::ColourValue and back
+-        pixels.push_back(colorToHandle(box.getColourAt(x, y, 1)));
++      uint32_t pos = (x + y * w) * size;
++      uint32_t pix_val = 0;
++      memcpy((uint8_t*)&pix_val, (uint8_t*)box.data + pos, size);
++      pixels.push_back(colorToHandle(box.format, pix_val));
+     }
+   }
+ }
