@@ -29,6 +29,7 @@ class Distro(object):
         # cache distribution type
         self._distribution_type = index.distributions[distro_name]['distribution_type']
         self._python_version = index.distributions[distro_name]['python_version']
+        self.build_packages = set()
 
         os.environ['ROS_VERSION'] = '1' if self.check_ros1() else '2'
 

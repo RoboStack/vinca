@@ -83,6 +83,9 @@ def generate_bld_ament_cmake():
     template_in = pkg_resources.resource_filename(
       'vinca', 'templates/bld_ament_cmake.bat.in')
     generate_template(template_in, open('bld_ament_cmake.bat', 'w'))
+    template_in = pkg_resources.resource_filename(
+      'vinca', 'templates/build_ament_cmake.sh.in')
+    generate_template(template_in, open('build_ament_cmake.sh', 'w'))
 
 
 def generate_bld_ament_python():
@@ -90,7 +93,9 @@ def generate_bld_ament_python():
     template_in = pkg_resources.resource_filename(
       'vinca', 'templates/bld_ament_python.bat.in')
     generate_template(template_in, open('bld_ament_python.bat', 'w'))
-
+    template_in = pkg_resources.resource_filename(
+      'vinca', 'templates/build_ament_python.sh.in')
+    generate_template(template_in, open('build_ament_python.sh', 'w'))
 
 def generate_bld_catkin():
     import pkg_resources

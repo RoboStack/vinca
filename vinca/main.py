@@ -151,9 +151,15 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         }
 
     elif pkg.get_build_type() in ['ament_cmake']:
-        output['build']['script'] = 'bld_ament_cmake.bat'
+        output['build']['script'] = {
+            'sel(win)': 'bld_ament_cmake.bat',
+            'sel(unix)': 'build_ament_cmake.sh'
+        }
     elif pkg.get_build_type() in ['ament_python']:
-        output['build']['script'] = 'bld_ament_python.bat'
+        output['build']['script'] = {
+            'sel(win)': 'bld_ament_python.bat',
+            'sel(unix)': 'build_ament_python.sh'
+        }
         resolved_setuptools = resolve_pkgname('setuptools', vinca_conf, distro)
         output['requirements']['host'].extend(resolved_setuptools)
     else:
