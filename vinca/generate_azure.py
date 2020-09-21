@@ -148,7 +148,7 @@ def main():
 					# 'script': '''.scripts/build_linux.sh''',
 					'script': azure_linux_script,
 					'env': {
-						'ANACONDA_TOKEN': '$(ANACONDA_TOKEN)',
+						'ANACONDA_API_TOKEN': '$(ANACONDA_API_TOKEN)',
 						'CURRENT_BUILD_PKG_NAME': pkg
 					},
 					'displayName': f'Build {pkg}'
@@ -190,7 +190,7 @@ def main():
 					# 'script': '''.scripts/build_linux.sh''',
 					'script': azure_osx_script,
 					'env': {
-						'ANACONDA_TOKEN': '$(ANACONDA_TOKEN)',
+						'ANACONDA_API_TOKEN': '$(ANACONDA_API_TOKEN)',
 						'CURRENT_BUILD_PKG_NAME': pkg
 					},
 					'displayName': f'Build {pkg}'
@@ -256,7 +256,7 @@ def main():
 				{
 					'script': azure_win_script,
 					'env': {
-						'ANACONDA_TOKEN': '$(ANACONDA_TOKEN)',
+						'ANACONDA_API_TOKEN': '$(ANACONDA_API_TOKEN)',
 						'CURRENT_BUILD_PKG_NAME': pkg,
 						'PYTHONUNBUFFERED': 1
 					},
