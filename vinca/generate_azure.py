@@ -77,8 +77,10 @@ boa build .
 
 def main():
 	metas = []
+	recipe_names = []
 
-	for f in glob.glob(os.path.join(sys.argv[1], "*.yaml")):
+	all_recipes = glob.glob(os.path.join(sys.argv[1], "*.yaml"))
+	for f in all_recipes:
 		print(f)
 		with open(f) as fi:
 			metas.append(yaml.load(fi.read(), Loader=Loader))
@@ -107,7 +109,7 @@ def main():
 	stages = []
 	current_stage = []
 	for pkg in tg:
-		for r in requirements[pkg]:
+		for r in requirements.get(pkg, []):
 			if r in current_stage:
 				stages.append(current_stage)
 				current_stage = []
@@ -140,6 +142,9 @@ def main():
 
 
 		for pkg in s:
+			if pkg not in requirements:
+				continue
+
 			pkg_jobname = pkg.replace('-', '_')
 			stage['jobs'].append({
 				'job': pkg_jobname,
@@ -154,7 +159,11 @@ def main():
 					'displayName': f'Build {pkg}'
 				}]
 			})
-		azure_stages.append(stage)
+
+		if len(stage['jobs']) != 0:
+			# all packages skipped ...
+			azure_stages.append(stage)
+
 
 	azure_template['trigger'] = ['buildbranch']
 	azure_template['pr'] = 'none'
