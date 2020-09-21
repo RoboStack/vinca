@@ -730,8 +730,11 @@ def main():
 
                     repodata = request.json()
                     selected_bn = 0
-                    for _, pkg in repodata.get('packages').items():
-                        selected_bn = max(selected_bn, pkg['build_number'])
+                    distro = vinca_conf['ros_distro']
+                    for pkg_name, pkg in repodata.get('packages').items():
+                        if pkg_name.startswith(f'ros-{distro}'):
+                            print(f"Already built {pkg_name}")
+                            selected_bn = max(selected_bn, pkg['build_number'])
                 else:
                     with open(fn) as fi:
                         repodata = json.load(fi)
