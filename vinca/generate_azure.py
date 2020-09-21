@@ -4,7 +4,10 @@ import glob
 import sys, os
 import textwrap
 from collections import OrderedDict
-from yaml import CLoader as Loader, CDumper as Dumper
+try:
+    from yaml import CLoader as Loader, CDumper as Dumper
+except ImportError:
+    from yaml import Loader, Dumper
 
 # def setup_yaml():
 #   """ https://stackoverflow.com/a/8661021 """
