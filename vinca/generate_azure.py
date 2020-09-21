@@ -92,9 +92,8 @@ def main():
 
     # sort out requirements that are not built in this run
 
-    for pkg_name, pkg in requirements.items():
-        requirements[pkg_name] = [r for r in requirements[pkg_name] if r in requirements]
-
+    for pkg_name, reqs in requirements.items():
+        requirements[pkg_name] = [r for r in reqs if (isinstance(r, str) and r in reqs)]
     print(requirements)
 
     G = nx.DiGraph()
