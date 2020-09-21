@@ -157,7 +157,6 @@ def main():
 		azure_stages.append(stage)
 
 	azure_template['trigger'] = ['buildbranch']
-	azure_template['trigger'] = ['']
 	azure_template['pr'] = 'none'
 	azure_template['stages'] = azure_stages
 
@@ -200,7 +199,6 @@ def main():
 		azure_stages.append(stage)
 
 	azure_template['trigger'] = ['buildbranch']
-	azure_template['trigger'] = ['']
 	azure_template['pr'] = 'none'
 	azure_template['stages'] = azure_stages
 
