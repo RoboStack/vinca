@@ -96,7 +96,7 @@ def main():
 	for pkg, reqs in requirements.items():
 		G.add_node(pkg)
 		for r in reqs:
-			if r.startswith('ros-'):
+			if r.startswith('ros-') and r in requirements:
 				G.add_edge(pkg, r)
 
 	# import matplotlib.pyplot as plt
