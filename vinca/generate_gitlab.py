@@ -2,7 +2,6 @@ import networkx as nx
 import yaml
 import glob
 import sys, os
-import matplotlib.pyplot as plt
 from collections import OrderedDict
 from yaml import CLoader as Loader, CDumper as Dumper
 
@@ -48,6 +47,7 @@ def main():
 			if r.startswith('ros-'):
 				G.add_edge(pkg, r)
 
+	# import matplotlib.pyplot as plt
 	# nx.draw(G, with_labels=True, font_weight='bold')
 	# plt.show()
 
