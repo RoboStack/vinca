@@ -3,6 +3,7 @@ import yaml
 import glob
 import sys, os
 import textwrap
+import argparse
 from collections import OrderedDict
 try:
     from yaml import CLoader as Loader, CDumper as Dumper
@@ -75,13 +76,41 @@ boa build .
 @rem conda.exe build "recipe" -m .ci_support/%CONFIG%.yaml
 """
 
+parsed_args = None
+
+def parse_command_line(argv):
+    parser = argparse.ArgumentParser(
+        description="Conda recipe Azure pipeline generator for ROS packages")
+
+    default_dir = './recipes'
+    parser.add_argument(
+        "-d", "--dir", dest="dir", default=default_dir,
+        help="The recipes directory to process (default: {}).".format(default_dir))
+
+    parser.add_argument(
+        "-t", "--trigger-branch", dest="trigger_branch",
+        help="Trigger branch for Azure")
+
+    parser.add_argument(
+        "-p", "--platform", dest="platform",
+        default="linux-64",
+        help="Platform to emit build pipeline for")
+
+    arguments = parser.parse_args(argv[1:])
+    global parsed_args
+    parsed_args = arguments
+    return arguments
+
+
 def main():
+
+    args = parse_command_line(sys.argv)
+
     metas = []
     recipe_names = []
 
-    all_recipes = glob.glob(os.path.join(sys.argv[1], "*.yaml"))
+    all_recipes = glob.glob(os.path.join(args.dir, "*.yaml"))
     for f in all_recipes:
-        print(f)
         with open(f) as fi:
             metas.append(yaml.load(fi.read(), Loader=Loader))
 
@@ -94,7 +123,7 @@ def main():
 
     for pkg_name, reqs in requirements.items():
         requirements[pkg_name] = [r for r in reqs if (isinstance(r, str) and r in reqs)]
-    print(requirements)
+    # print(requirements)
 
     G = nx.DiGraph()
     for pkg, reqs in requirements.items():
@@ -108,7 +137,6 @@ def main():
     # plt.show()
 
     tg = list(reversed(list(nx.topological_sort(G))))
-    print(tg)
 
     stages = []
     current_stage = []
@@ -118,7 +146,6 @@ def main():
         for r in reqs:
             # sort up the stages, until first stage found where all requirements are fulfilled.
             for sidx, stage in enumerate(stages):
-                print()
                 if r in stages[sidx]:
                     sort_in_stage = max(sidx + 1, sort_in_stage)
 
@@ -181,12 +208,13 @@ def main():
             azure_stages.append(stage)
 
 
-    azure_template['trigger'] = ['buildbranch']
+    azure_template['trigger'] = [args.trigger_branch]
     azure_template['pr'] = 'none'
     azure_template['stages'] = azure_stages
 
-    with open('linux.yml', 'w') as fo:
-        fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
+    if args.platform.startswith('linux'):
+        with open('linux.yml', 'w') as fo:
+            fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
 
     azure_template = {
         'pool': {
@@ -223,12 +251,13 @@ def main():
             })
         azure_stages.append(stage)
 
-    azure_template['trigger'] = ['buildbranch']
+    azure_template['trigger'] = [args.trigger_branch]
     azure_template['pr'] = 'none'
     azure_template['stages'] = azure_stages
 
-    with open('osx.yml', 'w') as fo:
-        fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
+    if args.platform.startswith('osx'):
+        with open('osx.yml', 'w') as fo:
+            fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
 
     # windows
     azure_template = {
@@ -290,9 +319,10 @@ def main():
             })
         azure_stages.append(stage)
 
-    azure_template['trigger'] = ['buildbranch']
+    azure_template['trigger'] = [args.trigger_branch]
     azure_template['pr'] = 'none'
     azure_template['stages'] = azure_stages
 
-    with open('win.yml', 'w') as fo:
-        fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
+    if args.platform.startswith('win'):
+        with open('win.yml', 'w') as fo:
+            fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))

@@ -17,8 +17,12 @@ from .distro import Distro
 unsatisfied_deps = set()
 distro = None
 
+parsed_args = None
 
 def get_conda_subdir():
+    if parsed_args.platform:
+        return parsed_args.platform
+
     platform = sys.platform
     if platform.startswith("linux"):
         return 'linux-64'
@@ -68,7 +72,12 @@ def parse_command_line(argv):
     parser.add_argument(
         "-p", "--package", dest="package", default=None,
         help="The package.xml path.")
+    parser.add_argument(
+        "--platform", dest="platform", default=None,
+        help="The conda platform to check existing recipes for.")
     arguments = parser.parse_args(argv[1:])
+    global parsed_args
+    parsed_args = arguments
     return arguments
 
 def read_vinca_yaml(filepath):
@@ -389,11 +398,7 @@ def generate_source(distro, vinca_conf):
             patches.extend(pd['any'])
 
             # find specific patches
-            plat = sys.platform
-            if plat == 'darwin':
-                plat = 'osx'
-            if plat.startswith('win'):
-                plat = 'win'
+            plat = get_conda_subdir().split('-')[0]
             patches.extend(pd[plat])
             if len(patches):
                 print(patches)
@@ -428,11 +433,7 @@ def generate_source_version(distro, vinca_conf):
             patches.extend(pd['any'])
 
             # find specific patches
-            plat = sys.platform
-            if plat == 'darwin':
-                plat = 'osx'
-            if plat.startswith('win'):
-                plat = 'win'
+            plat = get_conda_subdir().split('-')[0]
             patches.extend(pd[plat])
             if len(patches):
                 entry['patches'] = patches
