@@ -158,7 +158,8 @@ def main():
             stages[sort_in_stage].append(pkg)
         # current_stage.append(pkg)
 
-    stages.append(current_stage)
+    if len(current_stage):
+        stages.append(current_stage)
 
     print(stages)
 
