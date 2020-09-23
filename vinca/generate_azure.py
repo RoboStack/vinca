@@ -236,6 +236,9 @@ def main():
 
 
         for pkg in s:
+            if pkg not in requirements:
+                continue
+
             pkg_jobname = pkg.replace('-', '_')
             stage['jobs'].append({
                 'job': pkg_jobname,
@@ -279,6 +282,9 @@ def main():
         stage_names.append(stage_name)
 
         for pkg in s:
+            if pkg not in requirements:
+                continue
+
             pkg_jobname = pkg.replace('-', '_')
             stage['jobs'].append({
                 'job': pkg_jobname,
