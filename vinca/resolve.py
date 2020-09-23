@@ -1,12 +1,12 @@
 import os
 from urllib.request import urlopen
 import platform
-
+from vinca import config
 
 map_platform_python_to_conda = {
-    'Linux': 'linux',
-    'Darwin': 'osx',
-    'Windows': 'win64'
+    'linux-64': 'linux',
+    'osx-64': 'osx',
+    'win-64': 'win64'
 }
 
 
@@ -28,7 +28,7 @@ def get_conda_index(vinca_conf, base_dir):
 def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
     for i in conda_index:
         if pkg_shortname in i:
-            sys_platform = map_platform_python_to_conda[platform.system()]
+            sys_platform = map_platform_python_to_conda[config.selected_platform]
             if 'conda-forge' in i[pkg_shortname].keys():
                 if sys_platform in i[pkg_shortname]['conda-forge']:
                     return i[pkg_shortname]['conda-forge'][sys_platform]

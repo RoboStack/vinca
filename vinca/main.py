@@ -14,6 +14,8 @@ from .resolve import resolve_pkgname_from_indexes
 from .template import write_recipe, write_recipe_package
 from .distro import Distro
 
+from vinca import config
+
 unsatisfied_deps = set()
 distro = None
 
@@ -76,8 +78,9 @@ def parse_command_line(argv):
         "--platform", dest="platform", default=None,
         help="The conda platform to check existing recipes for.")
     arguments = parser.parse_args(argv[1:])
-    global parsed_args
+    global parsed_args, selected_platform
     parsed_args = arguments
+    config.selected_platform = get_conda_subdir()
     return arguments
 
 def read_vinca_yaml(filepath):
