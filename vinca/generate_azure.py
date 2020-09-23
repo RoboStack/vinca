@@ -253,7 +253,10 @@ def main():
                     'displayName': f'Build {pkg}'
                 }]
             })
-        azure_stages.append(stage)
+
+        if len(stage['jobs']) != 0:
+            # all packages skipped ...
+            azure_stages.append(stage)
 
     azure_template['trigger'] = [args.trigger_branch]
     azure_template['pr'] = 'none'
@@ -324,7 +327,10 @@ def main():
                     'displayName': f'Build {pkg}'
                 }]
             })
-        azure_stages.append(stage)
+
+        if len(stage['jobs']) != 0:
+            # all packages skipped ...
+            azure_stages.append(stage)
 
     azure_template['trigger'] = [args.trigger_branch]
     azure_template['pr'] = 'none'
