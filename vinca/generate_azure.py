@@ -1,5 +1,6 @@
 import networkx as nx
 import yaml
+import re
 import glob
 import sys, os
 import textwrap
@@ -101,6 +102,9 @@ def parse_command_line(argv):
     parsed_args = arguments
     return arguments
 
+def normalize_name(s):
+    s = s.replace('-', '_')
+    return re.sub('[^a-zA-Z_]+', '', s)
 
 def main():
 
@@ -193,7 +197,7 @@ def main():
             if pkg not in requirements:
                 continue
 
-            pkg_jobname = pkg.replace('-', '_')
+            pkg_jobname = normalize_name(pkg)
             stage['jobs'].append({
                 'job': pkg_jobname,
                 'steps':
@@ -243,7 +247,7 @@ def main():
             if pkg not in requirements:
                 continue
 
-            pkg_jobname = pkg.replace('-', '_')
+            pkg_jobname = normalize_name(pkg)
             stage['jobs'].append({
                 'job': pkg_jobname,
                 'steps':
@@ -292,7 +296,7 @@ def main():
             if pkg not in requirements:
                 continue
 
-            pkg_jobname = pkg.replace('-', '_')
+            pkg_jobname = normalize_name(pkg)
             stage['jobs'].append({
                 'job': pkg_jobname,
                 'variables': {
