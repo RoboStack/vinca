@@ -166,7 +166,7 @@ def main():
         if len(current_stage):
             stages.append(current_stage)
     else:
-        fn_wo_yaml = os.path.splitext(all_recipes[0])[0]
+        fn_wo_yaml = os.path.splitext(os.path.basename(all_recipes[0]))[0]
         stages = [[fn_wo_yaml]]
         requirements = [fn_wo_yaml]
     # print(stages)
