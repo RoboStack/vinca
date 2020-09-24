@@ -94,7 +94,7 @@ def parse_command_line(argv):
 
 def normalize_name(s):
     s = s.replace('-', '_')
-    return re.sub('[^a-zA-Z_]+', '', s)
+    return re.sub('[^a-zA-Z0-9_]+', '', s)
 
 def main():
 
