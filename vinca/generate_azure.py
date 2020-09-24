@@ -114,54 +114,58 @@ def main():
         with open(f) as fi:
             metas.append(yaml.load(fi.read(), Loader=Loader))
 
-    requirements = {}
+    if len(metas) > 1:
+        requirements = {}
 
-    for pkg in metas:
-        requirements[pkg['package']['name']] = pkg['requirements']['host'] + pkg['requirements']['run']
+        for pkg in metas:
+            requirements[pkg['package']['name']] = pkg['requirements']['host'] + pkg['requirements']['run']
 
-    # sort out requirements that are not built in this run
+        # sort out requirements that are not built in this run
 
-    for pkg_name, reqs in requirements.items():
-        requirements[pkg_name] = [r for r in reqs if (isinstance(r, str) and r in reqs)]
-    # print(requirements)
+        for pkg_name, reqs in requirements.items():
+            requirements[pkg_name] = [r for r in reqs if (isinstance(r, str) and r in reqs)]
+        # print(requirements)
 
-    G = nx.DiGraph()
-    for pkg, reqs in requirements.items():
-        G.add_node(pkg)
-        for r in reqs:
-            if r.startswith('ros-'):
-                G.add_edge(pkg, r)
+        G = nx.DiGraph()
+        for pkg, reqs in requirements.items():
+            G.add_node(pkg)
+            for r in reqs:
+                if r.startswith('ros-'):
+                    G.add_edge(pkg, r)
 
-    # import matplotlib.pyplot as plt
-    # nx.draw(G, with_labels=True, font_weight='bold')
-    # plt.show()
+        # import matplotlib.pyplot as plt
+        # nx.draw(G, with_labels=True, font_weight='bold')
+        # plt.show()
 
-    tg = list(reversed(list(nx.topological_sort(G))))
+        tg = list(reversed(list(nx.topological_sort(G))))
 
-    stages = []
-    current_stage = []
-    for pkg in tg:
-        reqs = requirements.get(pkg, [])
-        sort_in_stage = 0
-        for r in reqs:
-            # sort up the stages, until first stage found where all requirements are fulfilled.
-            for sidx, stage in enumerate(stages):
-                if r in stages[sidx]:
-                    sort_in_stage = max(sidx + 1, sort_in_stage)
+        stages = []
+        current_stage = []
+        for pkg in tg:
+            reqs = requirements.get(pkg, [])
+            sort_in_stage = 0
+            for r in reqs:
+                # sort up the stages, until first stage found where all requirements are fulfilled.
+                for sidx, stage in enumerate(stages):
+                    if r in stages[sidx]:
+                        sort_in_stage = max(sidx + 1, sort_in_stage)
 
-            # if r in current_stage:
-                # stages.append(current_stage)
-                # current_stage = []
-        if sort_in_stage >= len(stages):
-            stages.append([pkg])
-        else:
-            stages[sort_in_stage].append(pkg)
-        # current_stage.append(pkg)
+                # if r in current_stage:
+                    # stages.append(current_stage)
+                    # current_stage = []
+            if sort_in_stage >= len(stages):
+                stages.append([pkg])
+            else:
+                stages[sort_in_stage].append(pkg)
+            # current_stage.append(pkg)
 
-    if len(current_stage):
-        stages.append(current_stage)
-
-    print(stages)
+        if len(current_stage):
+            stages.append(current_stage)
+    else:
+        fn_wo_yaml = os.path.splitext(all_recipes[0])[0]
+        stages = [[fn_wo_yaml]]
+        requirements = [fn_wo_yaml]
+    # print(stages)
 
     azure_template = {
         # 'image': 'condaforge/linux-anvil-cos7-x86_64'
@@ -184,8 +188,8 @@ def main():
         }
         stage_names.append(stage_name)
 
-
         for pkg in s:
+            # print(pkg)
             if pkg not in requirements:
                 continue
 
