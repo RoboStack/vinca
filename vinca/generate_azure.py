@@ -53,28 +53,18 @@ azure_win_script = """
 set "CI=azure"
 call activate base
 
-@rem git clone https://github.com/thesnakepit/boa
-@rem cd boa
-@rem pip install -e .
-@rem cd ..
-
 conda config --append channels defaults
 conda config --add channels conda-forge
 conda config --add channels robostack
 conda config --set channel_priority strict
 
-@rem conda info
-@rem conda config --show-sources
-
 conda remove --force m2-git
-
-@rem conda list --show-channel-urls
 
 cp recipes/%CURRENT_BUILD_PKG_NAME%.yaml ./recipe.yaml
 
 boa build .
 
-@rem conda.exe build "recipe" -m .ci_support/%CONFIG%.yaml
+anaconda -t %ANACONDA_API_TOKEN% upload "C:\\bld\\win-64\\*.tar.bz2" --force
 """
 
 parsed_args = None
