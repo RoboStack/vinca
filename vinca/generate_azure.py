@@ -171,10 +171,13 @@ def main():
 
         if len(current_stage):
             stages.append(current_stage)
-    else:
+    elif len(metas) == 1:
         fn_wo_yaml = os.path.splitext(os.path.basename(all_recipes[0]))[0]
         stages = [[fn_wo_yaml]]
         requirements = [fn_wo_yaml]
+    else:
+        stages = []
+        requirements = []
     # print(stages)
 
     azure_template = {
