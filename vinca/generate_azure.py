@@ -346,7 +346,7 @@ def main():
 
     # Build aarch64 pipeline
     azure_template = {"pool": {
-        "name": "ubuntu-aarch64",
+        "name": "Default",
         "demands": [
             "Agent.OS -equals linux",
             "Agent.OSArchitecture -equals ARM64"
