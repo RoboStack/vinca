@@ -210,6 +210,7 @@ def main():
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
                                 "CURRENT_BUILD_PKG_NAME": pkg,
+                                "DOCKER_IMAGE": "linux-anvil-comp7"
                             },
                             "displayName": f"Build {pkg}",
                         }
@@ -225,7 +226,7 @@ def main():
     azure_template["pr"] = "none"
     azure_template["stages"] = azure_stages
 
-    if args.platform.startswith("linux"):
+    if args.platform == "linux-64":
         with open("linux.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
 
@@ -341,3 +342,58 @@ def main():
     if args.platform.startswith("win"):
         with open("win.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
+
+
+    # Build aarch64 pipeline
+    azure_template = {"pool": {
+        "name": "ubuntu-aarch64",
+        "demands": [
+            "Agent.OS -equals linux",
+            "Agent.OSArchitecture -equals ARM64"
+        ]}
+    }
+
+    azure_stages = []
+
+    stage_names = []
+    for i, s in enumerate(stages):
+        stage_name = f"stage_{i}"
+        stage = {"stage": stage_name, "jobs": []}
+        stage_names.append(stage_name)
+
+        for pkg in s:
+            # print(pkg)
+            if pkg not in requirements:
+                continue
+
+            pkg_jobname = normalize_name(pkg)
+            stage["jobs"].append(
+                {
+                    "job": pkg_jobname,
+                    "steps": [
+                        {
+                            # 'script': '''.scripts/build_linux.sh''',
+                            "script": azure_linux_script,
+                            "env": {
+                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
+                                "CURRENT_BUILD_PKG_NAME": pkg,
+                                "DOCKER_IMAGE": "linux-anvil-aarch64"
+                            },
+                            "displayName": f"Build {pkg}",
+                        }
+                    ],
+                }
+            )
+
+        if len(stage["jobs"]) != 0:
+            # all packages skipped ...
+            azure_stages.append(stage)
+
+    azure_template["trigger"] = [args.trigger_branch]
+    azure_template["pr"] = "none"
+    azure_template["stages"] = azure_stages
+
+    if args.platform == "linux-aarch64":
+        with open("linux_aarch64.yml", "w") as fo:
+            fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
+
