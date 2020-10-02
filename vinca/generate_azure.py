@@ -210,7 +210,7 @@ def main():
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
                                 "CURRENT_BUILD_PKG_NAME": pkg,
-                                "DOCKER_IMAGE": "conda-forge/linux-anvil-comp7"
+                                "DOCKER_IMAGE": "condaforge/linux-anvil-comp7"
                             },
                             "displayName": f"Build {pkg}",
                         }
