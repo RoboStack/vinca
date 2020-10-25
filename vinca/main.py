@@ -28,18 +28,18 @@ def get_conda_subdir():
     if parsed_args.platform:
         return parsed_args.platform
 
-    platform = sys.platform
+    sys_platform = sys.platform
     machine = platform.machine()
-    if platform.startswith("linux"):
+    if sys_platform.startswith("linux"):
         if machine == "aarch64":
             return "linux-aarch64"
         elif machine == "x86_64":
             return "linux-64"
         else:
             raise RuntimeError("Unknown machine!")
-    elif platform == "darwin":
+    elif sys_platform == "darwin":
         return "osx-64"
-    elif platform == "win32":
+    elif sys_platform == "win32":
         return "win-64"
 
 
