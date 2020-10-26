@@ -63,6 +63,7 @@ conda remove --force m2-git
 
 cp recipes/%CURRENT_BUILD_PKG_NAME%.yaml ./recipe.yaml
 
+boa render .
 boa build .
 
 anaconda -t %ANACONDA_API_TOKEN% upload "C:\\bld\\win-64\\*.tar.bz2" --force
@@ -298,7 +299,7 @@ def main():
                         {
                             "task": "CondaEnvironment@1",
                             "inputs": {
-                                "packageSpecs": "python=3.6 dataclasses conda-build conda conda-forge::conda-forge-ci-setup=3 pip boa quetz-client",
+                                "packageSpecs": "python=3.6 dataclasses conda-build conda conda-forge::conda-forge-ci-setup=3 pip \boa quetz-client",
                                 "installOptions": "-c conda-forge",
                                 "updateConda": True,
                             },
