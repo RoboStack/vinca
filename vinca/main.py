@@ -242,6 +242,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     output["requirements"]["run"] = sorted(output["requirements"]["run"])
     output["requirements"]["host"] = sorted(output["requirements"]["host"])
 
+    output["requirements"]["run"] += [
+        {'sel(osx and x86_64)': '__osx >={{ MACOSX_DEPLOYMENT_TARGET|default(\'10.14\') }}'}
+    ]
+
     # fix up OPENGL support for Unix
     if (
         "REQUIRE_OPENGL" in output["requirements"]["run"]
