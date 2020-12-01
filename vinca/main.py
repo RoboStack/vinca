@@ -802,7 +802,7 @@ def main():
                     print(f"Fetching repodata: {fn}")
 
                     repodata = request.json()
-                    selected_bn = 0
+                    selected_bn = vinca_conf.get("build_number", 0)
                     distro = vinca_conf["ros_distro"]
                     for pkg_name, pkg in repodata.get("packages").items():
                         if pkg_name.startswith(f"ros-{distro}"):
