@@ -29,6 +29,7 @@ extra:
 
 def write_recipe_package(recipe):
     file = yaml.YAML()
+    file.width = 4096
     file.indent(mapping=2, sequence=4, offset=2)
     with open(recipe["package"]["name"] + ".yaml", "w") as stream:
         file.dump(recipe, stream)
@@ -38,6 +39,7 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
     # single_file = False
     if single_file:
         file = yaml.YAML()
+        file.width = 4096
         file.indent(mapping=2, sequence=4, offset=2)
         meta = file.load(TEMPLATE)
 
@@ -50,6 +52,7 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
     else:
         for o in outputs:
             file = yaml.YAML()
+            file.width = 4096
             file.indent(mapping=2, sequence=4, offset=2)
             meta = file.load(TEMPLATE)
 

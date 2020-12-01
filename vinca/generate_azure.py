@@ -5,7 +5,6 @@ import glob
 import sys, os
 import textwrap
 import argparse
-from collections import OrderedDict
 
 try:
     from yaml import CLoader as Loader, CDumper as Dumper
@@ -211,7 +210,7 @@ def main():
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
                                 "CURRENT_BUILD_PKG_NAME": pkg,
-                                "DOCKER_IMAGE": "condaforge/linux-anvil-comp7"
+                                "DOCKER_IMAGE": "condaforge/linux-anvil-comp7",
                             },
                             "displayName": f"Build {pkg}",
                         }
@@ -344,14 +343,12 @@ def main():
         with open("win.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
 
-
     # Build aarch64 pipeline
-    azure_template = {"pool": {
-        "name": "Default",
-        "demands": [
-            "Agent.OS -equals linux",
-            "Agent.OSArchitecture -equals ARM64"
-        ]}
+    azure_template = {
+        "pool": {
+            "name": "Default",
+            "demands": ["Agent.OS -equals linux", "Agent.OSArchitecture -equals ARM64"],
+        }
     }
 
     azure_stages = []
@@ -378,7 +375,7 @@ def main():
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
                                 "CURRENT_BUILD_PKG_NAME": pkg,
-                                "DOCKER_IMAGE": "condaforge/linux-anvil-aarch64"
+                                "DOCKER_IMAGE": "condaforge/linux-anvil-aarch64",
                             },
                             "displayName": f"Build {pkg}",
                         }
@@ -397,4 +394,3 @@ def main():
     if args.platform == "linux-aarch64":
         with open("linux_aarch64.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
-

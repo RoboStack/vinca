@@ -8,6 +8,8 @@ import os
 import json
 import glob
 import platform
+import ruamel.yaml
+from pathlib import Path
 
 from vinca import __version__
 from .resolve import get_conda_index
@@ -116,9 +118,32 @@ def parse_command_line(argv):
     return arguments
 
 
-def read_vinca_yaml(filepath):
-    import ruamel.yaml
+def get_depmods(vinca_conf, pkg_name):
+    depmods = vinca_conf["depmods"].get(pkg_name, {})
+    rm_deps, add_deps = {"build": set(), "run": set()}, {"build": set(), "run": set()}
 
+    if depmods.get("remove"):
+        for el in depmods["remove"]:
+            if type(el) is str:
+                rm_deps["build"].add(el)
+                rm_deps["run"].add(el)
+            elif type(el) == dict:
+                rm_deps["build"] = set(el.get("build", []))
+                rm_deps["run"] = set(el.get("run", []))
+
+    if depmods.get("add"):
+        for el in depmods["add"]:
+            if type(el) is str:
+                add_deps["build"].add(el)
+                add_deps["run"].add(el)
+            elif type(el) == dict:
+                add_deps["build"] = set(el.get("build", []))
+                add_deps["run"] = set(el.get("run", []))
+
+    return rm_deps, add_deps
+
+
+def read_vinca_yaml(filepath):
     yaml = ruamel.yaml.YAML()
     vinca_conf = yaml.load(open(filepath, "r"))
 
@@ -131,7 +156,8 @@ def read_vinca_yaml(filepath):
             conda_index.append(i)
 
     vinca_conf["conda_index"] = conda_index
-    vinca_conf["_patch_dir"] = os.path.abspath(vinca_conf["patch_dir"])
+    patch_dir = Path(vinca_conf["patch_dir"]).absolute()
+    vinca_conf["_patch_dir"] = patch_dir
     patches = {}
 
     for x in glob.glob(os.path.join(vinca_conf["_patch_dir"], "*.patch")):
@@ -145,6 +171,12 @@ def read_vinca_yaml(filepath):
         patches[splitted[0]]["any"].append(x)
 
     vinca_conf["_patches"] = patches
+
+    if (patch_dir / "dependencies.yaml").exists():
+        vinca_conf["depmods"] = yaml.load(open(patch_dir / "dependencies.yaml"))
+    else:
+        vinca_conf["depmods"] = {}
+
     return vinca_conf
 
 
@@ -208,13 +240,16 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         output["requirements"]["host"].extend(resolved_setuptools)
     else:
         return None
+
+    rm_deps, add_deps = get_depmods(vinca_conf, pkg.name)
+
     build_deps = pkg.build_depends
     build_deps += pkg.buildtool_depends
     build_deps += pkg.build_export_depends
     build_deps += pkg.buildtool_export_depends
     build_deps += pkg.test_depends
     build_deps = [d.name for d in build_deps if d.evaluated_condition]
-    build_deps = set(build_deps)
+    build_deps = (set(build_deps) - rm_deps["build"]) | add_deps["build"]
 
     for dep in build_deps:
         resolved_dep = resolve_pkgname(dep, vinca_conf, distro)
@@ -228,7 +263,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     run_deps += pkg.build_export_depends
     run_deps += pkg.buildtool_export_depends
     run_deps = [d.name for d in run_deps if d.evaluated_condition]
-    run_deps = set(run_deps)
+    run_deps = (set(run_deps) - rm_deps["run"]) | add_deps["run"]
 
     for dep in run_deps:
         resolved_dep = resolve_pkgname(dep, vinca_conf, distro, is_rundep=True)
@@ -243,7 +278,9 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     output["requirements"]["host"] = sorted(output["requirements"]["host"])
 
     output["requirements"]["run"] += [
-        {'sel(osx and x86_64)': '__osx >={{ MACOSX_DEPLOYMENT_TARGET|default(\'10.14\') }}'}
+        {
+            "sel(osx and x86_64)": "__osx >={{ MACOSX_DEPLOYMENT_TARGET|default('10.14') }}"
+        }
     ]
 
     # fix up OPENGL support for Unix
