@@ -224,7 +224,8 @@ def main():
 
     azure_template["trigger"] = [args.trigger_branch]
     azure_template["pr"] = "none"
-    azure_template["stages"] = azure_stages
+    if azure_stages:
+        azure_template["stages"] = azure_stages
 
     if args.platform == "linux-64":
         with open("linux.yml", "w") as fo:
@@ -268,7 +269,8 @@ def main():
 
     azure_template["trigger"] = [args.trigger_branch]
     azure_template["pr"] = "none"
-    azure_template["stages"] = azure_stages
+    if azure_stages:
+        azure_template["stages"] = azure_stages
 
     if args.platform.startswith("osx"):
         with open("osx.yml", "w") as fo:
@@ -337,7 +339,8 @@ def main():
 
     azure_template["trigger"] = [args.trigger_branch]
     azure_template["pr"] = "none"
-    azure_template["stages"] = azure_stages
+    if azure_stages:
+        azure_template["stages"] = azure_stages
 
     if args.platform.startswith("win"):
         with open("win.yml", "w") as fo:
@@ -389,7 +392,8 @@ def main():
 
     azure_template["trigger"] = [args.trigger_branch]
     azure_template["pr"] = "none"
-    azure_template["stages"] = azure_stages
+    if azure_stages:
+        azure_template["stages"] = azure_stages
 
     if args.platform == "linux-aarch64":
         with open("linux_aarch64.yml", "w") as fo:
