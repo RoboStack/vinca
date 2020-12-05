@@ -241,6 +241,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     else:
         return None
 
+    if vinca_conf.get("mutex_package"):
+        output["requirements"]["host"].append(vinca_conf["mutex_package"])
+        output["requirements"]["run"].append(vinca_conf["mutex_package"])
+
+
     rm_deps, add_deps = get_depmods(vinca_conf, pkg.name)
 
     build_deps = pkg.build_depends

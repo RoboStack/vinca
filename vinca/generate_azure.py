@@ -5,11 +5,34 @@ import glob
 import sys, os
 import textwrap
 import argparse
+from distutils.dir_util import copy_tree
 
 try:
     from yaml import CLoader as Loader, CDumper as Dumper
 except ImportError:
     from yaml import Loader, Dumper
+
+import yaml
+
+
+class folded_unicode(str):
+    pass
+
+
+class literal_unicode(str):
+    pass
+
+
+def folded_unicode_representer(dumper, data):
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=">")
+
+
+def literal_unicode_representer(dumper, data):
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+
+
+yaml.add_representer(folded_unicode, folded_unicode_representer)
+yaml.add_representer(literal_unicode, literal_unicode_representer)
 
 # def setup_yaml():
 #   """ https://stackoverflow.com/a/8661021 """
@@ -39,17 +62,19 @@ build:
 
 # yaml.add_representer(str, str_presenter)
 
-azure_linux_script = """export CI=azure
+azure_linux_script = literal_unicode("""\
+export CI=azure
 export GIT_BRANCH=$BUILD_SOURCEBRANCHNAME
 export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
-.scripts/run_docker_build.sh"""
+.scripts/run_docker_build.sh""")
 
-azure_osx_script = """export CI=azure
+azure_osx_script = literal_unicode("""\
+export CI=azure
 export GIT_BRANCH=$BUILD_SOURCEBRANCHNAME
 export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
-.scripts/build_osx.sh"""
+.scripts/build_osx.sh""")
 
-azure_win_script = """
+azure_win_script = literal_unicode("""\
 set "CI=azure"
 call activate base
 
@@ -66,7 +91,7 @@ boa render .
 boa build .
 
 anaconda -t %ANACONDA_API_TOKEN% upload "C:\\bld\\win-64\\*.tar.bz2" --force
-"""
+""")
 
 parsed_args = None
 
@@ -97,6 +122,9 @@ def parse_command_line(argv):
         help="Platform to emit build pipeline for",
     )
 
+    parser.add_argument(
+        "-a", "--additional-recipes", action="store_true", help="search for additional_recipes folder?")
+
     arguments = parser.parse_args(argv[1:])
     global parsed_args
     parsed_args = arguments
@@ -108,6 +136,36 @@ def normalize_name(s):
     return re.sub("[^a-zA-Z0-9_]+", "", s)
 
 
+def batch_stages(stages, max_batch_size=5):
+    print(stages)
+    # this reduces the number of individual builds to try to save some time
+    stage_lengths = [len(s) for s in stages]
+    merged_stages = []
+    curr_stage = []
+
+    def chunks(lst, n):
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
+    i = 0
+    while i < len(stages):
+        if stage_lengths[i] < max_batch_size and len(curr_stage) + stage_lengths[i] < max_batch_size:
+            # merge with previous stage
+            curr_stage += stages[i]
+        else:
+            if len(curr_stage):
+                merged_stages.append([curr_stage])
+                curr_stage = []
+            if stage_lengths[i] < max_batch_size:
+                curr_stage += stages[i]
+            else:
+                # split this stage into multiple
+                merged_stages.append(list(chunks(stages[i], max_batch_size)))
+        i += 1
+    if len(curr_stage):
+        merged_stages.append([curr_stage])
+    return merged_stages
+
 def main():
 
     args = parse_command_line(sys.argv)
@@ -115,7 +173,13 @@ def main():
     metas = []
     recipe_names = []
 
-    all_recipes = glob.glob(os.path.join(args.dir, "*.yaml"))
+    if args.additional_recipes:
+        additional_recipes_path = os.path.abspath(os.path.join(args.dir, '..', 'additional_recipes'))
+        print(f"ADDITIONAL RECIPES IN? {additional_recipes_path}")
+        if os.path.exists(additional_recipes_path):
+            copy_tree(additional_recipes_path, args.dir)
+
+    all_recipes = glob.glob(os.path.join(args.dir, "**", "*.yaml"))
     for f in all_recipes:
         with open(f) as fi:
             metas.append(yaml.load(fi.read(), Loader=Loader))
@@ -125,16 +189,15 @@ def main():
 
         for pkg in metas:
             requirements[pkg["package"]["name"]] = (
-                pkg["requirements"]["host"] + pkg["requirements"]["run"]
+                pkg["requirements"].get("host", []) + pkg["requirements"].get("run", [])
             )
 
         # sort out requirements that are not built in this run
-
         for pkg_name, reqs in requirements.items():
             requirements[pkg_name] = [
-                r for r in reqs if (isinstance(r, str) and r in reqs)
+                r.split()[0] for r in reqs if (isinstance(r, str) and r in reqs)
             ]
-        # print(requirements)
+        print(requirements)
 
         G = nx.DiGraph()
         for pkg, reqs in requirements.items():
@@ -178,28 +241,25 @@ def main():
     else:
         stages = []
         requirements = []
-    # print(stages)
-
-    azure_template = {
-        # 'image': 'condaforge/linux-anvil-cos7-x86_64'
-    }
 
     azure_template = {"pool": {"vmImage": "ubuntu-16.04"}}
 
     azure_stages = []
 
     stage_names = []
+
+    stages = batch_stages(stages)
+
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
         stage = {"stage": stage_name, "jobs": []}
         stage_names.append(stage_name)
 
-        for pkg in s:
-            # print(pkg)
-            if pkg not in requirements:
-                continue
+        for batch in s:
+            # if batch not in requirements:
+            #     continue
 
-            pkg_jobname = normalize_name(pkg)
+            pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
                     "job": pkg_jobname,
@@ -209,10 +269,10 @@ def main():
                             "script": azure_linux_script,
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_BUILD_PKG_NAME": pkg,
+                                "CURRENT_RECIPES": f"({' '.join([pkg for pkg in batch])})",
                                 "DOCKER_IMAGE": "condaforge/linux-anvil-comp7",
                             },
-                            "displayName": f"Build {pkg}",
+                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
                         }
                     ],
                 }
@@ -229,8 +289,9 @@ def main():
 
     if args.platform == "linux-64":
         with open("linux.yml", "w") as fo:
-            fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
+            fo.write(yaml.dump(azure_template, sort_keys=False))
 
+    exit()
     azure_template = {"pool": {"vmImage": "macOS-10.15"}}
 
     azure_stages = []
@@ -255,7 +316,7 @@ def main():
                             "script": azure_osx_script,
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_BUILD_PKG_NAME": pkg,
+                                "CURRENT_RECIPES": f"({pkg})",
                             },
                             "displayName": f"Build {pkg}",
                         }
@@ -274,7 +335,7 @@ def main():
 
     if args.platform.startswith("osx"):
         with open("osx.yml", "w") as fo:
-            fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
+            fo.write(yaml.dump(azure_template, sort_keys=False))
 
     # windows
     azure_template = {"pool": {"vmImage": "vs2017-win2016"}}
@@ -344,7 +405,7 @@ def main():
 
     if args.platform.startswith("win"):
         with open("win.yml", "w") as fo:
-            fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
+            fo.write(yaml.dump(azure_template, sort_keys=False))
 
     # Build aarch64 pipeline
     azure_template = {
@@ -377,7 +438,7 @@ def main():
                             "script": azure_linux_script,
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_BUILD_PKG_NAME": pkg,
+                                "CURRENT_RECIPES": f"({pkg})",
                                 "DOCKER_IMAGE": "condaforge/linux-anvil-aarch64",
                             },
                             "displayName": f"Build {pkg}",
@@ -397,4 +458,4 @@ def main():
 
     if args.platform == "linux-aarch64":
         with open("linux_aarch64.yml", "w") as fo:
-            fo.write(yaml.dump(azure_template, Dumper=Dumper, sort_keys=False))
+            fo.write(yaml.dump(azure_template, sort_keys=False))
