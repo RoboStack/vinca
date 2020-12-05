@@ -256,16 +256,12 @@ def main():
         stage_names.append(stage_name)
 
         for batch in s:
-            # if batch not in requirements:
-            #     continue
-
             pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
                     "job": pkg_jobname,
                     "steps": [
                         {
-                            # 'script': '''.scripts/build_linux.sh''',
                             "script": azure_linux_script,
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
@@ -291,7 +287,6 @@ def main():
         with open("linux.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
-    exit()
     azure_template = {"pool": {"vmImage": "macOS-10.15"}}
 
     azure_stages = []
@@ -303,22 +298,18 @@ def main():
         stage_names.append(stage_name)
 
         for pkg in s:
-            if pkg not in requirements:
-                continue
-
-            pkg_jobname = normalize_name(pkg)
+            pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
                     "job": pkg_jobname,
                     "steps": [
                         {
-                            # 'script': '''.scripts/build_linux.sh''',
                             "script": azure_osx_script,
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"{pkg}",
+                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}"
                             },
-                            "displayName": f"Build {pkg}",
+                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
                         }
                     ],
                 }
@@ -337,6 +328,7 @@ def main():
         with open("osx.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
+    exit()
     # windows
     azure_template = {"pool": {"vmImage": "vs2017-win2016"}}
 
