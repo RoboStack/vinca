@@ -269,7 +269,7 @@ def main():
                             "script": azure_linux_script,
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"({' '.join([pkg for pkg in batch])})",
+                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
                                 "DOCKER_IMAGE": "condaforge/linux-anvil-comp7",
                             },
                             "displayName": f"Build {' '.join([pkg for pkg in batch])}",
@@ -316,7 +316,7 @@ def main():
                             "script": azure_osx_script,
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"({pkg})",
+                                "CURRENT_RECIPES": f"{pkg}",
                             },
                             "displayName": f"Build {pkg}",
                         }
@@ -438,7 +438,7 @@ def main():
                             "script": azure_linux_script,
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"({pkg})",
+                                "CURRENT_RECIPES": f"{pkg}",
                                 "DOCKER_IMAGE": "condaforge/linux-anvil-aarch64",
                             },
                             "displayName": f"Build {pkg}",
