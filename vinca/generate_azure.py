@@ -287,7 +287,7 @@ def main():
     if azure_stages:
         azure_template["stages"] = azure_stages
 
-    if args.platform == "linux-64":
+    if args.platform == "linux-64" and len(azure_stages):
         with open("linux.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
@@ -333,7 +333,7 @@ def main():
     if azure_stages:
         azure_template["stages"] = azure_stages
 
-    if args.platform.startswith("osx"):
+    if args.platform.startswith("osx") and len(azure_stages):
         with open("osx.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
@@ -403,7 +403,7 @@ def main():
     if azure_stages:
         azure_template["stages"] = azure_stages
 
-    if args.platform.startswith("win"):
+    if args.platform.startswith("win") and len(azure_stages):
         with open("win.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
@@ -456,6 +456,6 @@ def main():
     if azure_stages:
         azure_template["stages"] = azure_stages
 
-    if args.platform == "linux-aarch64":
+    if args.platform == "linux-aarch64" and len(azure_stages):
         with open("linux_aarch64.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, sort_keys=False))
