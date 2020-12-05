@@ -791,6 +791,20 @@ def main():
     vinca_conf = read_vinca_yaml(vinca_yaml)
     vinca_conf["_conda_indexes"] = get_conda_index(vinca_conf, base_dir)
 
+    from .template import generate_bld_ament_cmake
+    from .template import generate_bld_ament_python
+    from .template import generate_bld_catkin
+    from .template import generate_activate_hook
+    from .template import generate_bld_colcon_merge
+    from .template import generate_bld_catkin_merge
+
+    generate_bld_ament_cmake()
+    generate_bld_ament_python()
+    generate_bld_catkin()
+    generate_bld_colcon_merge()
+    generate_bld_catkin_merge()
+    generate_activate_hook()
+
     if arguments.package:
         pkg_files = glob.glob(arguments.package)
 
@@ -890,17 +904,4 @@ def main():
 
         print(unsatisfied_deps)
 
-    from .template import generate_bld_ament_cmake
-    from .template import generate_bld_ament_python
-    from .template import generate_bld_catkin
-    from .template import generate_activate_hook
-    from .template import generate_bld_colcon_merge
-    from .template import generate_bld_catkin_merge
-
-    generate_bld_ament_cmake()
-    generate_bld_ament_python()
-    generate_bld_catkin()
-    generate_bld_colcon_merge()
-    generate_bld_catkin_merge()
-    generate_activate_hook()
     print("build scripts are created successfully.")

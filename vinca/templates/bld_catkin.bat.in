@@ -23,6 +23,8 @@ rd /s /q build
 mkdir build
 pushd build
 
+set SKIP_TESTING=@(skip_testing)
+
 cmake ^
     -G "Ninja" ^
     -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ^
@@ -33,9 +35,17 @@ cmake ^
     -DSETUPTOOLS_DEB_LAYOUT=OFF ^
     -DBoost_USE_STATIC_LIBS=OFF ^
     %CATKIN_BUILD_BINARY_PACKAGE_ARGS% ^
-    -DCATKIN_SKIP_TESTING=ON ^
+    -DCATKIN_SKIP_TESTING=%SKIP_TESTING% ^
     %SRC_DIR%\%PKG_NAME%\src\work
 if errorlevel 1 exit 1
+
+cmake --build . --config Release --target all
+if errorlevel 1 exit 1
+
+if "%SKIP_TESTING%" == "OFF" (
+    cmake --build . --config Release --target run_tests
+    if errorlevel 1 exit 1
+)
 
 cmake --build . --config Release --target install
 if errorlevel 1 exit 1

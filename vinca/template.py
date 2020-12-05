@@ -1,8 +1,10 @@
 import datetime
+import shutil
 import ruamel
 import os
 
 from ruamel import yaml
+from pathlib import Path
 
 TEMPLATE = """\
 package:
@@ -31,7 +33,10 @@ def write_recipe_package(recipe):
     file = yaml.YAML()
     file.width = 4096
     file.indent(mapping=2, sequence=4, offset=2)
-    with open(recipe["package"]["name"] + ".yaml", "w") as stream:
+
+    os.makedirs(recipe["package"]["name"], exist_ok=True)
+    recipe_path = os.path.join(recipe["package"]["name"], "recipe.yaml")
+    with open(recipe_path, "w") as stream:
         file.dump(recipe, stream)
 
 
@@ -65,12 +70,26 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
 
             meta["build"]["number"] = build_number
 
-            if not os.path.isdir("recipes"):
-                os.makedirs("recipes")
+            recipe_dir = (Path("recipes") / o['package']['name']).absolute()
+            os.makedirs(recipe_dir, exist_ok=True)
             with open(
-                os.path.join("recipes", f"{o['package']['name']}.yaml"), "w"
+                recipe_dir / "recipe.yaml", "w"
             ) as stream:
                 file.dump(meta, stream)
+
+            if meta['source'].get('patches'):
+                for p in meta['source']['patches']:
+                    patch_dir, _ = os.path.split(p)
+                    os.makedirs(recipe_dir / patch_dir, exist_ok=True)
+                    shutil.copyfile(p, recipe_dir / p)
+
+            for key, script in meta['build']['script'].items():
+                shutil.copyfile(script, recipe_dir / script)
+            if "catkin" in o["package"]["name"]:
+                shutil.copyfile("activate.sh", recipe_dir / "activate.sh")
+                shutil.copyfile("activate.bat", recipe_dir / "activate.bat")
+                shutil.copyfile("deactivate.sh", recipe_dir / "deactivate.sh")
+                shutil.copyfile("deactivate.bat", recipe_dir / "deactivate.bat")
 
 
 def generate_template(template_in, template_out):
@@ -79,7 +98,10 @@ def generate_template(template_in, template_out):
     g = {
         "ros_distro": "melodic"
         if not os.environ.get("ROS_DISTRO", None)
-        else os.environ["ROS_DISTRO"]
+        else os.environ["ROS_DISTRO"],
+        "skip_testing": "ON"
+        if not os.environ.get("SKIP_TESTING")
+        else os.environ["SKIP_TESTING"]
     }
     interpreter = em.Interpreter(
         output=template_out, options={em.RAW_OPT: True, em.BUFFERED_OPT: True}
