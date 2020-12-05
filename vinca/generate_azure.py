@@ -297,7 +297,7 @@ def main():
         stage = {"stage": stage_name, "jobs": []}
         stage_names.append(stage_name)
 
-        for pkg in s:
+        for batch in s:
             pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
