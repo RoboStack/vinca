@@ -94,14 +94,10 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
 
 def generate_template(template_in, template_out):
     import em
-
+    from vinca.config import skip_testing, ros_distro
     g = {
-        "ros_distro": "melodic"
-        if not os.environ.get("ROS_DISTRO", None)
-        else os.environ["ROS_DISTRO"],
-        "skip_testing": "ON"
-        if not os.environ.get("SKIP_TESTING")
-        else os.environ["SKIP_TESTING"]
+        "ros_distro": ros_distro,
+        "skip_testing": "ON" if skip_testing else "OFF"
     }
     interpreter = em.Interpreter(
         output=template_out, options={em.RAW_OPT: True, em.BUFFERED_OPT: True}

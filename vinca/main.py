@@ -177,6 +177,9 @@ def read_vinca_yaml(filepath):
     else:
         vinca_conf["depmods"] = {}
 
+    config.ros_distro = vinca_conf["ros_distro"]
+    config.skip_testing = vinca_conf.get("skip_testing", True)
+
     return vinca_conf
 
 
