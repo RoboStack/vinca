@@ -328,7 +328,56 @@ def main():
         with open("osx.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
+    # Build aarch64 pipeline
+    azure_template = {
+        "pool": {
+            "name": "Default",
+            "demands": ["Agent.OS -equals linux", "Agent.OSArchitecture -equals ARM64"],
+        }
+    }
+
+    azure_stages = []
+
+    stage_names = []
+    for i, s in enumerate(stages):
+        stage_name = f"stage_{i}"
+        stage = {"stage": stage_name, "jobs": []}
+        stage_names.append(stage_name)
+
+        for batch in s:
+            pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
+            stage["jobs"].append(
+                {
+                    "job": pkg_jobname,
+                    "steps": [
+                        {
+                            "script": azure_linux_script,
+                            "env": {
+                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
+                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                                "DOCKER_IMAGE": "condaforge/linux-anvil-aarch64",
+                            },
+                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
+                        }
+                    ],
+                }
+            )
+
+        if len(stage["jobs"]) != 0:
+            # all packages skipped ...
+            azure_stages.append(stage)
+
+    azure_template["trigger"] = [args.trigger_branch]
+    azure_template["pr"] = "none"
+    if azure_stages:
+        azure_template["stages"] = azure_stages
+
+    if args.platform == "linux-aarch64" and len(azure_stages):
+        with open("linux_aarch64.yml", "w") as fo:
+            fo.write(yaml.dump(azure_template, sort_keys=False))
+
     exit()
+
     # windows
     azure_template = {"pool": {"vmImage": "vs2017-win2016"}}
 
@@ -397,57 +446,4 @@ def main():
 
     if args.platform.startswith("win") and len(azure_stages):
         with open("win.yml", "w") as fo:
-            fo.write(yaml.dump(azure_template, sort_keys=False))
-
-    # Build aarch64 pipeline
-    azure_template = {
-        "pool": {
-            "name": "Default",
-            "demands": ["Agent.OS -equals linux", "Agent.OSArchitecture -equals ARM64"],
-        }
-    }
-
-    azure_stages = []
-
-    stage_names = []
-    for i, s in enumerate(stages):
-        stage_name = f"stage_{i}"
-        stage = {"stage": stage_name, "jobs": []}
-        stage_names.append(stage_name)
-
-        for pkg in s:
-            # print(pkg)
-            if pkg not in requirements:
-                continue
-
-            pkg_jobname = normalize_name(pkg)
-            stage["jobs"].append(
-                {
-                    "job": pkg_jobname,
-                    "steps": [
-                        {
-                            # 'script': '''.scripts/build_linux.sh''',
-                            "script": azure_linux_script,
-                            "env": {
-                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"{pkg}",
-                                "DOCKER_IMAGE": "condaforge/linux-anvil-aarch64",
-                            },
-                            "displayName": f"Build {pkg}",
-                        }
-                    ],
-                }
-            )
-
-        if len(stage["jobs"]) != 0:
-            # all packages skipped ...
-            azure_stages.append(stage)
-
-    azure_template["trigger"] = [args.trigger_branch]
-    azure_template["pr"] = "none"
-    if azure_stages:
-        azure_template["stages"] = azure_stages
-
-    if args.platform == "linux-aarch64" and len(azure_stages):
-        with open("linux_aarch64.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, sort_keys=False))
