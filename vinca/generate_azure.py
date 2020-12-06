@@ -42,7 +42,9 @@ export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
 .scripts/build_osx.sh""")
 
 azure_win_script = literal_unicode("""\
+SETLOCAL EnableDelayedExpansion
 set "CI=azure"
+set "FEEDSTOCK_ROOT=%cd%"
 call activate base
 
 conda config --append channels defaults
@@ -52,10 +54,12 @@ conda config --set channel_priority strict
 
 conda remove --force m2-git
 
-cp recipes/%CURRENT_BUILD_PKG_NAME%.yaml ./recipe.yaml
-
-boa render .
-boa build .
+(for (%%recipe in %CURRENT_RECIPES%) do (
+    echo "BUILDING RECIPE %%recipe"
+    cd %FEEDSTOCK_ROOT%\\recipes\\%%recipe\\
+    copy %FEEDSTOCK_ROOT%\\conda_build_config.yaml .\\conda_build_config.yaml
+    boa build .
+))
 
 anaconda -t %ANACONDA_API_TOKEN% upload "C:\\bld\\win-64\\*.tar.bz2" --force
 """)
@@ -201,12 +205,13 @@ def main():
 
     if not os.path.exists(args.dir):
         print(f"{args.dir} not found. Not generating a pipeline.")
+
     all_recipes = glob.glob(os.path.join(args.dir, "**", "*.yaml"))
     for f in all_recipes:
         with open(f) as fi:
             metas.append(yaml.safe_load(fi.read()))
 
-    if len(metas) > 1:
+    if len(metas) >= 1:
         requirements = {}
 
         for pkg in metas:
@@ -405,8 +410,6 @@ def main():
         with open("linux_aarch64.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
-    exit()
-
     # windows
     azure_template = {"pool": {"vmImage": "vs2017-win2016"}}
 
@@ -418,11 +421,8 @@ def main():
         stage = {"stage": stage_name, "jobs": []}
         stage_names.append(stage_name)
 
-        for pkg in s:
-            if pkg not in requirements:
-                continue
-
-            pkg_jobname = normalize_name(pkg)
+        for batch in s:
+            pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
                     "job": pkg_jobname,
@@ -443,22 +443,20 @@ def main():
                         #   'continueOnError': True
                         # },
                         {
-                            "script": textwrap.dedent(
-                                """
-                        set "CI=azure"
-                        call activate base
-                        run_conda_forge_build_setup"""
-                            ),
+                            "script": literal_unicode(textwrap.dedent("""\
+                                set "CI=azure"
+                                call activate base
+                                run_conda_forge_build_setup""")),
                             "displayName": "conda-forge build setup",
                         },
                         {
                             "script": azure_win_script,
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_BUILD_PKG_NAME": pkg,
+                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
                                 "PYTHONUNBUFFERED": 1,
                             },
-                            "displayName": f"Build {pkg}",
+                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
                         },
                     ],
                 }
