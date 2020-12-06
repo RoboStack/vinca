@@ -113,7 +113,7 @@ conda config --set channel_priority strict
 
 conda remove --force m2-git
 
-pip install git+https://github.com/mamba-org/boa.git@master
+C:\\Miniconda\\python -m pip install git+https://github.com/mamba-org/boa.git@master
 
 for %%X in (%CURRENT_RECIPES%) do (
     echo "BUILDING RECIPE %%X"
