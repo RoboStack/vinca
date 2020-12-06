@@ -43,17 +43,9 @@ export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
 
 azure_win_script = literal_unicode("""\
 SETLOCAL EnableDelayedExpansion
+conda activate base
 
-echo %PATH%
-set "PATH=C:\\Miniconda\\Scripts;C:\\Miniconda;%PATH%"
-echo %PATH%
-
-
-set "CI=azure"
 set "FEEDSTOCK_ROOT=%cd%"
-call conda.bat activate base
-
-exit 1
 
 conda config --append channels defaults
 conda config --add channels conda-forge
@@ -61,6 +53,8 @@ conda config --add channels robostack
 conda config --set channel_priority strict
 
 conda remove --force m2-git
+
+pip install git+https://github.com/mamba-org/boa.git@master
 
 (for (%%recipe in %CURRENT_RECIPES%) do (
     echo "BUILDING RECIPE %%recipe"
@@ -437,19 +431,18 @@ def main():
                     "variables": {"CONDA_BLD_PATH": "C:\\\\bld\\\\"},
                     "steps": [
                         {
-                            "task": "CondaEnvironment@1",
-                            "inputs": {
-                                # "packageSpecs": "python=3.6 dataclasses conda-build conda conda-forge::conda-forge-ci-setup=3 pip boa quetz-client",
-                                # "installOptions": "-c conda-forge",
-                                # "updateConda": True,
-                            },
-                            "displayName": "Install conda-build, boa and activate environment",
+                            "powershell": 'Write-Host "##vso[task.prependpath]$env:CONDA\\Scripts"',
+                            "displayName": "Add conda to PATH"
+                        },
+                        {
+                            "script": 'conda install -c conda-forge --yes --quiet python=3.6 dataclasses conda-build conda "conda-forge::conda-forge-ci-setup=3" pip boa quetz-client',
+                            "displayName": "Install conda-build, boa and activate environment"
                         },
                         {
                             "script": literal_unicode(textwrap.dedent("""\
                                 set "CI=azure"
                                 set "PYTHONUNBUFFERED=1"
-                                call conda.bat activate base
+                                conda activate base
                                 run_conda_forge_build_setup""")),
                             "displayName": "conda-forge build setup",
                         },
