@@ -169,7 +169,6 @@ def normalize_name(s):
 
 
 def batch_stages(stages, max_batch_size=5):
-    print(stages)
     # this reduces the number of individual builds to try to save some time
     stage_lengths = [len(s) for s in stages]
     merged_stages = []
@@ -251,7 +250,9 @@ def add_additional_recipes(args):
 
         if not skip:
             print("Adding ", os.path.dirname(recipe_path))
-            copy_tree(os.path.dirname(recipe_path), args.dir)
+            goal_folder = os.path.join(args.dir, name)
+            os.makedirs(goal_folder, exist_ok=True)
+            copy_tree(os.path.dirname(recipe_path), goal_folder)
 
 
 def main():
@@ -344,6 +345,7 @@ def main():
             filtered_stages.append(filtered)
 
     stages = batch_stages(filtered_stages)
+    print(stages)
 
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
