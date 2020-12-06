@@ -248,7 +248,14 @@ def main():
 
     stage_names = []
 
-    stages = batch_stages(stages)
+    # filter out packages that we are not actually building
+    filtered_stages = []
+    for stage in stages:
+        filtered = [pkg for pkg in stage if pkg in requirements]
+        if len(filtered):
+            filtered_stages.append(filtered)
+
+    stages = batch_stages(filtered_stages)
 
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
