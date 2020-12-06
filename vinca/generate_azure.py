@@ -6,12 +6,6 @@ import sys, os
 import textwrap
 import argparse
 from distutils.dir_util import copy_tree
-
-try:
-    from yaml import CLoader as Loader, CDumper as Dumper
-except ImportError:
-    from yaml import Loader, Dumper
-
 import yaml
 
 
@@ -34,33 +28,6 @@ def literal_unicode_representer(dumper, data):
 yaml.add_representer(folded_unicode, folded_unicode_representer)
 yaml.add_representer(literal_unicode, literal_unicode_representer)
 
-# def setup_yaml():
-#   """ https://stackoverflow.com/a/8661021 """
-#   represent_dict_order = lambda self, data:  self.represent_mapping('tag:yaml.org,2002:map', data.items())
-#   yaml.add_representer(OrderedDict, represent_dict_order)
-# setup_yaml()
-
-# the stages
-
-"""
-# use the official gcc image, based on debian
-# can use verions as well, like gcc:5.2
-# see https://hub.docker.com/_/gcc/
-image: ubuntu:20.04
-
-build:
-  stage: build
-  script:
-    - echo "Hello"
-"""
-
-
-# def str_presenter(dumper, data):
-#   if len(data.splitlines()) > 1:  # check for multiline string
-#     return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
-#   return dumper.represent_scalar('tag:yaml.org,2002:str', data)
-
-# yaml.add_representer(str, str_presenter)
 
 azure_linux_script = literal_unicode("""\
 export CI=azure
@@ -166,6 +133,62 @@ def batch_stages(stages, max_batch_size=5):
         merged_stages.append([curr_stage])
     return merged_stages
 
+import requests
+
+def get_skip_existing(vinca_conf, platform):
+    fn = vinca_conf.get("skip_existing")
+    repodatas = []
+    fns = list(fn)
+    for fn in fns:
+        selected_bn = None
+        if "://" in fn:
+            fn += f"{platform}/repodata.json"
+            print(f"Fetching repodata: {fn}")
+            request = requests.get(fn)
+
+            repodata = request.json()
+            repodatas.append(repodata)
+        else:
+            with open(fn) as fi:
+                repodata = json.load(fi)
+                repodatas.append(repodata)
+
+    return repodatas
+
+def add_additional_recipes(args):
+    additional_recipes_path = os.path.abspath(os.path.join(args.dir, '..', 'additional_recipes'))
+
+    print("Searching additional recipes in ", additional_recipes_path)
+
+    if not os.path.exists(additional_recipes_path):
+        return
+
+    with open("vinca.yaml", "r") as vinca_yaml:
+        vinca_conf = yaml.safe_load(vinca_yaml)
+
+    existing_packages = {}
+    repodatas = get_skip_existing(vinca_conf, args.platform)
+    additional_recipes = []
+
+    for recipe_path in glob.glob(additional_recipes_path + '/**/recipe.yaml'):
+        with open(recipe_path) as recipe:
+            additional_recipe = yaml.safe_load(recipe)
+ 
+        name, version, bnumber = (additional_recipe["package"]["name"], additional_recipe["package"]["version"], additional_recipe["build"]["number"])
+        print("Checking if ", name, version, bnumber, " exists")
+        skip = False
+        for repo in repodatas:
+            for key, pkg in repo.get("packages", {}).items():
+                if pkg["name"] == name and pkg["version"] == version and pkg["build_number"] == bnumber:
+                    skip = True
+                    print(f"{name}=={version}=={bnumber} already exists. Skipping.")
+                    break
+
+        if not skip:
+            print("Adding ", os.path.dirname(recipe_path))
+            copy_tree(os.path.dirname(recipe_path), args.dir)
+
+
 def main():
 
     args = parse_command_line(sys.argv)
@@ -174,15 +197,14 @@ def main():
     recipe_names = []
 
     if args.additional_recipes:
-        additional_recipes_path = os.path.abspath(os.path.join(args.dir, '..', 'additional_recipes'))
-        print(f"ADDITIONAL RECIPES IN? {additional_recipes_path}")
-        if os.path.exists(additional_recipes_path):
-            copy_tree(additional_recipes_path, args.dir)
+        add_additional_recipes(args)
 
+    if not os.path.exists(args.dir):
+        print(f"{args.dir} not found. Not generating a pipeline.")
     all_recipes = glob.glob(os.path.join(args.dir, "**", "*.yaml"))
     for f in all_recipes:
         with open(f) as fi:
-            metas.append(yaml.load(fi.read(), Loader=Loader))
+            metas.append(yaml.safe_load(fi.read()))
 
     if len(metas) > 1:
         requirements = {}
