@@ -35,14 +35,73 @@ export GIT_BRANCH=$BUILD_SOURCEBRANCHNAME
 export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
 .scripts/run_docker_build.sh""")
 
-azure_osx_script = literal_unicode("""\
+azure_osx_script = literal_unicode(r"""\
 export CI=azure
 export GIT_BRANCH=$BUILD_SOURCEBRANCHNAME
 export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
 .scripts/build_osx.sh""")
 
+azure_win_preconfig_script = literal_unicode("""\
+set "CI=azure"
+conda activate base
+
+:: 2 cores available on Appveyor workers: https://www.appveyor.com/docs/build-environment/#build-vm-configurations
+:: CPU_COUNT is passed through conda build: https://github.com/conda/conda-build/pull/1149
+set CPU_COUNT=2
+
+set PYTHONUNBUFFERED=1
+
+conda config --set show_channel_urls true
+conda config --set auto_update_conda false
+conda config --set add_pip_as_python_dependency false
+
+call setup_x64
+
+:: Set the conda-build working directory to a smaller path
+if "%CONDA_BLD_PATH%" == "" (
+    set "CONDA_BLD_PATH=C:\\bld\\"
+)
+
+:: Remove some directories from PATH
+set "PATH=%PATH:C:\\ProgramData\\Chocolatey\\bin;=%"
+set "PATH=%PATH:C:\\Program Files (x86)\\sbt\\bin;=%"
+set "PATH=%PATH:C:\\Rust\\.cargo\\bin;=%"
+set "PATH=%PATH:C:\\Program Files\\Git\\usr\\bin;=%"
+set "PATH=%PATH:C:\\Program Files\\Git\\cmd;=%"
+set "PATH=%PATH:C:\\Program Files\\Git\\mingw64\\bin;=%"
+set "PATH=%PATH:C:\\Program Files (x86)\\Subversion\\bin;=%"
+set "PATH=%PATH:C:\\Program Files\\CMake\\bin;=%"
+set "PATH=%PATH:C:\\Program Files\\OpenSSL\\bin;=%"
+set "PATH=%PATH:C:\\Strawberry\\c\\bin;=%"
+set "PATH=%PATH:C:\\Strawberry\\perl\\bin;=%"
+set "PATH=%PATH:C:\\Strawberry\\perl\\site\\bin;=%"
+set "PATH=%PATH:c:\\tools\\php;=%"
+
+:: On azure, there are libcrypto*.dll & libssl*.dll under
+:: C:\\Windows\\System32, which should not be there (no vendor dlls in windows folder).
+:: They would be found before the openssl libs of the conda environment, so we delete them.
+if defined CI (
+    DEL C:\\Windows\\System32\\libcrypto-1_1-x64.dll || (Echo Ignoring failure to delete C:\\Windows\\System32\\libcrypto-1_1-x64.dll)
+    DEL C:\\Windows\\System32\\libssl-1_1-x64.dll || (Echo Ignoring failure to delete C:\\Windows\\System32\\libssl-1_1-x64.dll)
+)
+
+:: Make paths like C:\\hostedtoolcache\\windows\\Ruby\\2.5.7\\x64\\bin garbage
+set "PATH=%PATH:ostedtoolcache=%"
+
+mkdir "%CONDA_PREFIX%\\etc\\conda\\activate.d"
+
+echo set "CONDA_BLD_PATH=%CONDA_BLD_PATH%"         > "%CONDA_PREFIX%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
+echo set "CPU_COUNT=%CPU_COUNT%"                  >> "%CONDA_PREFIX%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
+echo set "PYTHONUNBUFFERED=%PYTHONUNBUFFERED%"    >> "%CONDA_PREFIX%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
+echo set "PATH=%PATH%"                            >> "%CONDA_PREFIX%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
+
+conda info
+conda config --show-sources
+conda list --show-channel-urls
+""")
+
 azure_win_script = literal_unicode("""\
-SETLOCAL EnableDelayedExpansion
+setlocal EnableExtensions EnableDelayedExpansion
 conda activate base
 
 set "FEEDSTOCK_ROOT=%cd%"
@@ -56,12 +115,12 @@ conda remove --force m2-git
 
 pip install git+https://github.com/mamba-org/boa.git@master
 
-(for (%%recipe in %CURRENT_RECIPES%) do (
-    echo "BUILDING RECIPE %%recipe"
-    cd %FEEDSTOCK_ROOT%\\recipes\\%%recipe\\
+for %%X in (%CURRENT_RECIPES%) do (
+    echo "BUILDING RECIPE %%X"
+    cd %FEEDSTOCK_ROOT%\\recipes\\%%X\\
     copy %FEEDSTOCK_ROOT%\\conda_build_config.yaml .\\conda_build_config.yaml
     boa build .
-))
+)
 
 anaconda -t %ANACONDA_API_TOKEN% upload "C:\\bld\\win-64\\*.tar.bz2" --force
 """)
@@ -439,11 +498,7 @@ def main():
                             "displayName": "Install conda-build, boa and activate environment"
                         },
                         {
-                            "script": literal_unicode(textwrap.dedent("""\
-                                set "CI=azure"
-                                set "PYTHONUNBUFFERED=1"
-                                conda activate base
-                                run_conda_forge_build_setup""")),
+                            "script": azure_win_preconfig_script,
                             "displayName": "conda-forge build setup",
                         },
                         {
