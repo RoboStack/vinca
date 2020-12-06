@@ -108,12 +108,12 @@ call %CONDA%\\condabin\\conda.bat activate base
 
 set "FEEDSTOCK_ROOT=%cd%"
 
-conda config --append channels defaults
-conda config --add channels conda-forge
-conda config --add channels robostack
-conda config --set channel_priority strict
+call conda config --append channels defaults
+call conda config --add channels conda-forge
+call conda config --add channels robostack
+call conda config --set channel_priority strict
 
-conda remove --force m2-git
+:: conda remove --force m2-git
 
 C:\\Miniconda\\python.exe -m pip install git+https://github.com/mamba-org/boa.git@master
 
