@@ -45,7 +45,7 @@ azure_win_script = literal_unicode("""\
 SETLOCAL EnableDelayedExpansion
 set "CI=azure"
 set "FEEDSTOCK_ROOT=%cd%"
-call activate base
+call conda.bat activate base
 
 conda config --append channels defaults
 conda config --add channels conda-forge
@@ -437,15 +437,11 @@ def main():
                             },
                             "displayName": "Install conda-build, boa and activate environment",
                         },
-                        # {
-                        #   'script': "rmdir C:\\cygwin /s /q",
-                        #   'displayName': 'Remove cygwin to make git work',
-                        #   'continueOnError': True
-                        # },
                         {
                             "script": literal_unicode(textwrap.dedent("""\
                                 set "CI=azure"
-                                call activate base
+                                set "PYTHONUNBUFFERED=1"
+                                call conda.bat activate base
                                 run_conda_forge_build_setup""")),
                             "displayName": "conda-forge build setup",
                         },
