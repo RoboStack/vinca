@@ -43,7 +43,7 @@ export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
 
 azure_win_preconfig_script = literal_unicode("""\
 set "CI=azure"
-conda activate base
+call activate base
 
 :: 2 cores available on Appveyor workers: https://www.appveyor.com/docs/build-environment/#build-vm-configurations
 :: CPU_COUNT is passed through conda build: https://github.com/conda/conda-build/pull/1149
@@ -102,7 +102,7 @@ conda list --show-channel-urls
 
 azure_win_script = literal_unicode("""\
 setlocal EnableExtensions EnableDelayedExpansion
-conda activate base
+call activate base
 
 set "FEEDSTOCK_ROOT=%cd%"
 
@@ -496,7 +496,7 @@ def main():
                             "displayName": "Add conda to PATH"
                         },
                         {
-                            "script": 'conda install -c conda-forge --yes --quiet python=3.6 dataclasses conda-build conda "conda-forge::conda-forge-ci-setup=3" pip boa quetz-client',
+                            "script": 'conda install -c conda-forge --yes --quiet conda-build pip mamba ruamel.yaml',
                             "displayName": "Install conda-build, boa and activate environment"
                         },
                         {
