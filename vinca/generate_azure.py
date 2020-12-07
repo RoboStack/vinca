@@ -116,18 +116,18 @@ call conda config --set channel_priority strict
 :: conda remove --force m2-git
 
 C:\\Miniconda\\python.exe -m pip install git+https://github.com/mamba-org/boa.git@master
-if %ERRORLEVEL% NEQ 0 exit 1
+if errorlevel 1 exit 1
 
 for %%X in (%CURRENT_RECIPES%) do (
     echo "BUILDING RECIPE %%X"
     cd %FEEDSTOCK_ROOT%\\recipes\\%%X\\
     copy %FEEDSTOCK_ROOT%\\conda_build_config.yaml .\\conda_build_config.yaml
     boa build .
-    if %ERRORLEVEL% NEQ 0 exit 1
+    if errorlevel 1 exit 1
 )
 
 anaconda -t %ANACONDA_API_TOKEN% upload "C:\\bld\\win-64\\*.tar.bz2" --force
-if %ERRORLEVEL% NEQ 0 exit 1
+if errorlevel 1 exit 1
 """)
 
 parsed_args = None
