@@ -207,7 +207,10 @@ import requests
 def get_skip_existing(vinca_conf, platform):
     fn = vinca_conf.get("skip_existing")
     repodatas = []
-    fns = list(fn)
+    if fn is not None:
+        fns = list(fn)
+    else:
+        fns = []
     for fn in fns:
         selected_bn = None
         if "://" in fn:
