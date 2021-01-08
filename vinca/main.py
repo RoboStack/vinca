@@ -262,7 +262,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
     gdeps = []
     if pkg.group_depends:
         for gdep in pkg.group_depends:
-            gdep.extract_group_members(gdep, all_pkgs)
+            gdep.extract_group_members(all_pkgs)
             gdeps += gdep.members
 
     build_deps = pkg.build_depends
