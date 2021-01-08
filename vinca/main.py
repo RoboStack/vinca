@@ -189,7 +189,7 @@ def read_vinca_yaml(filepath):
     return vinca_conf
 
 
-def generate_output(pkg_shortname, vinca_conf, distro, version):
+def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
     if pkg_shortname not in vinca_conf["_selected_pkgs"]:
         return None
 
@@ -258,8 +258,12 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         output["requirements"]["host"].append(vinca_conf["mutex_package"])
         output["requirements"]["run"].append(vinca_conf["mutex_package"])
 
-
     rm_deps, add_deps = get_depmods(vinca_conf, pkg.name)
+    gdeps = []
+    if pkg.group_depends:
+        for gdep in pkg.group_depends:
+            gdep.extract_group_members(gdep, all_pkgs)
+            gdeps += gdep.members
 
     build_deps = pkg.build_depends
     build_deps += pkg.buildtool_depends
@@ -267,6 +271,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     build_deps += pkg.buildtool_export_depends
     build_deps += pkg.test_depends
     build_deps = [d.name for d in build_deps if d.evaluated_condition]
+    build_deps += gdeps
 
     for dep in build_deps:
         if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
@@ -284,6 +289,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     run_deps += pkg.build_export_depends
     run_deps += pkg.buildtool_export_depends
     run_deps = [d.name for d in run_deps if d.evaluated_condition]
+    run_deps += gdeps
 
     for dep in run_deps:
         if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
@@ -401,9 +407,19 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
 
 def generate_outputs(distro, vinca_conf):
     outputs = []
+
+    def get_pkg(pkg_name):
+        pkg = catkin_pkg.package.parse_package_string(
+            distro.get_release_package_xml(pkg_name)
+        )
+        pkg.evaluate_conditions(os.environ)
+        return pkg
+
+    all_pkgs = [get_pkg(pkg) for pkg in distro.get_depends('ros_base')]
+
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
         output = generate_output(
-            pkg_shortname, vinca_conf, distro, distro.get_version(pkg_shortname)
+            pkg_shortname, vinca_conf, distro, distro.get_version(pkg_shortname), all_pkgs
         )
         if output is not None:
             outputs.append(output)
