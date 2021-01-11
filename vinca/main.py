@@ -260,6 +260,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     build_deps = (set(build_deps) - rm_deps["build"]) | add_deps["build"]
 
     for dep in build_deps:
+        if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
+            output["requirements"]["host"].append(dep)
+            continue
+
         resolved_dep = resolve_pkgname(dep, vinca_conf, distro)
         if not resolved_dep:
             unsatisfied_deps.add(dep)
@@ -274,6 +278,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     run_deps = (set(run_deps) - rm_deps["run"]) | add_deps["run"]
 
     for dep in run_deps:
+        if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
+            output["requirements"]["host"].append(dep)
+            continue
+
         resolved_dep = resolve_pkgname(dep, vinca_conf, distro, is_rundep=True)
         if not resolved_dep:
             unsatisfied_deps.add(dep)
