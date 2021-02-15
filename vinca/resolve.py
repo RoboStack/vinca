@@ -6,6 +6,7 @@ from vinca import config
 map_platform_python_to_conda = {
     "linux-64": "linux",
     "linux-aarch64": "linux",
+    "osx": "osx",
     "osx-64": "osx",
     "win-64": "win64",
 }
