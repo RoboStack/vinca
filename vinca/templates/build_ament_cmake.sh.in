@@ -5,6 +5,11 @@ rm -rf build
 mkdir build
 cd build
 
+if [[ $target_platform =~ linux.* ]]; then
+    export CFLAGS="${CFLAGS} -D__STDC_FORMAT_MACROS=1"
+    export CXXFLAGS="${CXXFLAGS} -D__STDC_FORMAT_MACROS=1"
+fi;
+
 cmake \
     -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX=$PREFIX \
