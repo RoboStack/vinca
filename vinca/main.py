@@ -174,6 +174,11 @@ def read_vinca_yaml(filepath):
             if splitted[1] in ("osx", "linux", "win"):
                 patches[splitted[0]][splitted[1]].append(x)
                 continue
+            if splitted[1] == "unix":
+                patches[splitted[0]]["linux"].append(x)
+                patches[splitted[0]]["osx"].append(x)
+                continue
+
         patches[splitted[0]]["any"].append(x)
 
     vinca_conf["_patches"] = patches
