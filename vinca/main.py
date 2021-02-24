@@ -188,7 +188,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         return None
 
     pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-    if not pkg_names or pkg_names[0] in vinca_conf["skip_built_packages"]:
+    if not pkg_names:
+        return None
+
+    if pkg_names[0] in vinca_conf["skip_built_packages"] and vinca_conf.get('full_rebuild', True):
         return None
 
     output = {
@@ -882,7 +885,7 @@ def main():
                 print(f"Selected build number: {selected_bn}")
 
                 for _, pkg in repodata.get("packages").items():
-                    if selected_bn is not None:
+                    if selected_bn is not None and vinca_conf.get("full_rebuild", True):
                         if pkg["build_number"] == selected_bn:
                             skip_built_packages.add(pkg["name"])
                     else:
