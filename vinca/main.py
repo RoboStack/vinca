@@ -885,10 +885,17 @@ def main():
 
                 print(f"Selected build number: {selected_bn}")
 
+                explicitly_selected_pkgs = [f"ros-{distro}-{pkg.replace('_', '-')}" for pkg in vinca_conf["packages_select_by_deps"]]
+
                 for _, pkg in repodata.get("packages").items():
-                    if selected_bn is not None and vinca_conf.get("full_rebuild", True):
-                        if pkg["build_number"] == selected_bn:
-                            skip_built_packages.add(pkg["name"])
+                    if selected_bn is not None:
+                        if vinca_conf.get("full_rebuild", True):
+                            if pkg["build_number"] == selected_bn:
+                                skip_built_packages.add(pkg["name"])
+                        else:
+                            # remove all packages except explicitly selected ones
+                            if pkg["name"] not in explicitly_selected_pkgs and pkg["build_number"] != selected_bn:
+                                skip_built_packages.add(pkg["name"])
                     else:
                         skip_built_packages.add(pkg["name"])
 
