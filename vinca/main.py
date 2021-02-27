@@ -191,7 +191,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     if not pkg_names:
         return None
 
-    if pkg_names[0] in vinca_conf["skip_built_packages"] and vinca_conf.get('full_rebuild', True):
+    if pkg_names[0] in vinca_conf["skip_built_packages"]:
         return None
 
     output = {
@@ -882,6 +882,7 @@ def main():
                 else:
                     with open(fn) as fi:
                         repodata = json.load(fi)
+
                 print(f"Selected build number: {selected_bn}")
 
                 for _, pkg in repodata.get("packages").items():
