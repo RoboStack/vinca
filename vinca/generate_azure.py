@@ -486,6 +486,11 @@ def main():
 
     azure_stages = []
 
+    global azure_win_script
+    if os.path.exists(".ci_support/azure_win_script.bat"):
+        with open(".ci_support/azure_win_script.bat", "r") as fi:
+            azure_win_script = literal_unicode(fi.read())
+
     stage_names = []
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
