@@ -487,8 +487,8 @@ def main():
     azure_stages = []
 
     global azure_win_script
-    if os.path.exists(".ci_support/azure_win_script.bat"):
-        with open(".ci_support/azure_win_script.bat", "r") as fi:
+    if os.path.exists(".scripts/build_win.bat"):
+        with open(".scripts/build_win.bat", "r") as fi:
             azure_win_script = literal_unicode(fi.read())
 
     stage_names = []
