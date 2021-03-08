@@ -89,12 +89,12 @@ if defined CI (
 :: Make paths like C:\\hostedtoolcache\\windows\\Ruby\\2.5.7\\x64\\bin garbage
 set "PATH=%PATH:ostedtoolcache=%"
 
-mkdir "%CONDA_PREFIX%\\etc\\conda\\activate.d"
+mkdir "%CONDA%\\etc\\conda\\activate.d"
 
-echo set "CONDA_BLD_PATH=%CONDA_BLD_PATH%"         > "%CONDA_PREFIX%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
-echo set "CPU_COUNT=%CPU_COUNT%"                  >> "%CONDA_PREFIX%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
-echo set "PYTHONUNBUFFERED=%PYTHONUNBUFFERED%"    >> "%CONDA_PREFIX%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
-echo set "PATH=%PATH%"                            >> "%CONDA_PREFIX%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
+echo set "CONDA_BLD_PATH=%CONDA_BLD_PATH%"         > "%CONDA%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
+echo set "CPU_COUNT=%CPU_COUNT%"                  >> "%CONDA%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
+echo set "PYTHONUNBUFFERED=%PYTHONUNBUFFERED%"    >> "%CONDA%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
+echo set "PATH=%PATH%"                            >> "%CONDA%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
 
 conda info
 conda config --show-sources
