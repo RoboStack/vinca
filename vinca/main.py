@@ -217,7 +217,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         },
         "build": {"script": ""},
     }
-    if pkg_shortname == "eigenpy":
+    if pkg_shortname == "eigenpy" or pkg_shortname.replace("-", "_") == "slam_toolbox":
         output["requirements"]["build"] += ["pkg-config"]
 
     pkg = catkin_pkg.package.parse_package_string(
