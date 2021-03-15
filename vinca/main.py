@@ -206,6 +206,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
                 "ninja",
                 {"sel(unix)": "make"},
                 "cmake",
+                {"sel(build_platform != target_platform)": "python"},
+                {"sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"},
+                {"sel(build_platform != target_platform)": "cython"},
+                {"sel(build_platform != target_platform)": "numpy"},
+                {"sel(build_platform != target_platform)": "pybind11"},
             ],
             "host": [],
             "run": [],
@@ -673,6 +678,11 @@ def parse_package(pkg, distro, vinca_conf, path):
                 "ninja",
                 {"sel(unix)": "make"},
                 "cmake",
+                {"sel(build_platform != target_platform)": "python"},
+                {"sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"},
+                {"sel(build_platform != target_platform)": "cython"},
+                {"sel(build_platform != target_platform)": "numpy"},
+                {"sel(build_platform != target_platform)": "pybind11"},
             ],
             "host": [],
             "run": [],
@@ -795,15 +805,6 @@ def parse_package(pkg, distro, vinca_conf, path):
             {"sel(linux)": "{{ cdt('libselinux') }}"},
             {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
         ]
-        
-    # add build requirements for cross-platform builds
-    recipe["requirements"]["build"] += [
-        {"sel(build_platform != target_platform)": "python"},
-        {"sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"},
-        {"sel(build_platform != target_platform)": "cython"},
-        {"sel(build_platform != target_platform)": "numpy"},
-        {"sel(build_platform != target_platform)": "pybind11"},
-    ]
 
     return recipe
 
