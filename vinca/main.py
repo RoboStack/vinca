@@ -582,7 +582,9 @@ def get_selected_packages(distro, vinca_conf):
     selected_packages = set()
     skipped_packages = set()
 
-    if vinca_conf["packages_select_by_deps"]:
+    if vinca_conf.get("build_all", False):
+        selected_packages = set(distro._distro.release_packages.keys())
+    elif vinca_conf["packages_select_by_deps"]:
         for i in vinca_conf["packages_select_by_deps"]:
             i = i.replace("-", "_")
             selected_packages = selected_packages.union([i])
