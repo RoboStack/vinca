@@ -26,6 +26,10 @@ echo "Using Python $ROS_PYTHON_VERSION"
 # the header-only version of the library.
 export CXXFLAGS="$CXXFLAGS -DBOOST_ERROR_CODE_HEADER_ONLY"
 
+if [[ $target_platform =~ linux.* ]]; then
+    export CXXFLAGS="$CXXFLAGS -D__STDC_FORMAT_MACROS=1"
+fi
+
 export SKIP_TESTING=@(skip_testing)
 
 if [[ "$CONDA_BUILD_CROSS_COMPILATION" != "1" ]]; then
