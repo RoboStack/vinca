@@ -27,7 +27,9 @@ echo "Using Python $ROS_PYTHON_VERSION"
 export CXXFLAGS="$CXXFLAGS -DBOOST_ERROR_CODE_HEADER_ONLY"
 
 if [[ $target_platform =~ linux.* ]]; then
-    export CXXFLAGS="$CXXFLAGS -D__STDC_FORMAT_MACROS=1"
+    export CXXFLAGS="$CXXFLAGS -D__STDC_FORMAT_MACROS=1";
+    # I am too scared to turn this on for now ...
+    # export LDFLAGS="$LDFLAGS -lrt";
 fi
 
 export SKIP_TESTING=@(skip_testing)
