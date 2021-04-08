@@ -591,7 +591,13 @@ def get_selected_packages(distro, vinca_conf):
             i = i.replace("-", "_")
             selected_packages = selected_packages.union([i])
             if "skip_all_deps" not in vinca_conf or not vinca_conf["skip_all_deps"]:
-                pkgs = distro.get_depends(i)
+                try:
+                    pkgs = distro.get_depends(i)
+                except KeyError:
+                    # handle (rare) package names that use "-" as separator
+                    pkgs = distro.get_depends(i.replace("_", "-"))
+                    selected_packages.remove(i)
+                    selected_packages.add(i.replace("_", "-"))
                 selected_packages = selected_packages.union(pkgs)
 
     if (
@@ -601,7 +607,13 @@ def get_selected_packages(distro, vinca_conf):
         for i in vinca_conf["packages_skip_by_deps"]:
             i = i.replace("-", "_")
             skipped_packages = skipped_packages.union([i])
-            pkgs = distro.get_depends(i)
+            try:
+                pkgs = distro.get_depends(i)
+            except KeyError:
+                # handle (rare) package names that use "-" as separator
+                pkgs = distro.get_depends(i.replace("_", "-"))
+                selected_packages.remove(i)
+                selected_packages.add(i.replace("_", "-"))
             skipped_packages = skipped_packages.union(pkgs)
 
     result = selected_packages.difference(skipped_packages)
