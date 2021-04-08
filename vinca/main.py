@@ -219,6 +219,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     }
     if pkg_shortname == "eigenpy" or pkg_shortname.replace("-", "_") == "slam_toolbox":
         output["requirements"]["build"] += ["pkg-config"]
+    if pkg_shortname.replace("-", "_") == "ur_client_library":
+        output["requirements"]["host"] += ["ros-noetic-catkin"]
 
     pkg = catkin_pkg.package.parse_package_string(
         distro.get_release_package_xml(pkg_shortname)
@@ -300,7 +302,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     output["requirements"]["host"] = list(set(output["requirements"]["host"]))
     output["requirements"]["run"] = sorted(output["requirements"]["run"])
     output["requirements"]["host"] = sorted(output["requirements"]["host"])
-    
+
     output["requirements"]["run"] += [
         {
             "sel(osx and x86_64)": "__osx >={{ MACOSX_DEPLOYMENT_TARGET|default('10.14') }}"
