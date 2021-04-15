@@ -26,6 +26,12 @@ distro = None
 parsed_args = None
 
 
+def ensure_list(l):
+    if not l:
+        return []
+    return l
+
+
 def get_conda_subdir():
     if parsed_args.platform:
         return parsed_args.platform
@@ -910,7 +916,7 @@ def main():
 
                 print(f"Selected build number: {selected_bn}")
 
-                explicitly_selected_pkgs = [f"ros-{distro}-{pkg.replace('_', '-')}" for pkg in vinca_conf["packages_select_by_deps"]]
+                explicitly_selected_pkgs = [f"ros-{distro}-{pkg.replace('_', '-')}" for pkg in ensure_list(vinca_conf["packages_select_by_deps"])]
 
                 for _, pkg in repodata.get("packages").items():
                     if selected_bn is not None:
