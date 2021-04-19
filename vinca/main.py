@@ -227,6 +227,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         output["requirements"]["build"] += ["pkg-config"]
     if pkg_shortname.replace("-", "_") == "ur_client_library":
         output["requirements"]["host"] += ["ros-noetic-catkin"]
+    if pkg_shortname.replace("-", "_") == "mqtt_bridge":
+        output["requirements"]["run"] += ["inject", "msgpack-python", "paho-mqtt", "pymongo"]
 
     pkg = catkin_pkg.package.parse_package_string(
         distro.get_release_package_xml(pkg_shortname)
