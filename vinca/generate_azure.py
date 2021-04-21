@@ -539,7 +539,7 @@ def main():
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
     # windows
-    azure_template = {"pool": {"vmImage": "vs2017-win2016"}}
+    azure_template = {"pool": {"vmImage": "windows-2019"}}
 
     azure_stages = []
 
