@@ -230,7 +230,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         output["requirements"]["host"] += ["ros-noetic-catkin"]
     if pkg_shortname.replace("-", "_") == "mqtt_bridge":
         output["requirements"]["run"] += ["inject", "msgpack-python", "paho-mqtt", "pymongo"]
-    if pkg_shortname.replace("-", "_") == "sainsmart_relay_usb" or pkg_shortname.replace("-", "_") == "kobuki_ftdi":
+    if pkg_shortname.replace("-", "_") == "sainsmart_relay_usb" or pkg_shortname.replace("-", "_") == "kobuki_ftdi" or pkg_shortname.replace("-", "_") == "sick_tim":
         output["requirements"]["build"] += [{"sel(linux)": "{{ cdt('libudev') }}"}, {"sel(linux)": "{{ cdt('libudev-devel') }}"}]
 
     pkg = catkin_pkg.package.parse_package_string(
