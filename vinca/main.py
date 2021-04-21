@@ -223,12 +223,15 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         },
         "build": {"script": ""},
     }
+
     if pkg_shortname == "eigenpy" or pkg_shortname.replace("-", "_") == "slam_toolbox":
         output["requirements"]["build"] += ["pkg-config"]
     if pkg_shortname.replace("-", "_") == "ur_client_library":
         output["requirements"]["host"] += ["ros-noetic-catkin"]
     if pkg_shortname.replace("-", "_") == "mqtt_bridge":
         output["requirements"]["run"] += ["inject", "msgpack-python", "paho-mqtt", "pymongo"]
+    if pkg_shortname.replace("-", "_") == "sainsmart_relay_usb" or pkg_shortname.replace("-", "_") == "kobuki_ftdi":
+        output["requirements"]["build"] += [{"sel(linux)": "{{ cdt('libudev') }}"}, {"sel(linux)": "{{ cdt('libudev-devel') }}"}]
 
     pkg = catkin_pkg.package.parse_package_string(
         distro.get_release_package_xml(pkg_shortname)
