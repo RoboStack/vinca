@@ -230,8 +230,12 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         output["requirements"]["host"] += ["ros-noetic-catkin"]
     if pkg_shortname.replace("-", "_") == "mqtt_bridge":
         output["requirements"]["run"] += ["inject", "msgpack-python", "paho-mqtt", "pymongo"]
-    if pkg_shortname.replace("-", "_") == "sainsmart_relay_usb" or pkg_shortname.replace("-", "_") == "kobuki_ftdi" or pkg_shortname.replace("-", "_") == "sick_tim":
+    if pkg_shortname.replace("-", "_") == "sainsmart_relay_usb" or pkg_shortname.replace("-", "_") == "kobuki_ftdi" or pkg_shortname.replace("-", "_") == "sick_tim" or pkg_shortname == "mrpt2":
         output["requirements"]["build"] += [{"sel(linux)": "{{ cdt('libudev') }}"}, {"sel(linux)": "{{ cdt('libudev-devel') }}"}]
+    if pkg_shortname == "mrpt2":
+        output["requirements"]["host"] += ["tinyxml2", "boost-cpp", "jsoncpp", "gtest", "boost", "libdc1394", "xorg-libxcomposite", "ros-noetic-octomap", "libftdi"]
+        output["requirements"]["run"] += ["tinyxml2", "boost-cpp", "jsoncpp", "gtest", "boost", "libdc1394", "xorg-libxcomposite", "ros-noetic-octomap", "libftdi"]
+        output["requirements"]["build"] += [{"sel(linux)": "{{ cdt('libxcomposite-devel') }}"}]
 
     pkg = catkin_pkg.package.parse_package_string(
         distro.get_release_package_xml(pkg_shortname)
