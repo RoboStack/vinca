@@ -17,7 +17,14 @@ cd build
 # necessary for correctly linking SIP files (from python_qt_bindings)
 export LINK=$CXX
 
-export ROS_PYTHON_VERSION=`$PREFIX/bin/python -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
+if [[ "$CONDA_BUILD_CROSS_COMPILATION" != "1" ]]; then
+  PYTHON_EXECUTABLE=$PREFIX/bin/python
+else
+  PYTHON_EXECUTABLE=$BUILD_PREFIX/bin/python
+fi
+echo "USING PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}"
+
+export ROS_PYTHON_VERSION=`$PYTHON_EXECUTABLE -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
 echo "Using Python $ROS_PYTHON_VERSION"
 
 # NOTE: there might be undefined references occurring
@@ -33,13 +40,6 @@ if [[ $target_platform =~ linux.* ]]; then
 fi
 
 export SKIP_TESTING=@(skip_testing)
-
-if [[ "$CONDA_BUILD_CROSS_COMPILATION" != "1" ]]; then
-  PYTHON_EXECUTABLE=$PREFIX/bin/python
-else
-  PYTHON_EXECUTABLE=$BUILD_PREFIX/bin/python
-fi
-echo PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}
 
 cmake ${CMAKE_ARGS} .. -DCMAKE_INSTALL_PREFIX=$PREFIX \
          -DCMAKE_PREFIX_PATH=$PREFIX \
