@@ -236,6 +236,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         output["requirements"]["host"] += ["tinyxml2", "boost-cpp", "jsoncpp", "gtest", "boost", "libdc1394", "xorg-libxcomposite", "ros-noetic-octomap", "libftdi"]
         output["requirements"]["run"] += ["tinyxml2", "boost-cpp", "jsoncpp", "gtest", "boost", "libdc1394", "xorg-libxcomposite", "ros-noetic-octomap", "libftdi"]
         output["requirements"]["build"] += [{"sel(linux)": "{{ cdt('libxcomposite-devel') }}"}]
+    if pkg_shortname.replace("-", "_") == "jsk_recognition_utils":
+        output["requirements"]["host"] += ["glew"]
+        output["requirements"]["run"] += ["glew"]
+
 
     pkg = catkin_pkg.package.parse_package_string(
         distro.get_release_package_xml(pkg_shortname)
