@@ -174,10 +174,14 @@ def normalize_name(s):
 
 
 def batch_stages(stages, max_batch_size=5):
+    with open("vinca.yaml", "r") as vinca_yaml:
+        vinca_conf = yaml.safe_load(vinca_yaml)
+
     # this reduces the number of individual builds to try to save some time
     stage_lengths = [len(s) for s in stages]
     merged_stages = []
     curr_stage = []
+    build_individually = vinca_conf.get("build_in_own_azure_stage", [])
 
     def chunks(lst, n):
         """Yield successive n-sized chunks from lst."""
@@ -185,6 +189,11 @@ def batch_stages(stages, max_batch_size=5):
             yield lst[i:i + n]
     i = 0
     while i < len(stages):
+        for build_individually_pkg in build_individually:
+            if build_individually_pkg in stages[i] and len(stages[i]) > 1:
+                merged_stages.append([[build_individually_pkg]])
+                stages[i].remove(build_individually_pkg)
+
         if stage_lengths[i] < max_batch_size and len(curr_stage) + stage_lengths[i] < max_batch_size:
             # merge with previous stage
             curr_stage += stages[i]
