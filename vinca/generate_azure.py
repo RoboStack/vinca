@@ -230,6 +230,7 @@ def get_skip_existing(vinca_conf, platform):
             repodata = request.json()
             repodatas.append(repodata)
         else:
+            import json
             with open(fn) as fi:
                 repodata = json.load(fi)
                 repodatas.append(repodata)
@@ -247,9 +248,7 @@ def add_additional_recipes(args):
     with open("vinca.yaml", "r") as vinca_yaml:
         vinca_conf = yaml.safe_load(vinca_yaml)
 
-    existing_packages = {}
     repodatas = get_skip_existing(vinca_conf, args.platform)
-    additional_recipes = []
 
     for recipe_path in glob.glob(additional_recipes_path + '/**/recipe.yaml'):
         with open(recipe_path) as recipe:
@@ -277,7 +276,6 @@ def main():
     args = parse_command_line(sys.argv)
 
     metas = []
-    recipe_names = []
 
     if args.additional_recipes:
         add_additional_recipes(args)
