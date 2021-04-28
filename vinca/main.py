@@ -938,7 +938,7 @@ def main():
                                 skip_built_packages.add(pkg["name"])
                         else:
                             # remove all packages except explicitly selected ones
-                            if pkg["name"] not in explicitly_selected_pkgs and pkg["build_number"] != selected_bn:
+                            if pkg["name"] not in explicitly_selected_pkgs or pkg["build_number"] == selected_bn:
                                 skip_built_packages.add(pkg["name"])
                     else:
                         skip_built_packages.add(pkg["name"])
