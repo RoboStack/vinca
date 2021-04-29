@@ -190,7 +190,7 @@ def batch_stages(stages, max_batch_size=5):
     i = 0
     while i < len(stages):
         for build_individually_pkg in build_individually:
-            if build_individually_pkg in stages[i] and len(stages[i]) > 1:
+            if build_individually_pkg in stages[i]:
                 merged_stages.append([[build_individually_pkg]])
                 stages[i].remove(build_individually_pkg)
 
