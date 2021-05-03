@@ -26,6 +26,12 @@ distro = None
 parsed_args = None
 
 
+def ensure_list(l):
+    if not l:
+        return []
+    return l
+
+
 def get_conda_subdir():
     if parsed_args.platform:
         return parsed_args.platform
@@ -217,10 +223,23 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         },
         "build": {"script": ""},
     }
+
     if pkg_shortname == "eigenpy" or pkg_shortname.replace("-", "_") == "slam_toolbox":
         output["requirements"]["build"] += ["pkg-config"]
     if pkg_shortname.replace("-", "_") == "ur_client_library":
         output["requirements"]["host"] += ["ros-noetic-catkin"]
+    if pkg_shortname.replace("-", "_") == "mqtt_bridge":
+        output["requirements"]["run"] += ["inject", "msgpack-python", "paho-mqtt", "pymongo"]
+    if pkg_shortname.replace("-", "_") == "sainsmart_relay_usb" or pkg_shortname.replace("-", "_") == "kobuki_ftdi" or pkg_shortname.replace("-", "_") == "sick_tim" or pkg_shortname == "mrpt2":
+        output["requirements"]["build"] += [{"sel(linux)": "{{ cdt('libudev') }}"}, {"sel(linux)": "{{ cdt('libudev-devel') }}"}]
+    if pkg_shortname == "mrpt2":
+        output["requirements"]["host"] += ["tinyxml2", "boost-cpp", "jsoncpp", "gtest", "boost", "libdc1394", "xorg-libxcomposite", "ros-noetic-octomap", "libftdi"]
+        output["requirements"]["run"] += ["tinyxml2", "boost-cpp", "jsoncpp", "gtest", "boost", "libdc1394", "xorg-libxcomposite", "ros-noetic-octomap", "libftdi"]
+        output["requirements"]["build"] += [{"sel(linux)": "{{ cdt('libxcomposite-devel') }}"}]
+    if pkg_shortname.replace("-", "_") == "jsk_recognition_utils":
+        output["requirements"]["host"] += ["glew"]
+        output["requirements"]["run"] += ["glew"]
+
 
     pkg = catkin_pkg.package.parse_package_string(
         distro.get_release_package_xml(pkg_shortname)
@@ -910,7 +929,7 @@ def main():
 
                 print(f"Selected build number: {selected_bn}")
 
-                explicitly_selected_pkgs = [f"ros-{distro}-{pkg.replace('_', '-')}" for pkg in vinca_conf["packages_select_by_deps"]]
+                explicitly_selected_pkgs = [f"ros-{distro}-{pkg.replace('_', '-')}" for pkg in ensure_list(vinca_conf["packages_select_by_deps"])]
 
                 for _, pkg in repodata.get("packages").items():
                     if selected_bn is not None:
@@ -919,7 +938,7 @@ def main():
                                 skip_built_packages.add(pkg["name"])
                         else:
                             # remove all packages except explicitly selected ones
-                            if pkg["name"] not in explicitly_selected_pkgs and pkg["build_number"] != selected_bn:
+                            if pkg["name"] not in explicitly_selected_pkgs or pkg["build_number"] == selected_bn:
                                 skip_built_packages.add(pkg["name"])
                     else:
                         skip_built_packages.add(pkg["name"])
