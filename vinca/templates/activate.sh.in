@@ -14,5 +14,10 @@
 
 source $CONDA_PREFIX/setup.sh
 
+case "$OSTYPE" in
+  darwin*)  export ROS_OS_OVERRIDE="robostack:osx";; 
+  linux*)   export ROS_OS_OVERRIDE="robostack:linux";;
+esac
+
 # Looks unnecessary for UNIX
 # unset PYTHONHOME=
