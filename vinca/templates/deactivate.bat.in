@@ -2,6 +2,7 @@
 :: DO NOT EDIT!
 @@if not defined CONDA_PREFIX goto:eof
 
+@@set ROS_OS_OVERRIDE=
 @@set ROS_DISTRO=
 @@set ROS_ETC_DIR=
 @@set ROS_PACKAGE_PATH=
