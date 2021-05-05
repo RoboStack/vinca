@@ -334,9 +334,9 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         or "REQUIRE_OPENGL" in output["requirements"]["host"]
     ):
         # add requirements for opengl
-        if "REQUIRE_OPENGL" in output["requirements"]["run"]:
+        while "REQUIRE_OPENGL" in output["requirements"]["run"]:
             output["requirements"]["run"].remove("REQUIRE_OPENGL")
-        if "REQUIRE_OPENGL" in output["requirements"]["host"]:
+        while "REQUIRE_OPENGL" in output["requirements"]["host"]:
             output["requirements"]["host"].remove("REQUIRE_OPENGL")
 
         output["requirements"]["build"] += [
@@ -366,9 +366,9 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         or "REQUIRE_GL" in output["requirements"]["host"]
     ):
         # add requirements for gl
-        if "REQUIRE_GL" in output["requirements"]["run"]:
+        while "REQUIRE_GL" in output["requirements"]["run"]:
             output["requirements"]["run"].remove("REQUIRE_GL")
-        if "REQUIRE_GL" in output["requirements"]["host"]:
+        while "REQUIRE_GL" in output["requirements"]["host"]:
             output["requirements"]["host"].remove("REQUIRE_GL")
 
         output["requirements"]["build"] += [
@@ -799,9 +799,9 @@ def parse_package(pkg, distro, vinca_conf, path):
         or "REQUIRE_OPENGL" in recipe["requirements"]["host"]
     ):
         # add requirements for opengl
-        if "REQUIRE_OPENGL" in recipe["requirements"]["run"]:
+        while "REQUIRE_OPENGL" in recipe["requirements"]["run"]:
             recipe["requirements"]["run"].remove("REQUIRE_OPENGL")
-        if "REQUIRE_OPENGL" in recipe["requirements"]["host"]:
+        while "REQUIRE_OPENGL" in recipe["requirements"]["host"]:
             recipe["requirements"]["host"].remove("REQUIRE_OPENGL")
 
         recipe["requirements"]["build"] += [
@@ -829,9 +829,9 @@ def parse_package(pkg, distro, vinca_conf, path):
         or "REQUIRE_GL" in recipe["requirements"]["host"]
     ):
         # add requirements for gl
-        if "REQUIRE_GL" in recipe["requirements"]["run"]:
+        while "REQUIRE_GL" in recipe["requirements"]["run"]:
             recipe["requirements"]["run"].remove("REQUIRE_GL")
-        if "REQUIRE_GL" in recipe["requirements"]["host"]:
+        while "REQUIRE_GL" in recipe["requirements"]["host"]:
             recipe["requirements"]["host"].remove("REQUIRE_GL")
 
         recipe["requirements"]["build"] += [
