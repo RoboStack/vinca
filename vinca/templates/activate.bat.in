@@ -9,5 +9,5 @@
 
 @@call "%CONDA_PREFIX%\Library\local_setup.bat"
 @@set PYTHONHOME=
-@@set "ROS_OS_OVERRIDE=robostack:win"
+@@set "ROS_OS_OVERRIDE=robostack:win64"
 
