@@ -41,6 +41,12 @@ export GIT_BRANCH=$BUILD_SOURCEBRANCHNAME
 export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
 .scripts/build_osx.sh""")
 
+azure_osx_arm64_script = literal_unicode(r"""\
+export CI=azure
+export GIT_BRANCH=$BUILD_SOURCEBRANCHNAME
+export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
+.scripts/build_osx_arm64.sh""")
+
 azure_win_preconfig_script = literal_unicode("""\
 set "CI=azure"
 call %CONDA%\\condabin\\conda_hook.bat
@@ -346,11 +352,6 @@ def main():
         stages = []
         requirements = []
 
-    azure_template = {"pool": {"vmImage": "ubuntu-16.04"}}
-
-    azure_stages = []
-
-    stage_names = []
 
     # filter out packages that we are not actually building
     filtered_stages = []
@@ -362,6 +363,12 @@ def main():
     stages = batch_stages(filtered_stages)
     print(stages)
 
+    # Build Linux pipeline
+    azure_template = {"pool": {"vmImage": "ubuntu-16.04"}}
+
+    azure_stages = []
+
+    stage_names = []
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
         stage = {"stage": stage_name, "jobs": []}
@@ -399,6 +406,7 @@ def main():
         with open("linux.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
+    # Build OSX pipeline
     azure_template = {"pool": {"vmImage": "macOS-10.15"}}
 
     azure_stages = []
@@ -436,8 +444,50 @@ def main():
     if azure_stages:
         azure_template["stages"] = azure_stages
 
-    if args.platform.startswith("osx") and len(azure_stages):
+    if args.platform == "osx-64" and len(azure_stages):
         with open("osx.yml", "w") as fo:
+            fo.write(yaml.dump(azure_template, sort_keys=False))
+
+    # Build OSX-arm64 pipeline
+    azure_template = {"pool": {"vmImage": "macOS-10.15"}}
+
+    azure_stages = []
+
+    stage_names = []
+    for i, s in enumerate(stages):
+        stage_name = f"stage_{i}"
+        stage = {"stage": stage_name, "jobs": []}
+        stage_names.append(stage_name)
+
+        for batch in s:
+            pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
+            stage["jobs"].append(
+                {
+                    "job": pkg_jobname,
+                    "steps": [
+                        {
+                            "script": azure_osx_arm64_script,
+                            "env": {
+                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
+                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}"
+                            },
+                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
+                        }
+                    ],
+                }
+            )
+
+        if len(stage["jobs"]) != 0:
+            # all packages skipped ...
+            azure_stages.append(stage)
+
+    azure_template["trigger"] = [args.trigger_branch]
+    azure_template["pr"] = "none"
+    if azure_stages:
+        azure_template["stages"] = azure_stages
+
+    if args.platform == "osx-arm64" and len(azure_stages):
+        with open("osx-arm64.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
     # Build aarch64 pipeline
