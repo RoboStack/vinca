@@ -46,7 +46,10 @@ def get_conda_subdir():
         else:
             raise RuntimeError("Unknown machine!")
     elif sys_platform == "darwin":
-        return "osx-64"
+        if machine == "arm64":
+            return "osx-arm64"
+        else:
+            return "osx-64"
     elif sys_platform == "win32":
         return "win-64"
 

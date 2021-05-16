@@ -487,7 +487,7 @@ def main():
         azure_template["stages"] = azure_stages
 
     if args.platform == "osx-arm64" and len(azure_stages):
-        with open("osx-arm64.yml", "w") as fo:
+        with open("osx_arm64.yml", "w") as fo:
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
     # Build aarch64 pipeline
