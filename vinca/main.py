@@ -218,8 +218,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
                 {"sel(build_platform != target_platform)": "python"},
                 {"sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"},
                 {"sel(build_platform != target_platform)": "cython"},
-                {"sel(build_platform != target_platform)": "numpy"},
-                {"sel(build_platform != target_platform)": "pybind11"},
             ],
             "host": [],
             "run": [],
@@ -330,6 +328,16 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
             "sel(osx and x86_64)": "__osx >={{ MACOSX_DEPLOYMENT_TARGET|default('10.14') }}"
         }
     ]
+
+    # add cross-platform stuff; only do if needed otherwise weird segfaults may occur
+    if "numpy" in output["requirements"]["host"]:
+        output["requirements"]["build"] += [
+            {"sel(build_platform != target_platform)": "numpy"}
+        ]
+    if "pybind11" in output["requirements"]["host"]:
+        output["requirements"]["build"] += [
+            {"sel(build_platform != target_platform)": "pybind11"}
+        ]
 
     # fix up OPENGL support for Unix
     if (
