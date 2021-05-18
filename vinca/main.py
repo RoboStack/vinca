@@ -338,6 +338,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         output["requirements"]["build"] += [
             {"sel(build_platform != target_platform)": "pybind11"}
         ]
+    if "pkg-config" in output["requirements"]["host"]:
+        output["requirements"]["build"] += [
+            {"sel(build_platform != target_platform)": "pkg-config"}
+        ]
 
     # fix up OPENGL support for Unix
     if (
