@@ -24,6 +24,14 @@ else
 fi
 echo "USING PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}"
 
+
+if [[ "$CONDA_BUILD_CROSS_COMPILATION" != "1" ]]; then
+  PKG_CONFIG_EXECUTABLE=$PREFIX/bin/pkg-config
+else
+  PKG_CONFIG_EXECUTABLE=$BUILD_PREFIX/bin/pkg-config
+fi
+echo "USING PKG_CONFIG_EXECUTABLE=${PKG_CONFIG_EXECUTABLE}"
+
 export ROS_PYTHON_VERSION=`$PYTHON_EXECUTABLE -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
 echo "Using Python $ROS_PYTHON_VERSION"
 
