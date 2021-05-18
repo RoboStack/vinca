@@ -343,6 +343,13 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
             {"sel(build_platform != target_platform)": "pkg-config"}
         ]
 
+    # fixup problems with udev (which is mapped to libusb):
+    if "libusb" in output["requirements"]["host"]:
+        output["requirements"]["build"] += [
+            {"sel(linux)": "{{ cdt('libudev') }}"},
+            {"sel(linux)": "{{ cdt('libudev-devel') }}"},
+        ]
+
     # fix up OPENGL support for Unix
     if (
         "REQUIRE_OPENGL" in output["requirements"]["run"]
