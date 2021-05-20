@@ -129,25 +129,22 @@ def parse_command_line(argv):
 
 def get_depmods(vinca_conf, pkg_name):
     depmods = vinca_conf["depmods"].get(pkg_name, {})
-    rm_deps, add_deps = {"build": set(), "run": set()}, {"build": set(), "run": set()}
+    rm_deps, add_deps = {"build": [], "host": [], "run": []}, {"build": [], "host": [], "run": []}
 
-    if depmods.get("remove"):
-        for el in depmods["remove"]:
-            if type(el) is str:
-                rm_deps["build"].add(el)
-                rm_deps["run"].add(el)
-            elif type(el) == dict:
-                rm_deps["build"] = set(el.get("build", []))
-                rm_deps["run"] = set(el.get("run", []))
+    for dep_type in ["build", "host", "run"]:
+        if depmods.get("remove_" + dep_type):
+            for el in depmods["remove_" + dep_type]:
+                if isinstance(el, dict):
+                    rm_deps[dep_type].append(dict(el))
+                else:
+                    rm_deps[dep_type].append(el)
 
-    if depmods.get("add"):
-        for el in depmods["add"]:
-            if type(el) is str:
-                add_deps["build"].add(el)
-                add_deps["run"].add(el)
-            elif type(el) == dict:
-                add_deps["build"] = set(el.get("build", []))
-                add_deps["run"] = set(el.get("run", []))
+        if depmods.get("add_" + dep_type):
+            for el in depmods["add_" + dep_type]:
+                if isinstance(el, dict):
+                    add_deps[dep_type].append(dict(el))
+                else:
+                    add_deps[dep_type].append(el)
 
     return rm_deps, add_deps
 
@@ -225,23 +222,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         "build": {"script": ""},
     }
 
-    if pkg_shortname == "eigenpy" or pkg_shortname.replace("-", "_") == "slam_toolbox":
-        output["requirements"]["build"] += ["pkg-config"]
-    if pkg_shortname.replace("-", "_") == "ur_client_library":
-        output["requirements"]["host"] += ["ros-noetic-catkin"]
-    if pkg_shortname.replace("-", "_") == "mqtt_bridge":
-        output["requirements"]["run"] += ["inject", "msgpack-python", "paho-mqtt", "pymongo"]
-    if pkg_shortname.replace("-", "_") == "sainsmart_relay_usb" or pkg_shortname.replace("-", "_") == "kobuki_ftdi" or pkg_shortname.replace("-", "_") == "sick_tim" or pkg_shortname == "mrpt2":
-        output["requirements"]["build"] += [{"sel(linux)": "{{ cdt('libudev') }}"}, {"sel(linux)": "{{ cdt('libudev-devel') }}"}]
-    if pkg_shortname == "mrpt2":
-        output["requirements"]["host"] += ["tinyxml2", "boost-cpp", "jsoncpp", "gtest", "boost", "libdc1394", "xorg-libxcomposite", "ros-noetic-octomap", "libftdi"]
-        output["requirements"]["run"] += ["tinyxml2", "boost-cpp", "jsoncpp", "gtest", "boost", "libdc1394", "xorg-libxcomposite", "ros-noetic-octomap", "libftdi"]
-        output["requirements"]["build"] += [{"sel(linux)": "{{ cdt('libxcomposite-devel') }}"}]
-    if pkg_shortname.replace("-", "_") == "jsk_recognition_utils":
-        output["requirements"]["host"] += ["glew"]
-        output["requirements"]["run"] += ["glew"]
-
-
     pkg = catkin_pkg.package.parse_package_string(
         distro.get_release_package_xml(pkg_shortname)
     )
@@ -287,7 +267,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     build_deps += pkg.buildtool_export_depends
     build_deps += pkg.test_depends
     build_deps = [d.name for d in build_deps if d.evaluated_condition]
-    build_deps = (set(build_deps) - rm_deps["build"]) | add_deps["build"]
 
     for dep in build_deps:
         if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
@@ -305,7 +284,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     run_deps += pkg.build_export_depends
     run_deps += pkg.buildtool_export_depends
     run_deps = [d.name for d in run_deps if d.evaluated_condition]
-    run_deps = (set(run_deps) - rm_deps["run"]) | add_deps["run"]
 
     for dep in run_deps:
         if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
@@ -318,8 +296,12 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
             continue
         output["requirements"]["run"].extend(resolved_dep)
 
-    output["requirements"]["run"] = list(set(output["requirements"]["run"]))
-    output["requirements"]["host"] = list(set(output["requirements"]["host"]))
+    for dep_type in ["build", "host", "run"]:
+        for dep in add_deps[dep_type]:
+            output["requirements"][dep_type].append(dep)
+        for dep in rm_deps[dep_type]:
+            output["requirements"][dep_type].remove(dep)
+
     output["requirements"]["run"] = sorted(output["requirements"]["run"])
     output["requirements"]["host"] = sorted(output["requirements"]["host"])
 
@@ -402,6 +384,12 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
             {"sel(linux)": "{{ cdt('libselinux') }}"},
             {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
         ]
+
+    # remove duplicates
+    for dep_type in ["build", "host", "run"]:
+        tmp_nonduplicate = []
+        [tmp_nonduplicate.append(x) for x in output["requirements"][dep_type] if x not in tmp_nonduplicate]
+        output["requirements"][dep_type] = tmp_nonduplicate
 
     return output
 
