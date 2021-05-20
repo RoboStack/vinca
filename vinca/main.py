@@ -338,10 +338,13 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         output["requirements"]["build"] += [
             {"sel(build_platform != target_platform)": "pybind11"}
         ]
+    # pkg-config must be in build, not host
     if "pkg-config" in output["requirements"]["host"]:
         output["requirements"]["build"] += [
             {"sel(build_platform != target_platform)": "pkg-config"}
         ]
+        while "pkg-config" in output["requirements"]["host"]:
+            output["requirements"]["host"].remove("pkg-config")
 
     # fixup problems with udev (which is mapped to libusb):
     if "libusb" in output["requirements"]["host"]:
