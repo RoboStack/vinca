@@ -422,107 +422,6 @@ def generate_outputs_version(distro, vinca_conf):
     return outputs
 
 
-def generate_fat_output(pkg_shortname, vinca_conf, distro):
-    if pkg_shortname not in vinca_conf["_selected_pkgs"]:
-        return [], []
-    pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-    if not pkg_names:
-        return [], []
-    pkg = catkin_pkg.package.parse_package_string(
-        distro.get_release_package_xml(pkg_shortname)
-    )
-    pkg.evaluate_conditions(os.environ)
-    resolved_python = resolve_pkgname_from_indexes(
-        "python", vinca_conf["_conda_indexes"]
-    )
-    host_requirements = []
-    run_requirements = []
-    run_requirements.extend(resolved_python)
-    host_requirements.extend(resolved_python)
-    if distro.get_python_version() == 3:
-        resolved_setuptools = resolve_pkgname_from_indexes(
-            "setuptools", vinca_conf["_conda_indexes"]
-        )
-        host_requirements.extend(resolved_setuptools)
-    if not distro.check_ros1():
-        resolved_colcon = resolve_pkgname_from_indexes(
-            "colcon-common-extensions", vinca_conf["_conda_indexes"]
-        )
-        host_requirements.extend(resolved_colcon)
-
-    build_deps = pkg.build_depends
-    build_deps += pkg.buildtool_depends
-    build_deps += pkg.build_export_depends
-    build_deps += pkg.buildtool_export_depends
-    build_deps += pkg.test_depends
-    build_deps += pkg.run_depends
-    build_deps += pkg.exec_depends
-    build_deps = [d.name for d in build_deps if d.evaluated_condition]
-    build_deps = set(build_deps)
-
-    for dep in build_deps:
-        if dep in vinca_conf["_selected_pkgs"]:
-            # don't repeat the selected pkgs in the reqs.
-            continue
-        resolved_dep = resolve_pkgname_from_indexes(dep, vinca_conf["_conda_indexes"])
-        if not resolved_dep:
-            unsatisfied_deps.add(dep)
-            continue
-        host_requirements.extend(resolved_dep)
-
-    run_deps = pkg.run_depends
-    run_deps += pkg.exec_depends
-    run_deps += pkg.build_export_depends
-    run_deps += pkg.buildtool_export_depends
-    run_deps = [d.name for d in run_deps if d.evaluated_condition]
-    run_deps = set(run_deps)
-
-    for dep in run_deps:
-        if dep in vinca_conf["_selected_pkgs"]:
-            # don't repeat the selected pkgs in the reqs.
-            continue
-        resolved_dep = resolve_pkgname_from_indexes(dep, vinca_conf["_conda_indexes"])
-        if not resolved_dep:
-            unsatisfied_deps.add(dep)
-            continue
-        run_requirements.extend(resolved_dep)
-
-    return host_requirements, run_requirements
-
-
-def generate_fat_outputs(distro, vinca_conf):
-    outputs = []
-    output = {
-        "name": vinca_conf["name"],
-        "requirements": {
-            "build": ["{{ compiler('cxx') }}", "{{ compiler('c') }}", "ninja", "cmake"],
-            "host": [],
-            "run": [],
-        },
-    }
-
-    # use catkin for ros1
-    if distro.check_ros1():
-        output["script"] = "bld_catkin_merge.bat"
-    else:
-        output["script"] = "bld_colcon_merge.bat"
-
-    for pkg_shortname in vinca_conf["_selected_pkgs"]:
-        host_requirements, run_requirements = generate_fat_output(
-            pkg_shortname, vinca_conf, distro
-        )
-        output["requirements"]["host"].extend(host_requirements)
-        output["requirements"]["run"].extend(run_requirements)
-
-    output["requirements"]["host"] = list(set(output["requirements"]["host"]))
-    output["requirements"]["run"] = list(set(output["requirements"]["run"]))
-    output["requirements"]["host"] = sorted(output["requirements"]["host"])
-    output["requirements"]["run"] = sorted(output["requirements"]["run"])
-    outputs.append(output)
-
-    return outputs
-
-
 def generate_source(distro, vinca_conf):
     source = {}
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
@@ -970,22 +869,19 @@ def main():
 
         vinca_conf["_selected_pkgs"] = selected_pkgs
 
-        if "fat_archive" in vinca_conf and vinca_conf["fat_archive"]:
-            source = generate_fat_source(distro, vinca_conf)
-            outputs = generate_fat_outputs(distro, vinca_conf)
+        if arguments.source:
+            source = generate_source_version(distro, vinca_conf)
+            outputs = generate_outputs_version(distro, vinca_conf)
         else:
-            if arguments.source:
-                source = generate_source_version(distro, vinca_conf)
-                outputs = generate_outputs_version(distro, vinca_conf)
-            else:
-                source = generate_source(distro, vinca_conf)
-                outputs = generate_outputs(distro, vinca_conf)
+            source = generate_source(distro, vinca_conf)
+            outputs = generate_outputs(distro, vinca_conf)
 
         if arguments.multiple_file:
             write_recipe(source, outputs, vinca_conf.get("build_number", 0), False)
         else:
             write_recipe(source, outputs, vinca_conf.get("build_number", 0))
 
-        print(unsatisfied_deps)
+        if unsatisfied_deps:
+            print('Unsatisfied dependencies:', unsatisfied_deps)
 
     print("build scripts are created successfully.")
