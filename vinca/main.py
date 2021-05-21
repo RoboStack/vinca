@@ -300,7 +300,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         for dep in add_deps[dep_type]:
             output["requirements"][dep_type].append(dep)
         for dep in rm_deps[dep_type]:
-            output["requirements"][dep_type].remove(dep)
+            while dep in output["requirements"][dep_type]:
+                output["requirements"][dep_type].remove(dep)
 
     output["requirements"]["run"] = sorted(output["requirements"]["run"])
     output["requirements"]["host"] = sorted(output["requirements"]["host"])
