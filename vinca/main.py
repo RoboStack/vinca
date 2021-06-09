@@ -323,9 +323,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         ]
     # pkg-config must be in build, not host
     if "pkg-config" in output["requirements"]["host"]:
-        output["requirements"]["build"] += [
-            {"sel(build_platform != target_platform)": "pkg-config"}
-        ]
+        output["requirements"]["build"].append("pkg-config")
         while "pkg-config" in output["requirements"]["host"]:
             output["requirements"]["host"].remove("pkg-config")
 
