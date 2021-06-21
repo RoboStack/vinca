@@ -359,6 +359,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
             {"sel(linux)": "{{ cdt('libxfixes') }}"},
             {"sel(linux)": "{{ cdt('libxext') }}"},
             {"sel(linux)": "{{ cdt('libxau') }}"},
+            {"sel(linux)": "{{ cdt('libxcb') }}"},
         ]
         output["requirements"]["host"] += [
             {"sel(unix)": "xorg-libx11"},
