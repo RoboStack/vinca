@@ -185,7 +185,7 @@ def read_vinca_yaml(filepath):
 
     if (patch_dir / "dependencies.yaml").exists():
         vinca_conf["depmods"] = yaml.load(open(patch_dir / "dependencies.yaml"))
-    else:
+    if not vinca_conf.get("depmods"):
         vinca_conf["depmods"] = {}
 
     config.ros_distro = vinca_conf["ros_distro"]
