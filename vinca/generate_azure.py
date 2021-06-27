@@ -364,7 +364,7 @@ def main():
     print(stages)
 
     # Build Linux pipeline
-    azure_template = {"pool": {"vmImage": "ubuntu-16.04"}}
+    azure_template = {"pool": {"vmImage": "ubuntu-latest"}}
 
     azure_stages = []
 
@@ -378,7 +378,7 @@ def main():
             pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
-                    "job": pkg_jobname,
+                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
                     "steps": [
                         {
                             "script": azure_linux_script,

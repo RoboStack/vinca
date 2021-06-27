@@ -145,7 +145,6 @@ def get_depmods(vinca_conf, pkg_name):
                     add_deps[dep_type].append(dict(el))
                 else:
                     add_deps[dep_type].append(el)
-
     return rm_deps, add_deps
 
 
