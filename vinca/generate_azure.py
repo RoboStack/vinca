@@ -558,7 +558,7 @@ def main():
             pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
-                    "job": pkg_jobname,
+                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
                     "variables": {"CONDA_BLD_PATH": "C:\\\\bld\\\\"},
                     "steps": [
                         {
