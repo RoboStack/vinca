@@ -56,8 +56,9 @@ def resolve_pkgname(pkg_shortname, vinca_conf, distro, is_rundep=False):
             if (
                 "packages_remove_from_deps" in vinca_conf
                 and vinca_conf["packages_remove_from_deps"] is not None
-                and pkg_shortname.replace("_", "-")
-                not in vinca_conf["packages_remove_from_deps"]
+                and not (
+                    pkg_shortname.replace("_", "-") in vinca_conf["packages_remove_from_deps"] or
+                    pkg_shortname in vinca_conf["packages_remove_from_deps"])
             ):
                 return [
                     "ros-%s-%s"

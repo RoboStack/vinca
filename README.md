@@ -37,3 +37,14 @@ packages_select_by_deps:
 # patch directory
 patch_dir: ./patch
 ```
+
+### Special modes
+
+#### Build all
+
+To generate recipes for all available ROS packages you can add `build_all: true` to your vinca.yaml. In that case, otherwise selected packages will be ignored and vinca will generate recipes for all available packages. To try to see how far one can go, it's recommended to run vinca and boa like this:
+
+```
+vinca --multiple  # to generate a `./recipes` folder with multiple subfolders
+boa build --skip-existing=fast --continue-on-failure -m conda_build_config.yaml ./recipes
+```

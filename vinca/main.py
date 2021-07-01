@@ -551,7 +551,6 @@ def get_selected_packages(distro, vinca_conf):
                 selected_packages.remove(i)
                 selected_packages.add(i.replace("_", "-"))
             skipped_packages = skipped_packages.union(pkgs)
-
     result = selected_packages.difference(skipped_packages)
     result = sorted(list(result))
     return result
