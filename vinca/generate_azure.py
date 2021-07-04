@@ -119,6 +119,9 @@ call conda config --add channels conda-forge
 call conda config --add channels robostack
 call conda config --set channel_priority strict
 
+:: Enable long path names on Windows
+reg add HKLM\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f
+
 :: conda remove --force m2-git
 
 C:\\Miniconda\\python.exe -m pip install git+https://github.com/mamba-org/boa.git@master
