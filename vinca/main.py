@@ -333,7 +333,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         ]
 
     # fixup problems with udev (which is mapped to libusb):
-    if "libusb" in output["requirements"]["host"]:
+    if "libusb" in output["requirements"]["host"] or "ros-"+distro.name+"-lusb" in output["requirements"]["host"]:
         output["requirements"]["build"] += [
             {"sel(linux)": "{{ cdt('libudev') }}"},
             {"sel(linux)": "{{ cdt('libudev-devel') }}"},
