@@ -700,9 +700,6 @@ def parse_package(pkg, distro, vinca_conf, path):
             resolve_pkgname(d.name, vinca_conf, distro)
         )
 
-    if name == "eigenpy":
-        recipe["requirements"]["build"] += ["pkg-config"]
-
     if pkg.get_build_type() in ["cmake", "catkin"]:
         recipe["build"]["script"] = {
             "sel(win)": "bld_catkin.bat",
