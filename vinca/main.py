@@ -68,7 +68,7 @@ def parse_command_line(argv):
         """
       Examples:
         {0} -d ./examples/
-      See: https://github.com/ros-forge/vinca
+      See: https://github.com/robostack/vinca
     """
     ).format(os.path.basename(argv[0]))
     formatter_class = argparse.RawDescriptionHelpFormatter
@@ -86,6 +86,13 @@ def parse_command_line(argv):
         dest="dir",
         default=default_dir,
         help="The directory to process (default: {}).".format(default_dir),
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        dest="file",
+        default="vinca.yaml",
+        help="The vinca file to process (default: vinca.yaml)",
     )
     parser.add_argument(
         "-s",
@@ -763,7 +770,7 @@ def main():
     arguments = parse_command_line(sys.argv)
 
     base_dir = os.path.abspath(arguments.dir)
-    vinca_yaml = os.path.join(base_dir, "vinca.yaml")
+    vinca_yaml = os.path.join(base_dir, arguments.file)
     vinca_conf = read_vinca_yaml(vinca_yaml)
     vinca_conf["_conda_indexes"] = get_conda_index(vinca_conf, base_dir)
 
