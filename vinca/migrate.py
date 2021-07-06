@@ -2,11 +2,23 @@ import json
 import requests
 import networkx as nx
 
+from vinca.distro import Distro
+
 packages_to_migrate = ["libopencv"]
-distro = "noetic"
+distro_version = "noetic"
+ros_prefix = f"ros-{distro_version}"
 
 arches = ["linux-64", "linux-aarch64", "win-64", "osx-64", "osx-arm64"]
 arches = ["linux-64"]
+
+def to_ros_name(distro, pkg_name):
+    shortname = pkg_name[len(ros_prefix) + 1:]
+    if distro.check_package(shortname):
+        return shortname
+    elif distro.check_package(shortname.replace('-', '_')):
+        return shortname.replace('-', '_')
+    else:
+        raise RuntimeError(f"Couldnt convert {pkg_name} to ROS pkg name")
 
 for arch in arches:
     url = f"https://conda.anaconda.org/robostack/{arch}/repodata.json"
@@ -16,7 +28,6 @@ for arch in arches:
     packages = repodata["packages"]
     to_migrate = set()
     ros_pkgs = set()
-    ros_prefix = f"ros-{distro}"
     for pkey in packages:
         if not pkey.startswith(ros_prefix):
             continue
@@ -74,7 +85,26 @@ for arch in arches:
     to_migrate = sorted(to_migrate, key=lambda x: gsorted.index(x))
 
     print("Sorted to migrate: ", to_migrate)
-    
+
+    distro = Distro(distro_version)
+    # import IPython; IPython.embed()
+
+    ros_names = []
+    for pkg in to_migrate:
+        ros_names.append(to_ros_name(distro, pkg))
+    print("Final names: ", ros_names)
+
+    from vinca.main import read_vinca_yaml
+    import ruamel.yaml
+    yaml = ruamel.yaml.YAML()
+    with open("vinca.yaml", "r") as fi:
+        vinca_conf = yaml.load(fi)
+
+    vinca_conf["packages_select_by_deps"] = ros_names
+    vinca_conf["skip_all_deps"] = True
+    with open("vinca_generated.yaml", "w") as fo:
+        yaml.dump(vinca_conf, fo)
+
     # import matplotlib.pyplot as plt
     # nx.draw(G, with_labels=True, font_weight='bold')
     # plt.show()

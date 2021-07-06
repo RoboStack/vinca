@@ -88,6 +88,13 @@ def parse_command_line(argv):
         help="The directory to process (default: {}).".format(default_dir),
     )
     parser.add_argument(
+        "-f",
+        "--file",
+        dest="file",
+        default="vinca.yaml",
+        help="The vinca file to process (default: vinca.yaml)",
+    )
+    parser.add_argument(
         "-s",
         "--skip",
         dest="skip_already_built_repodata",
@@ -738,7 +745,7 @@ def main():
     arguments = parse_command_line(sys.argv)
 
     base_dir = os.path.abspath(arguments.dir)
-    vinca_yaml = os.path.join(base_dir, "vinca.yaml")
+    vinca_yaml = os.path.join(base_dir, arguments.file)
     vinca_conf = read_vinca_yaml(vinca_yaml)
     vinca_conf["_conda_indexes"] = get_conda_index(vinca_conf, base_dir)
 
