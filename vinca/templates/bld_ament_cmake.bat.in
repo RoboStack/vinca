@@ -17,6 +17,9 @@ set "CMAKE_GENERATOR=Ninja"
 if "%PKG_NAME%" == "ros-@(ros_distro)-mimick-vendor" (
     set "CMAKE_GENERATOR=Visual Studio %VS_MAJOR% %VS_YEAR%"
 )
+if "%PKG_NAME%" == "ros-@(ros_distro)-unique-identifier-msgs" (
+    set "CMAKE_GENERATOR=Visual Studio %VS_MAJOR% %VS_YEAR%"
+)
 
 cmake ^
     -G "%CMAKE_GENERATOR%" ^
@@ -27,7 +30,7 @@ cmake ^
     -DSETUPTOOLS_DEB_LAYOUT=OFF ^
     -DBUILD_SHARED_LIBS=ON ^
     -DBUILD_TESTING=OFF ^
-    -DCMAKE_OBJECT_PATH_MAX=128 ^
+    -DCMAKE_OBJECT_PATH_MAX=255 ^
     %SRC_DIR%\%PKG_NAME%\src\work
 if errorlevel 1 exit 1
 
