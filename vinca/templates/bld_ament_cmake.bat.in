@@ -12,7 +12,10 @@ rd /s /q build
 mkdir build
 pushd build
 
-set "CMAKE_GENERATOR=Ninja"
+@rem set "CMAKE_GENERATOR=Ninja"
+
+@rem try to fix long paths issues by using default generator
+set "CMAKE_GENERATOR=Visual Studio %VS_MAJOR% %VS_YEAR%"
 
 if "%PKG_NAME%" == "ros-@(ros_distro)-mimick-vendor" (
     set "CMAKE_GENERATOR=Visual Studio %VS_MAJOR% %VS_YEAR%"
