@@ -314,8 +314,13 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
             while dep in output["requirements"][dep_type]:
                 output["requirements"][dep_type].remove(dep)
 
-    output["requirements"]["run"] = sorted(output["requirements"]["run"])
-    output["requirements"]["host"] = sorted(output["requirements"]["host"])
+    def sortkey(k):
+        if isinstance(k, dict):
+            return list(k.values())[0]
+        return k
+
+    output["requirements"]["run"] = sorted(output["requirements"]["run"], key=sortkey)
+    output["requirements"]["host"] = sorted(output["requirements"]["host"], key=sortkey)
 
     output["requirements"]["run"] += [
         {
