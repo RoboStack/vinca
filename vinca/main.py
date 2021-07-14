@@ -68,7 +68,7 @@ def parse_command_line(argv):
         """
       Examples:
         {0} -d ./examples/
-      See: https://github.com/ros-forge/vinca
+      See: https://github.com/RoboStack/vinca
     """
     ).format(os.path.basename(argv[0]))
     formatter_class = argparse.RawDescriptionHelpFormatter
