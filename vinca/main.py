@@ -263,6 +263,9 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
         output["requirements"]["host"].append(vinca_conf["mutex_package"])
         output["requirements"]["run"].append(vinca_conf["mutex_package"])
 
+    if not distro.check_ros1():
+        output["requirements"]["run"].append(f"ros-{config.ros_distro}-ros-workspace")
+
     rm_deps, add_deps = get_depmods(vinca_conf, pkg.name)
     gdeps = []
     if pkg.group_depends:
