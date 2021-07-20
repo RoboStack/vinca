@@ -20,6 +20,7 @@ case "$OSTYPE" in
 esac
 
 export ROS_ETC_DIR=$CONDA_PREFIX/etc/ros
+export AMENT_PREFIX_PATH=$CONDA_PREFIX
 
 # Looks unnecessary for UNIX
 # unset PYTHONHOME=
