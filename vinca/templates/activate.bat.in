@@ -11,4 +11,4 @@
 @@set PYTHONHOME=
 @@set "ROS_OS_OVERRIDE=robostack:win64"
 @@set "ROS_ETC_DIR=%CONDA_PREFIX%\Library\etc\ros"
-
+@@set "AMENT_PREFIX_PATH=%CONDA_PREFIX%\Library"
