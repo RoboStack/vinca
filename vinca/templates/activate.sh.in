@@ -19,5 +19,7 @@ case "$OSTYPE" in
   linux*)   export ROS_OS_OVERRIDE="robostack:linux";;
 esac
 
+export ROS_ETC_DIR=$CONDA_PREFIX/etc/ros
+
 # Looks unnecessary for UNIX
 # unset PYTHONHOME=
