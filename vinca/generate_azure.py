@@ -143,40 +143,6 @@ if errorlevel 1 exit 1
 parsed_args = None
 
 
-def parse_command_line(argv):
-    parser = argparse.ArgumentParser(
-        description="Conda recipe Azure pipeline generator for ROS packages"
-    )
-
-    default_dir = "./recipes"
-    parser.add_argument(
-        "-d",
-        "--dir",
-        dest="dir",
-        default=default_dir,
-        help="The recipes directory to process (default: {}).".format(default_dir),
-    )
-
-    parser.add_argument(
-        "-t", "--trigger-branch", dest="trigger_branch", help="Trigger branch for Azure"
-    )
-
-    parser.add_argument(
-        "-p",
-        "--platform",
-        dest="platform",
-        default="linux-64",
-        help="Platform to emit build pipeline for",
-    )
-
-    parser.add_argument(
-        "-a", "--additional-recipes", action="store_true", help="search for additional_recipes folder?")
-
-    arguments = parser.parse_args(argv[1:])
-    global parsed_args
-    parsed_args = arguments
-    return arguments
-
 
 def normalize_name(s):
     s = s.replace("-", "_")
@@ -197,6 +163,7 @@ def batch_stages(stages, max_batch_size=5):
         """Yield successive n-sized chunks from lst."""
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
+
     i = 0
     while i < len(stages):
         for build_individually_pkg in build_individually:
@@ -247,8 +214,8 @@ def get_skip_existing(vinca_conf, platform):
 
     return repodatas
 
-def add_additional_recipes(args):
-    additional_recipes_path = os.path.abspath(os.path.join(args.dir, '..', 'additional_recipes'))
+def add_additional_recipes(recipe_dir, platform):
+    additional_recipes_path = os.path.abspath(os.path.join(recipe_dir, '..', 'additional_recipes'))
 
     print("Searching additional recipes in ", additional_recipes_path)
 
@@ -258,7 +225,10 @@ def add_additional_recipes(args):
     with open("vinca.yaml", "r") as vinca_yaml:
         vinca_conf = yaml.safe_load(vinca_yaml)
 
-    repodatas = get_skip_existing(vinca_conf, args.platform)
+    if vinca_conf.get("is_migration"):
+        return
+
+    repodatas = get_skip_existing(vinca_conf, platform)
 
     for recipe_path in glob.glob(additional_recipes_path + '/**/recipe.yaml'):
         with open(recipe_path) as recipe:
@@ -276,7 +246,7 @@ def add_additional_recipes(args):
 
         if not skip:
             print("Adding ", os.path.dirname(recipe_path))
-            goal_folder = os.path.join(args.dir, name)
+            goal_folder = os.path.join(recipe_dir, name)
             os.makedirs(goal_folder, exist_ok=True)
             copy_tree(os.path.dirname(recipe_path), goal_folder)
 
@@ -521,7 +491,7 @@ def build_osx_arm64(stages, trigger_branch):
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
 
-def extend_graph(graph, arch='linux-64'):
+def extend_graph(graph, arch='linux-64', distro='noetic'):
     url = f"https://conda.anaconda.org/robostack/{arch}/repodata.json"
     repodata = requests.get(url).json()
 
@@ -567,19 +537,9 @@ def extend_graph(graph, arch='linux-64'):
             if req.startswith(ros_prefix):
                 graph.add_edge(pkg, req)
 
-def main():
-
-    args = parse_command_line(sys.argv)
-
+def generate_pipeline(recipe_dir, platform, trigger_branch, sequential=False):
     metas = []
-
-    if args.additional_recipes:
-        add_additional_recipes(args)
-
-    if not os.path.exists(args.dir):
-        print(f"{args.dir} not found. Not generating a pipeline.")
-
-    all_recipes = glob.glob(os.path.join(args.dir, "**", "*.yaml"))
+    all_recipes = glob.glob(os.path.join(recipe_dir, "**", "*.yaml"))
     for f in all_recipes:
         with open(f) as fi:
             metas.append(yaml.safe_load(fi.read()))
@@ -601,7 +561,7 @@ def main():
                 if r.startswith("ros-"):
                     G.add_edge(pkg, r)
 
-        extend_graph(G, arch=args.platform)
+        extend_graph(G, arch=platform)
         # import matplotlib.pyplot as plt
         # nx.draw(G, with_labels=True, font_weight='bold')
         # plt.show()
@@ -656,16 +616,77 @@ def main():
         if len(filtered):
             filtered_stages.append(filtered)
 
-    stages = batch_stages(filtered_stages)
-    print(stages)
+    if sequential:
+        single_stage = []
+        for s in filtered_stages:
+            single_stage.extend(s)
+        stages = [[single_stage]]
+    else:
+        stages = batch_stages(filtered_stages)
 
-    if args.platform == "linux-64":
-        build_linux(stages, args.trigger_branch)
-    elif args.platform == "linux-aarch64":
-        build_linux_aarch64(stages, args.trigger_branch)
-    elif args.platform == "osx-64":
-        build_osx(stages, args.trigger_branch)
-    elif args.platform == "osx-arm64":
-        build_osx_arm64(stages, args.trigger_branch)
-    elif args.platform == "win-64":
-        build_win(stages, args.trigger_branch)
+    if platform == "linux-64":
+        build_linux(stages, trigger_branch)
+    elif platform == "linux-aarch64":
+        build_linux_aarch64(stages, trigger_branch)
+    elif platform == "osx-64":
+        build_osx(stages, trigger_branch)
+    elif platform == "osx-arm64":
+        build_osx_arm64(stages, trigger_branch)
+    elif platform == "win-64":
+        build_win(stages, trigger_branch)
+
+
+def parse_command_line(argv):
+    parser = argparse.ArgumentParser(
+        description="Conda recipe Azure pipeline generator for ROS packages"
+    )
+
+    default_dir = "./recipes"
+    parser.add_argument(
+        "-d",
+        "--dir",
+        dest="dir",
+        default=default_dir,
+        help="The recipes directory to process (default: {}).".format(default_dir),
+    )
+    parser.add_argument(
+        "--sequential",
+        dest="sequential",
+        action="store_true",
+        help="Don't parallelize stages",
+    )
+    parser.add_argument(
+        "-t", "--trigger-branch", dest="trigger_branch", help="Trigger branch for Azure"
+    )
+
+    parser.add_argument(
+        "-p",
+        "--platform",
+        dest="platform",
+        default="linux-64",
+        help="Platform to emit build pipeline for",
+    )
+
+    parser.add_argument(
+        "-a", "--additional-recipes", action="store_true", help="search for additional_recipes folder?")
+
+    arguments = parser.parse_args(argv[1:])
+    global parsed_args
+    parsed_args = arguments
+    return arguments
+
+
+def main():
+
+    args = parse_command_line(sys.argv)
+
+    metas = []
+
+    if not os.path.exists(args.dir):
+        print(f"{args.dir} not found. Not generating a pipeline.")
+        return
+
+    if args.additional_recipes:
+        add_additional_recipes(args.dir, args.platform)
+
+    generate_pipeline(args.dir, args.platform, args.trigger_branch, args.sequential)

@@ -1,6 +1,11 @@
-import json
+import yaml
+import sys, os
+import glob
+import argparse
 import requests
 import networkx as nx
+import subprocess
+import shutil
 
 from vinca.distro import Distro
 
@@ -9,7 +14,6 @@ distro_version = "noetic"
 ros_prefix = f"ros-{distro_version}"
 
 arches = ["linux-64", "linux-aarch64", "win-64", "osx-64", "osx-arm64"]
-arches = ["linux-64"]
 
 def to_ros_name(distro, pkg_name):
     shortname = pkg_name[len(ros_prefix) + 1:]
@@ -20,7 +24,7 @@ def to_ros_name(distro, pkg_name):
     else:
         raise RuntimeError(f"Couldnt convert {pkg_name} to ROS pkg name")
 
-for arch in arches:
+def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     url = f"https://conda.anaconda.org/robostack/{arch}/repodata.json"
     print("URL: ", url)
     # return
@@ -102,11 +106,57 @@ for arch in arches:
 
     vinca_conf["packages_select_by_deps"] = ros_names
     vinca_conf["skip_all_deps"] = True
-    with open("vinca_generated.yaml", "w") as fo:
+    vinca_conf["is_migration"] = True
+
+    with open("vinca.yaml", "w") as fo:
         yaml.dump(vinca_conf, fo)
 
-    # import matplotlib.pyplot as plt
-    # nx.draw(G, with_labels=True, font_weight='bold')
-    # plt.show()
+    if os.path.exists("recipes"):
+        shutil.rmtree("recipes")
+
+    subprocess.check_call(["vinca", "-f", "vinca.yaml", "--multiple", "--platform", arch])
+    subprocess.check_call(["vinca-azure", "--platform", arch, "--trigger-branch", "buildbranch_linux", "-d", "./recipes", "--additional-recipes", "--sequential"])
+
+def parse_command_line(argv):
+    parser = argparse.ArgumentParser(
+        description="Conda recipe Azure pipeline generator for ROS packages"
+    )
+
+    default_dir = "./recipes"
+    parser.add_argument(
+        "-d",
+        "--dir",
+        dest="dir",
+        default=default_dir,
+        help="The recipes directory to process (default: {}).".format(default_dir),
+    )
+
+    parser.add_argument(
+        "-t", "--trigger-branch", dest="trigger_branch", help="Trigger branch for Azure"
+    )
+
+    parser.add_argument(
+        "-p",
+        "--platform",
+        dest="platform",
+        default="linux-64",
+        help="Platform to emit build pipeline for",
+    )
+
+    parser.add_argument(
+        "-a", "--additional-recipes", action="store_true", help="search for additional_recipes folder?")
+
+    arguments = parser.parse_args(argv[1:])
+    global parsed_args
+    parsed_args = arguments
+    return arguments
 
 
+def main():
+    args = parse_command_line(sys.argv)
+
+    mfile = os.path.join(args.dir + "/migration.yaml")
+    with open(mfile, "r") as fi:
+        migration = yaml.safe_load(fi)
+        print(migration)
+        create_migration_instructions(args.platform, migration.get('packages', []), args.trigger_branch)
