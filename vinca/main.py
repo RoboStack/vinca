@@ -222,7 +222,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
                 "{{ compiler('c') }}",
                 "ninja",
                 {"sel(unix)": "make"},
-                {"sel(osx)": "tapi"},
+                # let's figure out if we need this, was added for ROS2
+                # {"sel(osx)": "tapi"},
                 "cmake",
                 {"sel(build_platform != target_platform)": "python"},
                 {"sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"},
