@@ -367,7 +367,7 @@ def main():
     print(stages)
 
     # Build Linux pipeline
-    azure_template = {"pool": {"vmImage": "ubuntu-16.04"}}
+    azure_template = {"pool": {"vmImage": "ubuntu-latest"}}
 
     azure_stages = []
 
@@ -381,7 +381,7 @@ def main():
             pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
-                    "job": pkg_jobname,
+                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
                     "steps": [
                         {
                             "script": azure_linux_script,
@@ -424,7 +424,7 @@ def main():
             pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
-                    "job": pkg_jobname,
+                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
                     "steps": [
                         {
                             "script": azure_osx_script,
@@ -466,7 +466,7 @@ def main():
             pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
-                    "job": pkg_jobname,
+                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
                     "steps": [
                         {
                             "script": azure_osx_arm64_script,
@@ -542,7 +542,7 @@ def main():
             fo.write(yaml.dump(azure_template, sort_keys=False))
 
     # windows
-    azure_template = {"pool": {"vmImage": "vs2017-win2016"}}
+    azure_template = {"pool": {"vmImage": "windows-2019"}}
 
     azure_stages = []
 
@@ -561,7 +561,7 @@ def main():
             pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
-                    "job": pkg_jobname,
+                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
                     "variables": {"CONDA_BLD_PATH": "C:\\\\bld\\\\"},
                     "steps": [
                         {

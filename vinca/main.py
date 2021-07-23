@@ -145,7 +145,6 @@ def get_depmods(vinca_conf, pkg_name):
                     add_deps[dep_type].append(dict(el))
                 else:
                     add_deps[dep_type].append(el)
-
     return rm_deps, add_deps
 
 
@@ -174,13 +173,18 @@ def read_vinca_yaml(filepath):
             if splitted[1] in ("osx", "linux", "win"):
                 patches[splitted[0]][splitted[1]].append(x)
                 continue
+            if splitted[1] == "unix":
+                patches[splitted[0]]["linux"].append(x)
+                patches[splitted[0]]["osx"].append(x)
+                continue
+
         patches[splitted[0]]["any"].append(x)
 
     vinca_conf["_patches"] = patches
 
     if (patch_dir / "dependencies.yaml").exists():
         vinca_conf["depmods"] = yaml.load(open(patch_dir / "dependencies.yaml"))
-    else:
+    if not vinca_conf.get("depmods"):
         vinca_conf["depmods"] = {}
 
     config.ros_distro = vinca_conf["ros_distro"]
@@ -189,7 +193,7 @@ def read_vinca_yaml(filepath):
     return vinca_conf
 
 
-def generate_output(pkg_shortname, vinca_conf, distro, version):
+def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
     if pkg_shortname not in vinca_conf["_selected_pkgs"]:
         return None
 
@@ -211,6 +215,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
                 "{{ compiler('c') }}",
                 "ninja",
                 {"sel(unix)": "make"},
+                {"sel(osx)": "tapi"},
                 "cmake",
                 {"sel(build_platform != target_platform)": "python"},
                 {"sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"},
@@ -258,8 +263,15 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
         output["requirements"]["host"].append(vinca_conf["mutex_package"])
         output["requirements"]["run"].append(vinca_conf["mutex_package"])
 
+    if not distro.check_ros1() and pkg_shortname not in ['ament_cmake_core', 'ament_package', 'ros_workspace']:
+        output["requirements"]["run"].append(f"ros-{config.ros_distro}-ros-workspace")
 
     rm_deps, add_deps = get_depmods(vinca_conf, pkg.name)
+    gdeps = []
+    if pkg.group_depends:
+        for gdep in pkg.group_depends:
+            gdep.extract_group_members(all_pkgs)
+            gdeps += gdep.members
 
     build_deps = pkg.build_depends
     build_deps += pkg.buildtool_depends
@@ -267,6 +279,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     build_deps += pkg.buildtool_export_depends
     build_deps += pkg.test_depends
     build_deps = [d.name for d in build_deps if d.evaluated_condition]
+    build_deps += gdeps
 
     for dep in build_deps:
         if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
@@ -284,6 +297,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
     run_deps += pkg.build_export_depends
     run_deps += pkg.buildtool_export_depends
     run_deps = [d.name for d in run_deps if d.evaluated_condition]
+    run_deps += gdeps
 
     for dep in run_deps:
         if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
@@ -303,8 +317,13 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
             while dep in output["requirements"][dep_type]:
                 output["requirements"][dep_type].remove(dep)
 
-    output["requirements"]["run"] = sorted(output["requirements"]["run"])
-    output["requirements"]["host"] = sorted(output["requirements"]["host"])
+    def sortkey(k):
+        if isinstance(k, dict):
+            return list(k.values())[0]
+        return k
+
+    output["requirements"]["run"] = sorted(output["requirements"]["run"], key=sortkey)
+    output["requirements"]["host"] = sorted(output["requirements"]["host"], key=sortkey)
 
     output["requirements"]["run"] += [
         {
@@ -401,9 +420,19 @@ def generate_output(pkg_shortname, vinca_conf, distro, version):
 
 def generate_outputs(distro, vinca_conf):
     outputs = []
+
+    def get_pkg(pkg_name):
+        pkg = catkin_pkg.package.parse_package_string(
+            distro.get_release_package_xml(pkg_name)
+        )
+        pkg.evaluate_conditions(os.environ)
+        return pkg
+
+    all_pkgs = [get_pkg(pkg) for pkg in distro.get_depends('ros_base')]
+
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
         output = generate_output(
-            pkg_shortname, vinca_conf, distro, distro.get_version(pkg_shortname)
+            pkg_shortname, vinca_conf, distro, distro.get_version(pkg_shortname), all_pkgs
         )
         if output is not None:
             outputs.append(output)
@@ -523,12 +552,22 @@ def get_selected_packages(distro, vinca_conf):
     if vinca_conf.get("build_all", False):
         selected_packages = set(distro._distro.release_packages.keys())
     elif vinca_conf["packages_select_by_deps"]:
+
+        if (
+            "packages_skip_by_deps" in vinca_conf
+            and vinca_conf["packages_skip_by_deps"] is not None
+        ):
+            for i in vinca_conf["packages_skip_by_deps"]:
+                skipped_packages = skipped_packages.union([i, i.replace("-", "_")])
+        print("Skipped pkgs: ", skipped_packages)
         for i in vinca_conf["packages_select_by_deps"]:
             i = i.replace("-", "_")
             selected_packages = selected_packages.union([i])
             if "skip_all_deps" not in vinca_conf or not vinca_conf["skip_all_deps"]:
+                if i in skipped_packages:
+                    continue
                 try:
-                    pkgs = distro.get_depends(i)
+                    pkgs = distro.get_depends(i, ignore_pkgs=skipped_packages)
                 except KeyError:
                     # handle (rare) package names that use "-" as separator
                     pkgs = distro.get_depends(i.replace("_", "-"))
@@ -536,72 +575,8 @@ def get_selected_packages(distro, vinca_conf):
                     selected_packages.add(i.replace("_", "-"))
                 selected_packages = selected_packages.union(pkgs)
 
-    if (
-        "packages_skip_by_deps" in vinca_conf
-        and vinca_conf["packages_skip_by_deps"] is not None
-    ):
-        for i in vinca_conf["packages_skip_by_deps"]:
-            i = i.replace("-", "_")
-            skipped_packages = skipped_packages.union([i])
-            try:
-                pkgs = distro.get_depends(i)
-            except KeyError:
-                # handle (rare) package names that use "-" as separator
-                pkgs = distro.get_depends(i.replace("_", "-"))
-                selected_packages.remove(i)
-                selected_packages.add(i.replace("_", "-"))
-            skipped_packages = skipped_packages.union(pkgs)
-    result = selected_packages.difference(skipped_packages)
-    result = sorted(list(result))
+    result = sorted(list(selected_packages))
     return result
-
-
-# def parse_dep(dep, vinca_conf, distro):
-#     res = dep.name
-#     res = resolve_pkgname(res, vinca_conf, distro)
-
-#     if dep.version_eq :
-#         return res + " ==" + dep.version_eq
-
-#     if dep.version_gt :
-#         res = res + " >" + dep.version_gt
-
-#         if dep.version_lt :
-#             res = res + ", <" + dep.version_lt
-
-#         if dep.version_lte :
-#             res = res + ", <=" + dep.version_lte
-
-#         return res
-
-#     if dep.version_gte :
-#         res = res + " >=" + dep.version_gte
-
-#         if dep.version_lt :
-#             res = res + ", <" + dep.version_lt
-
-#         return res
-
-#     if dep.version_lt :
-#         res = res + " <" + dep.version_lt
-
-#         if dep.version_gt :
-#             res = res + ", >" + dep.version_gt
-
-#         if dep.version_gte :
-#             res = res + ", >=" + dep.version_gte
-
-#         return res
-
-#     if dep.version_lte :
-#         res = res + " <=" + dep.version_lte
-
-#         if dep.version_gt :
-#             res = res + ", >" + dep.version_gt
-
-#         return res
-
-#     return res
 
 
 def parse_package(pkg, distro, vinca_conf, path):

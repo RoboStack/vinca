@@ -37,7 +37,7 @@ class Distro(object):
     def add_packages(self, packages):
         self.build_packages = set(packages)
 
-    def get_depends(self, pkg):
+    def get_depends(self, pkg, ignore_pkgs=None):
         dependencies = set()
         dependencies |= self._walker.get_recursive_depends(
             pkg,
@@ -51,6 +51,7 @@ class Distro(object):
                 "exec",
             ],
             ros_packages_only=True,
+            ignore_pkgs=ignore_pkgs
         )
         return dependencies
 

@@ -85,7 +85,7 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
 
             for key, script in meta['build']['script'].items():
                 shutil.copyfile(script, recipe_dir / script)
-            if "catkin" in o["package"]["name"]:
+            if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
                 shutil.copyfile("activate.sh", recipe_dir / "activate.sh")
                 shutil.copyfile("activate.bat", recipe_dir / "activate.bat")
                 shutil.copyfile("deactivate.sh", recipe_dir / "deactivate.sh")

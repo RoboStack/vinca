@@ -45,27 +45,28 @@ def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
     return None
 
 
+def should_skip_pkg(pkg_shortname, vinca_conf):
+    skip = vinca_conf.get("packages_remove_from_deps", [])
+    if not skip:
+        return False
+
+    if pkg_shortname in skip:
+        return True
+    if pkg_shortname.replace('_', '-') in skip:
+        return True
+
 def resolve_pkgname(pkg_shortname, vinca_conf, distro, is_rundep=False):
     pkg_names = resolve_pkgname_from_indexes(
         pkg_shortname, vinca_conf["_conda_indexes"]
     )
     if pkg_names is None:
-        if not distro.check_package(pkg_shortname):
+        if not distro.check_package(pkg_shortname) or should_skip_pkg(pkg_shortname, vinca_conf):
             return []
         else:
-            if (
-                "packages_remove_from_deps" in vinca_conf
-                and vinca_conf["packages_remove_from_deps"] is not None
-                and not (
-                    pkg_shortname.replace("_", "-") in vinca_conf["packages_remove_from_deps"] or
-                    pkg_shortname in vinca_conf["packages_remove_from_deps"])
-            ):
-                return [
-                    "ros-%s-%s"
-                    % (vinca_conf["ros_distro"], pkg_shortname.replace("_", "-"))
-                ]
-            else:
-                return []
+            return [
+                "ros-%s-%s"
+                % (vinca_conf["ros_distro"], pkg_shortname.replace("_", "-"))
+            ]
     else:
         if is_rundep:  # for run dependencies, remove the version
             pkg_names_pinned = []
