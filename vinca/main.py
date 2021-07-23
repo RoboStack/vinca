@@ -552,12 +552,22 @@ def get_selected_packages(distro, vinca_conf):
     if vinca_conf.get("build_all", False):
         selected_packages = set(distro._distro.release_packages.keys())
     elif vinca_conf["packages_select_by_deps"]:
+
+        if (
+            "packages_skip_by_deps" in vinca_conf
+            and vinca_conf["packages_skip_by_deps"] is not None
+        ):
+            for i in vinca_conf["packages_skip_by_deps"]:
+                skipped_packages = skipped_packages.union([i, i.replace("-", "_")])
+        print("Skipped pkgs: ", skipped_packages)
         for i in vinca_conf["packages_select_by_deps"]:
             i = i.replace("-", "_")
             selected_packages = selected_packages.union([i])
             if "skip_all_deps" not in vinca_conf or not vinca_conf["skip_all_deps"]:
+                if i in skipped_packages:
+                    continue
                 try:
-                    pkgs = distro.get_depends(i)
+                    pkgs = distro.get_depends(i, ignore_pkgs=skipped_packages)
                 except KeyError:
                     # handle (rare) package names that use "-" as separator
                     pkgs = distro.get_depends(i.replace("_", "-"))
@@ -565,72 +575,8 @@ def get_selected_packages(distro, vinca_conf):
                     selected_packages.add(i.replace("_", "-"))
                 selected_packages = selected_packages.union(pkgs)
 
-    if (
-        "packages_skip_by_deps" in vinca_conf
-        and vinca_conf["packages_skip_by_deps"] is not None
-    ):
-        for i in vinca_conf["packages_skip_by_deps"]:
-            i = i.replace("-", "_")
-            skipped_packages = skipped_packages.union([i])
-            try:
-                pkgs = distro.get_depends(i)
-            except KeyError:
-                # handle (rare) package names that use "-" as separator
-                pkgs = distro.get_depends(i.replace("_", "-"))
-                selected_packages.remove(i)
-                selected_packages.add(i.replace("_", "-"))
-            skipped_packages = skipped_packages.union(pkgs)
-    result = selected_packages.difference(skipped_packages)
-    result = sorted(list(result))
+    result = sorted(list(selected_packages))
     return result
-
-
-# def parse_dep(dep, vinca_conf, distro):
-#     res = dep.name
-#     res = resolve_pkgname(res, vinca_conf, distro)
-
-#     if dep.version_eq :
-#         return res + " ==" + dep.version_eq
-
-#     if dep.version_gt :
-#         res = res + " >" + dep.version_gt
-
-#         if dep.version_lt :
-#             res = res + ", <" + dep.version_lt
-
-#         if dep.version_lte :
-#             res = res + ", <=" + dep.version_lte
-
-#         return res
-
-#     if dep.version_gte :
-#         res = res + " >=" + dep.version_gte
-
-#         if dep.version_lt :
-#             res = res + ", <" + dep.version_lt
-
-#         return res
-
-#     if dep.version_lt :
-#         res = res + " <" + dep.version_lt
-
-#         if dep.version_gt :
-#             res = res + ", >" + dep.version_gt
-
-#         if dep.version_gte :
-#             res = res + ", >=" + dep.version_gte
-
-#         return res
-
-#     if dep.version_lte :
-#         res = res + " <=" + dep.version_lte
-
-#         if dep.version_gt :
-#             res = res + ", >" + dep.version_gt
-
-#         return res
-
-#     return res
 
 
 def parse_package(pkg, distro, vinca_conf, path):
