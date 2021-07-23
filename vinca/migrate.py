@@ -6,14 +6,23 @@ import requests
 import networkx as nx
 import subprocess
 import shutil
+from vinca.main import read_vinca_yaml
+import ruamel.yaml
+
 
 from vinca.distro import Distro
 
-packages_to_migrate = ["libopencv"]
-distro_version = "noetic"
-ros_prefix = f"ros-{distro_version}"
+distro_version = None
+ros_prefix = None
 
-arches = ["linux-64", "linux-aarch64", "win-64", "osx-64", "osx-arm64"]
+# arches = ["linux-64", "linux-aarch64", "win-64", "osx-64", "osx-arm64"]
+# arch_to_fname = {
+#     "linux-64": "linux",
+#     "linux-aarch64": "linux_aarch_64",
+#     "win-64": "win",
+#     "osx-64": "osx",
+#     "osx-arm64": "osx_arm64"
+# }
 
 def to_ros_name(distro, pkg_name):
     shortname = pkg_name[len(ros_prefix) + 1:]
@@ -26,6 +35,15 @@ def to_ros_name(distro, pkg_name):
 
 def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     url = f"https://conda.anaconda.org/robostack/{arch}/repodata.json"
+
+    yaml = ruamel.yaml.YAML()
+    with open("vinca.yaml", "r") as fi:
+        vinca_conf = yaml.load(fi)
+
+    global distro_version, ros_prefix
+    distro_version = vinca_conf['ros_distro']
+    ros_prefix = f"ros-{distro_version}"
+
     print("URL: ", url)
     # return
     repodata = requests.get(url).json()
@@ -45,9 +63,6 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
             if d.split()[0] in packages_to_migrate:
                 # print(f"need to migrate {pkey}")
                 to_migrate.add(pname)
-
-    # print(to_migrate)
-    # print(ros_pkgs)
 
     latest = {}
     for pkg in ros_pkgs:
@@ -70,9 +85,7 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
                     current = pkey
         latest[pkg] = current
 
-    # print(latest)
-
-        # now we can build the graph ... 
+    # now we can build the graph ... 
 
     G = nx.DiGraph()
     for pkg, pkgkey in latest.items():
@@ -97,12 +110,6 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     for pkg in to_migrate:
         ros_names.append(to_ros_name(distro, pkg))
     print("Final names: ", ros_names)
-
-    from vinca.main import read_vinca_yaml
-    import ruamel.yaml
-    yaml = ruamel.yaml.YAML()
-    with open("vinca.yaml", "r") as fi:
-        vinca_conf = yaml.load(fi)
 
     vinca_conf["packages_select_by_deps"] = ros_names
     vinca_conf["skip_all_deps"] = True
