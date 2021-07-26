@@ -34,7 +34,7 @@ cmake ^
     -DBUILD_SHARED_LIBS=ON ^
     -DBUILD_TESTING=OFF ^
     -DCMAKE_OBJECT_PATH_MAX=255 ^
-    -DNOMINMAX=ON ^
+    -DNOMINMAX ^
     %SRC_DIR%\%PKG_NAME%\src\work
 if errorlevel 1 exit 1
 
