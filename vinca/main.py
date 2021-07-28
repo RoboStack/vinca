@@ -431,9 +431,12 @@ def generate_outputs(distro, vinca_conf):
     all_pkgs = [get_pkg(pkg) for pkg in distro.get_depends('ros_base')]
 
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
-        output = generate_output(
-            pkg_shortname, vinca_conf, distro, distro.get_version(pkg_shortname), all_pkgs
-        )
+        try:
+            output = generate_output(
+                pkg_shortname, vinca_conf, distro, distro.get_version(pkg_shortname), all_pkgs
+            )
+        except AttributeError as e:
+            print('Skip ' + pkg_shortname + ' due to invalid version / XML.')
         if output is not None:
             outputs.append(output)
     return outputs
