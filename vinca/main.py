@@ -264,6 +264,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
         output["requirements"]["run"].append(vinca_conf["mutex_package"])
 
     if not distro.check_ros1() and pkg_shortname not in ['ament_cmake_core', 'ament_package', 'ros_workspace']:
+        output["requirements"]["host"].append(f"ros-{config.ros_distro}-ros-workspace")
         output["requirements"]["run"].append(f"ros-{config.ros_distro}-ros-workspace")
 
     rm_deps, add_deps = get_depmods(vinca_conf, pkg.name)
