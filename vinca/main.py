@@ -88,6 +88,13 @@ def parse_command_line(argv):
         help="The directory to process (default: {}).".format(default_dir),
     )
     parser.add_argument(
+        "-f",
+        "--file",
+        dest="file",
+        default="vinca.yaml",
+        help="The vinca file to process (default: vinca.yaml)",
+    )
+    parser.add_argument(
         "-s",
         "--skip",
         dest="skip_already_built_repodata",
@@ -215,7 +222,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
                 "{{ compiler('c') }}",
                 "ninja",
                 {"sel(unix)": "make"},
-                {"sel(osx)": "tapi"},
+                # let's figure out if we need this, was added for ROS2
+                # {"sel(osx)": "tapi"},
                 "cmake",
                 {"sel(build_platform != target_platform)": "python"},
                 {"sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"},
@@ -743,7 +751,7 @@ def main():
     arguments = parse_command_line(sys.argv)
 
     base_dir = os.path.abspath(arguments.dir)
-    vinca_yaml = os.path.join(base_dir, "vinca.yaml")
+    vinca_yaml = os.path.join(base_dir, arguments.file)
     vinca_conf = read_vinca_yaml(vinca_yaml)
     vinca_conf["_conda_indexes"] = get_conda_index(vinca_conf, base_dir)
 
