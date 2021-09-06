@@ -14,3 +14,5 @@
 @@set AMENT_PREFIX_PATH=
 @@set COLCON_PREFIX_PATH=
 @@set QT_PLUGIN_PATH=
+@@set ROS_LOCALHOST_ONLY=
+@@set ament_python_executable=
