@@ -12,3 +12,4 @@
 @@set "ROS_OS_OVERRIDE=robostack:win64"
 @@set "ROS_ETC_DIR=%CONDA_PREFIX%\Library\etc\ros"
 @@set "AMENT_PREFIX_PATH=%CONDA_PREFIX%\Library"
+@@set "AMENT_PYTHON_EXECUTABLE=%CONDA_PREFIX%\Library\python.exe"
