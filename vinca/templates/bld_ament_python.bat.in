@@ -14,8 +14,7 @@ for /f "usebackq tokens=*" %%a in ('%LIBRARY_PREFIX%') do (
 )
 
 %PYTHON% setup.py install ^
-    --prefix=%_LIBRARY_PREFIX_PATH% ^
+    --prefix=%SP_DIR% ^
     --install-scripts=%_LIBRARY_PREFIX_PATH%\bin ^
-    --root=%_LIBRARY_PREFIX_ROOT% ^
-    --target=%SP_DIR%
+    --root=%_LIBRARY_PREFIX_ROOT%
 if errorlevel 1 exit 1
