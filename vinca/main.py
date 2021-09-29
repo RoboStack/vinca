@@ -263,7 +263,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
         output["requirements"]["host"].append(vinca_conf["mutex_package"])
         output["requirements"]["run"].append(vinca_conf["mutex_package"])
 
-    if not distro.check_ros1() and pkg_shortname not in ['ament_cmake_core', 'ament_package', 'ros_workspace']:
+    if not distro.check_ros1() and pkg_shortname not in ['ament_cmake_core', 'ament_package', 'ros_workspace', 'ros_environment']:
         output["requirements"]["host"].append(f"ros-{config.ros_distro}-ros-environment")
         output["requirements"]["host"].append(f"ros-{config.ros_distro}-ros-workspace")
         output["requirements"]["run"].append(f"ros-{config.ros_distro}-ros-workspace")
