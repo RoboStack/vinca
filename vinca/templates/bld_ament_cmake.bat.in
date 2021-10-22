@@ -16,6 +16,7 @@ pushd build
 
 :: try to fix long paths issues by using default generator
 set "CMAKE_GENERATOR=Visual Studio %VS_MAJOR% %VS_YEAR%"
+set "SP_DIR_FORWARDSLASHES=%SP_DIR:\=/%"
 
 cmake ^
     -G "%CMAKE_GENERATOR%" ^
@@ -28,7 +29,7 @@ cmake ^
     -DBUILD_SHARED_LIBS=ON ^
     -DBUILD_TESTING=OFF ^
     -DCMAKE_OBJECT_PATH_MAX=255 ^
-    -DPYTHON_INSTALL_DIR=%SP_DIR% ^
+    -DPYTHON_INSTALL_DIR=%SP_DIR_FORWARDSLASHES% ^
     %SRC_DIR%\%PKG_NAME%\src\work
 if errorlevel 1 exit 1
 
