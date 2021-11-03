@@ -10,12 +10,12 @@ import pkg_resources
 
 from distutils.dir_util import copy_tree
 
+
 def read_azure_script(fn):
-    template_in = pkg_resources.resource_filename(
-        "vinca", f"azure_templates/{fn}"
-    )
+    template_in = pkg_resources.resource_filename("vinca", f"azure_templates/{fn}")
     with open(template_in, "r") as fi:
         return fi.read()
+
 
 class folded_unicode(str):
     pass
@@ -43,6 +43,8 @@ azure_win_preconfig_script = literal_unicode(read_azure_script("win_preconfig.ba
 azure_win_script = literal_unicode(read_azure_script("win_build.bat"))
 
 parsed_args = None
+
+
 def parse_command_line(argv):
     parser = argparse.ArgumentParser(
         description="Conda recipe Azure pipeline generator for ROS packages"

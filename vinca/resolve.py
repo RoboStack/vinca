@@ -1,6 +1,5 @@
 import os
 from urllib.request import urlopen
-import platform
 from vinca import config
 
 map_platform_python_to_conda = {

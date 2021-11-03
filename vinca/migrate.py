@@ -1,12 +1,12 @@
 import yaml
-import sys, os
-import glob
+import sys
+import os
 import argparse
 import requests
+import re
 import networkx as nx
 import subprocess
 import shutil
-from vinca.main import read_vinca_yaml
 import ruamel.yaml
 
 

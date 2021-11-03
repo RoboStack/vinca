@@ -1,8 +1,8 @@
 import networkx as nx
 import yaml
 import glob
-import sys, os
-from collections import OrderedDict
+import sys
+import os
 
 try:
     from yaml import CLoader as Loader, CDumper as Dumper

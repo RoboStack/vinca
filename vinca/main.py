@@ -14,7 +14,6 @@ from pathlib import Path
 from vinca import __version__
 from .resolve import get_conda_index
 from .resolve import resolve_pkgname
-from .resolve import resolve_pkgname_from_indexes
 from .template import write_recipe, write_recipe_package
 from .distro import Distro
 
@@ -26,10 +25,11 @@ distro = None
 parsed_args = None
 
 
-def ensure_list(l):
-    if not l:
+def ensure_list(obj):
+    if not obj:
         return []
-    return l
+    assert isinstance(obj, list)
+    return obj
 
 
 def get_conda_subdir():
@@ -196,7 +196,10 @@ def read_vinca_yaml(filepath):
     return vinca_conf
 
 
-def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
+def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
+    if not all_pkgs:
+        all_pkgs = []
+
     if pkg_shortname not in vinca_conf["_selected_pkgs"]:
         return None
 
@@ -208,7 +211,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
         return None
 
     output = {
-        "package": {"name": pkg_names[0], "version": version,},
+        "package": {"name": pkg_names[0], "version": version},
         "requirements": {
             "build": [
                 "{{ compiler('cxx') }}",
@@ -457,7 +460,7 @@ def generate_outputs(distro, vinca_conf):
                 distro.get_version(pkg_shortname),
                 all_pkgs,
             )
-        except AttributeError as e:
+        except AttributeError:
             print("Skip " + pkg_shortname + " due to invalid version / XML.")
         if output is not None:
             outputs.append(output)
@@ -612,7 +615,7 @@ def parse_package(pkg, distro, vinca_conf, path):
         "package": {"name": final_name, "version": pkg["version"]},
         "about": {
             "home": "https://www.ros.org/",
-            "license": [str(l) for l in pkg["licenses"]],
+            "license": [str(lic) for lic in pkg["licenses"]],
             "summary": pkg["description"],
             "maintainers": [],
         },

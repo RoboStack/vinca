@@ -1,6 +1,5 @@
 import datetime
 import shutil
-import ruamel
 import os
 
 from ruamel import yaml
@@ -81,7 +80,7 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
                     os.makedirs(recipe_dir / patch_dir, exist_ok=True)
                     shutil.copyfile(p, recipe_dir / p)
 
-            for key, script in meta["build"]["script"].items():
+            for _, script in meta["build"]["script"].items():
                 shutil.copyfile(script, recipe_dir / script)
             if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
                 shutil.copyfile("activate.sh", recipe_dir / "activate.sh")
