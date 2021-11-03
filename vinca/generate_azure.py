@@ -5,11 +5,11 @@ import glob
 import sys
 import os
 import argparse
-import requests
 import pkg_resources
 from .utils import literal_unicode as lu
 
 from distutils.dir_util import copy_tree
+from .utils import get_repodata
 
 
 def read_azure_script(fn):
@@ -121,20 +121,11 @@ def get_skip_existing(vinca_conf, platform):
         fns = list(fn)
     else:
         fns = []
+
     for fn in fns:
-        if "://" in fn:
-            fn += f"{platform}/repodata.json"
-            print(f"Fetching repodata: {fn}")
-            request = requests.get(fn)
-
-            repodata = request.json()
-            repodatas.append(repodata)
-        else:
-            import json
-
-            with open(fn) as fi:
-                repodata = json.load(fi)
-                repodatas.append(repodata)
+        print(f"Fetching repodata: {fn}")
+        repodata = get_repodata(fn, platform)
+        repodatas.append(repodata)
 
     return repodatas
 
@@ -239,7 +230,9 @@ def build_linux_pipeline(
         fo.write(yaml.dump(azure_template, sort_keys=False))
 
 
-def build_osx_pipeline(stages, trigger_branch, outfile="osx.yml", script=azure_osx_script):
+def build_osx_pipeline(
+    stages, trigger_branch, outfile="osx.yml", script=azure_osx_script
+):
     # Build OSX pipeline
     azure_template = {"pool": {"vmImage": "macOS-10.15"}}
 
@@ -439,7 +432,12 @@ def main():
         build_osx_pipeline(stages, args.trigger_branch, script=azure_osx_script)
 
     if args.platform == "osx-arm64":
-        build_osx_pipeline(stages, args.trigger_branch, outfile="osx_arm64.yml", script=azure_osx_arm64_script)
+        build_osx_pipeline(
+            stages,
+            args.trigger_branch,
+            outfile="osx_arm64.yml",
+            script=azure_osx_arm64_script,
+        )
 
     if args.platform == "linux-aarch64":
         # Build aarch64 pipeline

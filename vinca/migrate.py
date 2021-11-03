@@ -2,13 +2,12 @@ import yaml
 import sys
 import os
 import argparse
-import requests
 import re
 import networkx as nx
 import subprocess
 import shutil
 import ruamel.yaml
-
+from .utils import get_repodata
 
 from vinca.distro import Distro
 
@@ -36,7 +35,7 @@ def to_ros_name(distro, pkg_name):
 
 
 def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
-    url = f"https://conda.anaconda.org/robostack/{arch}/repodata.json"
+    url = "https://conda.anaconda.org/robostack/"
 
     yaml = ruamel.yaml.YAML()
     with open("vinca.yaml", "r") as fi:
@@ -46,9 +45,8 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     distro_version = vinca_conf["ros_distro"]
     ros_prefix = f"ros-{distro_version}"
 
-    print("URL: ", url)
-    # return
-    repodata = requests.get(url).json()
+    repodata = get_repodata(url, arch)
+
     packages = repodata["packages"]
     to_migrate = set()
     ros_pkgs = set()

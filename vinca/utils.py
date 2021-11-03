@@ -1,4 +1,9 @@
 import yaml
+import hashlib
+import os
+import time
+import json
+import requests
 
 
 class folded_unicode(str):
@@ -19,3 +24,32 @@ def literal_unicode_representer(dumper, data):
 
 yaml.add_representer(folded_unicode, folded_unicode_representer)
 yaml.add_representer(literal_unicode, literal_unicode_representer)
+
+
+def get_repodata(url_or_path, platform=None):
+    if platform:
+        if not url_or_path.endswith("/"):
+            url_or_path += "/"
+        url_or_path += f"{platform}/repodata.json"
+
+    if "://" not in url_or_path:
+        with open(url_or_path) as fi:
+            return json.load(fi)
+
+    m = hashlib.md5(url_or_path.encode("utf-8")).hexdigest()[:10]
+    # print(tempfile.gettempdir())
+    fn = f"vinca_{m}.json"
+    if os.path.exists(fn):
+        st = os.stat(fn)
+        age = time.time() - st.st_mtime
+        print(f"Found cached repodata, age: {age}")
+        max_age = 100_000  # seconds == 27 hours
+        if age < max_age:
+            with open(fn) as fi:
+                return json.load(fi)
+
+    repodata = requests.get(url_or_path)
+    content = repodata.content
+    with open(fn, "w") as fcache:
+        fcache.write(content.decode("utf-8"))
+    return json.loads(content)
