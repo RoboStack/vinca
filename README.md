@@ -1,6 +1,6 @@
 # vinca
  Conda recipe generator for ROS packages
- 
+
 **WARNING**:
 This project is at a super early stage.
 No guarantees everything works.

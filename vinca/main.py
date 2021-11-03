@@ -14,7 +14,6 @@ from pathlib import Path
 from vinca import __version__
 from .resolve import get_conda_index
 from .resolve import resolve_pkgname
-from .resolve import resolve_pkgname_from_indexes
 from .template import write_recipe, write_recipe_package
 from .distro import Distro
 
@@ -26,10 +25,11 @@ distro = None
 parsed_args = None
 
 
-def ensure_list(l):
-    if not l:
+def ensure_list(obj):
+    if not obj:
         return []
-    return l
+    assert isinstance(obj, list)
+    return obj
 
 
 def get_conda_subdir():
@@ -129,7 +129,10 @@ def parse_command_line(argv):
 
 def get_depmods(vinca_conf, pkg_name):
     depmods = vinca_conf["depmods"].get(pkg_name, {})
-    rm_deps, add_deps = {"build": [], "host": [], "run": []}, {"build": [], "host": [], "run": []}
+    rm_deps, add_deps = (
+        {"build": [], "host": [], "run": []},
+        {"build": [], "host": [], "run": []},
+    )
 
     for dep_type in ["build", "host", "run"]:
         if depmods.get("remove_" + dep_type):
@@ -193,7 +196,10 @@ def read_vinca_yaml(filepath):
     return vinca_conf
 
 
-def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
+def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
+    if not all_pkgs:
+        all_pkgs = []
+
     if pkg_shortname not in vinca_conf["_selected_pkgs"]:
         return None
 
@@ -205,10 +211,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
         return None
 
     output = {
-        "package": {
-            "name": pkg_names[0],
-            "version": version,
-        },
+        "package": {"name": pkg_names[0], "version": version},
         "requirements": {
             "build": [
                 "{{ compiler('cxx') }}",
@@ -218,7 +221,9 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
                 {"sel(osx)": "tapi"},
                 "cmake",
                 {"sel(build_platform != target_platform)": "python"},
-                {"sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"},
+                {
+                    "sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"
+                },
                 {"sel(build_platform != target_platform)": "cython"},
             ],
             "host": [],
@@ -263,8 +268,15 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
         output["requirements"]["host"].append(vinca_conf["mutex_package"])
         output["requirements"]["run"].append(vinca_conf["mutex_package"])
 
-    if not distro.check_ros1() and pkg_shortname not in ['ament_cmake_core', 'ament_package', 'ros_workspace', 'ros_environment']:
-        output["requirements"]["host"].append(f"ros-{config.ros_distro}-ros-environment")
+    if not distro.check_ros1() and pkg_shortname not in [
+        "ament_cmake_core",
+        "ament_package",
+        "ros_workspace",
+        "ros_environment",
+    ]:
+        output["requirements"]["host"].append(
+            f"ros-{config.ros_distro}-ros-environment"
+        )
         output["requirements"]["host"].append(f"ros-{config.ros_distro}-ros-workspace")
         output["requirements"]["run"].append(f"ros-{config.ros_distro}-ros-workspace")
 
@@ -354,7 +366,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
         ]
 
     # fixup problems with udev (which is mapped to libusb):
-    if "libusb" in output["requirements"]["host"] or "ros-"+distro.name+"-lusb" in output["requirements"]["host"]:
+    if (
+        "libusb" in output["requirements"]["host"]
+        or "ros-" + distro.name + "-lusb" in output["requirements"]["host"]
+    ):
         output["requirements"]["build"] += [
             {"sel(linux)": "{{ cdt('libudev') }}"},
             {"sel(linux)": "{{ cdt('libudev-devel') }}"},
@@ -414,7 +429,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=[]):
     # remove duplicates
     for dep_type in ["build", "host", "run"]:
         tmp_nonduplicate = []
-        [tmp_nonduplicate.append(x) for x in output["requirements"][dep_type] if x not in tmp_nonduplicate]
+        [
+            tmp_nonduplicate.append(x)
+            for x in output["requirements"][dep_type]
+            if x not in tmp_nonduplicate
+        ]
         output["requirements"][dep_type] = tmp_nonduplicate
 
     return output
@@ -430,15 +449,19 @@ def generate_outputs(distro, vinca_conf):
         pkg.evaluate_conditions(os.environ)
         return pkg
 
-    all_pkgs = [get_pkg(pkg) for pkg in distro.get_depends('ros_base')]
+    all_pkgs = [get_pkg(pkg) for pkg in distro.get_depends("ros_base")]
 
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
         try:
             output = generate_output(
-                pkg_shortname, vinca_conf, distro, distro.get_version(pkg_shortname), all_pkgs
+                pkg_shortname,
+                vinca_conf,
+                distro,
+                distro.get_version(pkg_shortname),
+                all_pkgs,
             )
-        except AttributeError as e:
-            print('Skip ' + pkg_shortname + ' due to invalid version / XML.')
+        except AttributeError:
+            print("Skip " + pkg_shortname + " due to invalid version / XML.")
         if output is not None:
             outputs.append(output)
     return outputs
@@ -592,7 +615,7 @@ def parse_package(pkg, distro, vinca_conf, path):
         "package": {"name": final_name, "version": pkg["version"]},
         "about": {
             "home": "https://www.ros.org/",
-            "license": [str(l) for l in pkg["licenses"]],
+            "license": [str(lic) for lic in pkg["licenses"]],
             "summary": pkg["description"],
             "maintainers": [],
         },
@@ -610,7 +633,9 @@ def parse_package(pkg, distro, vinca_conf, path):
                 {"sel(unix)": "make"},
                 "cmake",
                 {"sel(build_platform != target_platform)": "python"},
-                {"sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"},
+                {
+                    "sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"
+                },
                 {"sel(build_platform != target_platform)": "cython"},
                 {"sel(build_platform != target_platform)": "numpy"},
                 {"sel(build_platform != target_platform)": "pybind11"},
@@ -822,7 +847,10 @@ def main():
 
                 print(f"Selected build number: {selected_bn}")
 
-                explicitly_selected_pkgs = [f"ros-{distro}-{pkg.replace('_', '-')}" for pkg in ensure_list(vinca_conf["packages_select_by_deps"])]
+                explicitly_selected_pkgs = [
+                    f"ros-{distro}-{pkg.replace('_', '-')}"
+                    for pkg in ensure_list(vinca_conf["packages_select_by_deps"])
+                ]
 
                 for _, pkg in repodata.get("packages").items():
                     if selected_bn is not None:
@@ -831,7 +859,10 @@ def main():
                                 skip_built_packages.add(pkg["name"])
                         else:
                             # remove all packages except explicitly selected ones
-                            if pkg["name"] not in explicitly_selected_pkgs or pkg["build_number"] == selected_bn:
+                            if (
+                                pkg["name"] not in explicitly_selected_pkgs
+                                or pkg["build_number"] == selected_bn
+                            ):
                                 skip_built_packages.add(pkg["name"])
                     else:
                         skip_built_packages.add(pkg["name"])
@@ -863,6 +894,6 @@ def main():
             write_recipe(source, outputs, vinca_conf.get("build_number", 0))
 
         if unsatisfied_deps:
-            print('Unsatisfied dependencies:', unsatisfied_deps)
+            print("Unsatisfied dependencies:", unsatisfied_deps)
 
     print("build scripts are created successfully.")

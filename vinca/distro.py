@@ -51,7 +51,7 @@ class Distro(object):
                 "exec",
             ],
             ros_packages_only=True,
-            ignore_pkgs=ignore_pkgs
+            ignore_pkgs=ignore_pkgs,
         )
         return dependencies
 

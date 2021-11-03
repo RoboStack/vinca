@@ -2,9 +2,11 @@
 
 set -x
 
+export FEEDSTOCK_ROOT=`pwd`
+
 echo -e "\n\nInstalling a fresh version of Miniforge."
 MINIFORGE_URL="https://github.com/conda-forge/miniforge/releases/latest/download"
-MINIFORGE_FILE="Miniforge3-MacOSX-x86_64.sh"
+MINIFORGE_FILE="Mambaforge-MacOSX-x86_64.sh"
 curl -L -O --silent "${MINIFORGE_URL}/${MINIFORGE_FILE}"
 /bin/bash $MINIFORGE_FILE -b
 
@@ -13,15 +15,12 @@ echo -e "\n\nConfiguring conda."
 source ${HOME}/miniforge3/etc/profile.d/conda.sh
 conda activate base
 
-echo -e "\n\nInstalling conda-forge-ci-setup=3 and conda-build."
-conda install -n base --quiet --yes conda-forge-ci-setup=3 conda-build pip boa quetz-client \
-			  -c conda-forge/label/boa_dev -c conda-forge
+conda config --set remote_max_retries 5
 
-# install boa from master
-git clone https://github.com/thesnakepit/boa
-cd boa
-pip install -e .
-cd ..
+echo -e "\n\nInstalling conda-forge-ci-setup=3 and conda-build."
+conda install -n base --quiet --yes conda-forge-ci-setup=3 conda-build boa quetz-client -c conda-forge
+
+set -e
 
 # echo -e "\n\nSetting up the condarc and mangling the compiler."
 # # setup_conda_rc ./ ./recipe ./.ci_support/${CONFIG}.yaml
@@ -34,13 +33,15 @@ cd ..
 # echo -e "\n\nRunning the build setup script."
 # # source run_conda_forge_build_setup
 
-# set -e
-conda config --append channels defaults
+conda config --set show_channel_urls true
+conda config --set auto_update_conda false
+conda config --set add_pip_as_python_dependency false
+
 conda config --add channels conda-forge
 conda config --add channels robostack
 conda config --set channel_priority strict
 
-export "CONDA_BLD_PATH=${FEEDSTOCK_ROOT}/build_artifacts/"
+export "CONDA_BLD_PATH=$CONDA_PREFIX/conda-bld/"
 
 # echo -e "\n\nMaking the build clobber file and running the build."
 # make_build_number ./ ./recipe ./.ci_support/${CONFIG}.yaml
@@ -49,16 +50,18 @@ conda info
 conda config --show-sources
 conda list --show-channel-urls
 
-cd ${FEEDSTOCK_ROOT}
-pip install -e .
-
-cd ${FEEDSTOCK_ROOT}/examples
-vinca
-
-boa build .
+for recipe in ${CURRENT_RECIPES[@]}; do
+	cd ${FEEDSTOCK_ROOT}/recipes/${recipe}
+	if [[ ${recipe} == *"rviz" || ${recipe} == *"moveit-setup-assistant" || ${recipe} == *"turtlesim" ]]; then
+		boa build . -m ${FEEDSTOCK_ROOT}/.ci_support/conda_forge_pinnings.yaml -m ${FEEDSTOCK_ROOT}/conda_build_config.yaml -m ${FEEDSTOCK_ROOT}/conda_build_config_old_osx.yaml
+	else
+		boa build . -m ${FEEDSTOCK_ROOT}/.ci_support/conda_forge_pinnings.yaml -m ${FEEDSTOCK_ROOT}/conda_build_config.yaml
+	fi
+done
 
 anaconda -t ${ANACONDA_API_TOKEN} upload ${CONDA_BLD_PATH}/osx-64/*.tar.bz2 --force
-quetz-client "${QUETZ_URL}" ${CONDA_BLD_PATH} --force
+
+# quetz-client "${QUETZ_URL}" ${CONDA_BLD_PATH} --force
 
 # conda build ./recipe -m ./.ci_support/${CONFIG}.yaml --clobber-file ./.ci_support/clobber_${CONFIG}.yaml
 

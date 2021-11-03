@@ -15,7 +15,7 @@ else
 fi
 
 case "$OSTYPE" in
-  darwin*)  export ROS_OS_OVERRIDE="robostack:osx";; 
+  darwin*)  export ROS_OS_OVERRIDE="robostack:osx";;
   linux*)   export ROS_OS_OVERRIDE="robostack:linux";;
 esac
 

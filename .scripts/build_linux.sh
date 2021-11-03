@@ -19,7 +19,7 @@ CONDARC
 
 sudo yum install -y install mesa-libGL-devel
 
-conda install --yes --quiet boa quetz-client conda-build pip anaconda-client -c conda-forge/label/boa_dev  -c conda-forge
+mamba install --yes --quiet boa quetz-client conda-build anaconda-client -c conda-forge
 
 # install boa from master
 git clone https://github.com/thesnakepit/boa
@@ -34,7 +34,6 @@ conda config --set show_channel_urls true
 conda config --set auto_update_conda false
 conda config --set add_pip_as_python_dependency false
 
-conda config --append channels defaults
 conda config --add channels conda-forge
 conda config --add channels robostack
 conda config --set channel_priority strict
