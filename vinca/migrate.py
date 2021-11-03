@@ -24,14 +24,16 @@ ros_prefix = None
 #     "osx-arm64": "osx_arm64"
 # }
 
+
 def to_ros_name(distro, pkg_name):
-    shortname = pkg_name[len(ros_prefix) + 1:]
+    shortname = pkg_name[len(ros_prefix) + 1 :]
     if distro.check_package(shortname):
         return shortname
-    elif distro.check_package(shortname.replace('-', '_')):
-        return shortname.replace('-', '_')
+    elif distro.check_package(shortname.replace("-", "_")):
+        return shortname.replace("-", "_")
     else:
         raise RuntimeError(f"Couldnt convert {pkg_name} to ROS pkg name")
+
 
 def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     url = f"https://conda.anaconda.org/robostack/{arch}/repodata.json"
@@ -41,7 +43,7 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
         vinca_conf = yaml.load(fi)
 
     global distro_version, ros_prefix
-    distro_version = vinca_conf['ros_distro']
+    distro_version = vinca_conf["ros_distro"]
     ros_prefix = f"ros-{distro_version}"
 
     print("URL: ", url)
@@ -54,7 +56,7 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
         if not pkey.startswith(ros_prefix):
             continue
 
-        pname = pkey.rsplit('-', 2)[0]
+        pname = pkey.rsplit("-", 2)[0]
         ros_pkgs.add(pname)
 
         p = packages[pkey]
@@ -69,13 +71,13 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
         current = current_version = None
         for pkey in packages:
             if packages[pkey]["name"] == pkg:
-                tmp = packages[pkey]["version"].split('.')
+                tmp = packages[pkey]["version"].split(".")
                 version = []
                 for el in tmp:
                     if el.isdecimal():
                         version.append(int(el))
                     else:
-                        x = re.search(r'[^0-9]', version).start()
+                        x = re.search(r"[^0-9]", version).start()
                         version.append(int(el[:x]))
 
                 version = tuple(version)
@@ -85,13 +87,13 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
                     current = pkey
         latest[pkg] = current
 
-    # now we can build the graph ... 
+    # now we can build the graph ...
 
     G = nx.DiGraph()
     for pkg, pkgkey in latest.items():
         full_pkg = packages[pkgkey]
         for dep in full_pkg.get("depends", []):
-            req = dep.split(' ')[0]
+            req = dep.split(" ")[0]
             G.add_node(pkg)
             if req.startswith(ros_prefix):
                 G.add_edge(pkg, req)
@@ -121,8 +123,23 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     if os.path.exists("recipes"):
         shutil.rmtree("recipes")
 
-    subprocess.check_call(["vinca", "-f", "vinca.yaml", "--multiple", "--platform", arch])
-    subprocess.check_call(["vinca-azure", "--platform", arch, "--trigger-branch", "buildbranch_linux", "-d", "./recipes", "--additional-recipes", "--sequential"])
+    subprocess.check_call(
+        ["vinca", "-f", "vinca.yaml", "--multiple", "--platform", arch]
+    )
+    subprocess.check_call(
+        [
+            "vinca-azure",
+            "--platform",
+            arch,
+            "--trigger-branch",
+            "buildbranch_linux",
+            "-d",
+            "./recipes",
+            "--additional-recipes",
+            "--sequential",
+        ]
+    )
+
 
 def parse_command_line(argv):
     parser = argparse.ArgumentParser(
@@ -151,7 +168,11 @@ def parse_command_line(argv):
     )
 
     parser.add_argument(
-        "-a", "--additional-recipes", action="store_true", help="search for additional_recipes folder?")
+        "-a",
+        "--additional-recipes",
+        action="store_true",
+        help="search for additional_recipes folder?",
+    )
 
     arguments = parser.parse_args(argv[1:])
     global parsed_args
@@ -166,4 +187,6 @@ def main():
     with open(mfile, "r") as fi:
         migration = yaml.safe_load(fi)
         print(migration)
-        create_migration_instructions(args.platform, migration.get('packages', []), args.trigger_branch)
+        create_migration_instructions(
+            args.platform, migration.get("packages", []), args.trigger_branch
+        )

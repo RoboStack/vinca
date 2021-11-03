@@ -52,15 +52,18 @@ def should_skip_pkg(pkg_shortname, vinca_conf):
 
     if pkg_shortname in skip:
         return True
-    if pkg_shortname.replace('_', '-') in skip:
+    if pkg_shortname.replace("_", "-") in skip:
         return True
+
 
 def resolve_pkgname(pkg_shortname, vinca_conf, distro, is_rundep=False):
     pkg_names = resolve_pkgname_from_indexes(
         pkg_shortname, vinca_conf["_conda_indexes"]
     )
     if pkg_names is None:
-        if not distro.check_package(pkg_shortname) or should_skip_pkg(pkg_shortname, vinca_conf):
+        if not distro.check_package(pkg_shortname) or should_skip_pkg(
+            pkg_shortname, vinca_conf
+        ):
             return []
         else:
             return [

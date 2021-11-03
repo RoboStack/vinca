@@ -2,12 +2,20 @@ import networkx as nx
 import yaml
 import re
 import glob
-import sys, os
-import textwrap
+import sys
+import os
 import argparse
-from distutils.dir_util import copy_tree
-import yaml
+import requests
+import pkg_resources
 
+from distutils.dir_util import copy_tree
+
+def read_azure_script(fn):
+    template_in = pkg_resources.resource_filename(
+        "vinca", f"azure_templates/{fn}"
+    )
+    with open(template_in, "r") as fi:
+        return fi.read()
 
 class folded_unicode(str):
     pass
@@ -28,120 +36,13 @@ def literal_unicode_representer(dumper, data):
 yaml.add_representer(folded_unicode, folded_unicode_representer)
 yaml.add_representer(literal_unicode, literal_unicode_representer)
 
-
-azure_linux_script = literal_unicode("""\
-export CI=azure
-export GIT_BRANCH=$BUILD_SOURCEBRANCHNAME
-export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
-.scripts/run_docker_build.sh""")
-
-azure_osx_script = literal_unicode(r"""\
-export CI=azure
-export GIT_BRANCH=$BUILD_SOURCEBRANCHNAME
-export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
-.scripts/build_osx.sh""")
-
-azure_osx_arm64_script = literal_unicode(r"""\
-export CI=azure
-export GIT_BRANCH=$BUILD_SOURCEBRANCHNAME
-export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
-.scripts/build_osx_arm64.sh""")
-
-azure_win_preconfig_script = literal_unicode("""\
-set "CI=azure"
-call %CONDA%\\condabin\\conda_hook.bat
-call %CONDA%\\condabin\\conda.bat activate base
-
-:: 2 cores available on Appveyor workers: https://www.appveyor.com/docs/build-environment/#build-vm-configurations
-:: CPU_COUNT is passed through conda build: https://github.com/conda/conda-build/pull/1149
-set CPU_COUNT=2
-
-set PYTHONUNBUFFERED=1
-
-conda config --set show_channel_urls true
-conda config --set auto_update_conda false
-conda config --set add_pip_as_python_dependency false
-
-call setup_x64
-
-:: Set the conda-build working directory to a smaller path
-if "%CONDA_BLD_PATH%" == "" (
-    set "CONDA_BLD_PATH=C:\\bld\\"
-)
-
-:: Remove some directories from PATH
-set "PATH=%PATH:C:\\ProgramData\\Chocolatey\\bin;=%"
-set "PATH=%PATH:C:\\Program Files (x86)\\sbt\\bin;=%"
-set "PATH=%PATH:C:\\Rust\\.cargo\\bin;=%"
-set "PATH=%PATH:C:\\Program Files\\Git\\usr\\bin;=%"
-set "PATH=%PATH:C:\\Program Files\\Git\\cmd;=%"
-set "PATH=%PATH:C:\\Program Files\\Git\\mingw64\\bin;=%"
-set "PATH=%PATH:C:\\Program Files (x86)\\Subversion\\bin;=%"
-set "PATH=%PATH:C:\\Program Files\\CMake\\bin;=%"
-set "PATH=%PATH:C:\\Program Files\\OpenSSL\\bin;=%"
-set "PATH=%PATH:C:\\Strawberry\\c\\bin;=%"
-set "PATH=%PATH:C:\\Strawberry\\perl\\bin;=%"
-set "PATH=%PATH:C:\\Strawberry\\perl\\site\\bin;=%"
-set "PATH=%PATH:c:\\tools\\php;=%"
-
-:: On azure, there are libcrypto*.dll & libssl*.dll under
-:: C:\\Windows\\System32, which should not be there (no vendor dlls in windows folder).
-:: They would be found before the openssl libs of the conda environment, so we delete them.
-if defined CI (
-    DEL C:\\Windows\\System32\\libcrypto-1_1-x64.dll || (Echo Ignoring failure to delete C:\\Windows\\System32\\libcrypto-1_1-x64.dll)
-    DEL C:\\Windows\\System32\\libssl-1_1-x64.dll || (Echo Ignoring failure to delete C:\\Windows\\System32\\libssl-1_1-x64.dll)
-)
-
-:: Make paths like C:\\hostedtoolcache\\windows\\Ruby\\2.5.7\\x64\\bin garbage
-set "PATH=%PATH:ostedtoolcache=%"
-
-mkdir "%CONDA%\\etc\\conda\\activate.d"
-
-echo set "CONDA_BLD_PATH=%CONDA_BLD_PATH%"         > "%CONDA%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
-echo set "CPU_COUNT=%CPU_COUNT%"                  >> "%CONDA%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
-echo set "PYTHONUNBUFFERED=%PYTHONUNBUFFERED%"    >> "%CONDA%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
-echo set "PATH=%PATH%"                            >> "%CONDA%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
-
-conda info
-conda config --show-sources
-conda list --show-channel-urls
-""")
-
-azure_win_script = literal_unicode("""\
-setlocal EnableExtensions EnableDelayedExpansion
-call %CONDA%\\condabin\\conda_hook.bat
-call %CONDA%\\condabin\\conda.bat activate base
-
-set "FEEDSTOCK_ROOT=%cd%"
-
-call conda config --append channels defaults
-call conda config --add channels conda-forge
-call conda config --add channels robostack
-call conda config --set channel_priority strict
-
-:: Enable long path names on Windows
-reg add HKLM\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f
-
-:: conda remove --force m2-git
-
-C:\\Miniconda\\python.exe -m pip install git+https://github.com/mamba-org/boa.git@master
-if errorlevel 1 exit 1
-
-for %%X in (%CURRENT_RECIPES%) do (
-    echo "BUILDING RECIPE %%X"
-    cd %FEEDSTOCK_ROOT%\\recipes\\%%X\\
-    copy %FEEDSTOCK_ROOT%\\conda_build_config.yaml .\\conda_build_config.yaml
-    boa build .
-    if errorlevel 1 exit 1
-)
-
-anaconda -t %ANACONDA_API_TOKEN% upload "C:\\bld\\win-64\\*.tar.bz2" --force
-if errorlevel 1 exit 1
-""")
+azure_linux_script = literal_unicode(read_azure_script("linux.sh"))
+azure_osx_script = literal_unicode(read_azure_script("osx_64.sh"))
+azure_osx_arm64_script = literal_unicode(read_azure_script("osx_arm64.sh"))
+azure_win_preconfig_script = literal_unicode(read_azure_script("win_preconfig.bat"))
+azure_win_script = literal_unicode(read_azure_script("win_build.bat"))
 
 parsed_args = None
-
-
 def parse_command_line(argv):
     parser = argparse.ArgumentParser(
         description="Conda recipe Azure pipeline generator for ROS packages"
@@ -169,7 +70,11 @@ def parse_command_line(argv):
     )
 
     parser.add_argument(
-        "-a", "--additional-recipes", action="store_true", help="search for additional_recipes folder?")
+        "-a",
+        "--additional-recipes",
+        action="store_true",
+        help="search for additional_recipes folder?",
+    )
 
     arguments = parser.parse_args(argv[1:])
     global parsed_args
@@ -195,7 +100,8 @@ def batch_stages(stages, max_batch_size=5):
     def chunks(lst, n):
         """Yield successive n-sized chunks from lst."""
         for i in range(0, len(lst), n):
-            yield lst[i:i + n]
+            yield lst[i : i + n]
+
     i = 0
     while i < len(stages):
         for build_individually_pkg in build_individually:
@@ -203,7 +109,10 @@ def batch_stages(stages, max_batch_size=5):
                 merged_stages.append([[build_individually_pkg]])
                 stages[i].remove(build_individually_pkg)
 
-        if stage_lengths[i] < max_batch_size and len(curr_stage) + stage_lengths[i] < max_batch_size:
+        if (
+            stage_lengths[i] < max_batch_size
+            and len(curr_stage) + stage_lengths[i] < max_batch_size
+        ):
             # merge with previous stage
             curr_stage += stages[i]
         else:
@@ -220,7 +129,6 @@ def batch_stages(stages, max_batch_size=5):
         merged_stages.append([curr_stage])
     return merged_stages
 
-import requests
 
 def get_skip_existing(vinca_conf, platform):
     fn = vinca_conf.get("skip_existing")
@@ -230,7 +138,6 @@ def get_skip_existing(vinca_conf, platform):
     else:
         fns = []
     for fn in fns:
-        selected_bn = None
         if "://" in fn:
             fn += f"{platform}/repodata.json"
             print(f"Fetching repodata: {fn}")
@@ -240,14 +147,18 @@ def get_skip_existing(vinca_conf, platform):
             repodatas.append(repodata)
         else:
             import json
+
             with open(fn) as fi:
                 repodata = json.load(fi)
                 repodatas.append(repodata)
 
     return repodatas
 
+
 def add_additional_recipes(args):
-    additional_recipes_path = os.path.abspath(os.path.join(args.dir, '..', 'additional_recipes'))
+    additional_recipes_path = os.path.abspath(
+        os.path.join(args.dir, "..", "additional_recipes")
+    )
 
     print("Searching additional recipes in ", additional_recipes_path)
 
@@ -259,16 +170,24 @@ def add_additional_recipes(args):
 
     repodatas = get_skip_existing(vinca_conf, args.platform)
 
-    for recipe_path in glob.glob(additional_recipes_path + '/**/recipe.yaml'):
+    for recipe_path in glob.glob(additional_recipes_path + "/**/recipe.yaml"):
         with open(recipe_path) as recipe:
             additional_recipe = yaml.safe_load(recipe)
- 
-        name, version, bnumber = (additional_recipe["package"]["name"], additional_recipe["package"]["version"], additional_recipe["build"]["number"])
+
+        name, version, bnumber = (
+            additional_recipe["package"]["name"],
+            additional_recipe["package"]["version"],
+            additional_recipe["build"]["number"],
+        )
         print("Checking if ", name, version, bnumber, " exists")
         skip = False
         for repo in repodatas:
-            for key, pkg in repo.get("packages", {}).items():
-                if pkg["name"] == name and pkg["version"] == version and pkg["build_number"] == bnumber:
+            for _, pkg in repo.get("packages", {}).items():
+                if (
+                    pkg["name"] == name
+                    and pkg["version"] == version
+                    and pkg["build_number"] == bnumber
+                ):
                     skip = True
                     print(f"{name}=={version}=={bnumber} already exists. Skipping.")
                     break
@@ -301,9 +220,9 @@ def main():
         requirements = {}
 
         for pkg in metas:
-            requirements[pkg["package"]["name"]] = (
-                pkg["requirements"].get("host", []) + pkg["requirements"].get("run", [])
-            )
+            requirements[pkg["package"]["name"]] = pkg["requirements"].get(
+                "host", []
+            ) + pkg["requirements"].get("run", [])
 
         # sort out requirements that are not built in this run
         for pkg_name, reqs in requirements.items():
@@ -332,7 +251,7 @@ def main():
             sort_in_stage = 0
             for r in reqs:
                 # sort up the stages, until first stage found where all requirements are fulfilled.
-                for sidx, stage in enumerate(stages):
+                for sidx, _ in enumerate(stages):
                     if r in stages[sidx]:
                         sort_in_stage = max(sidx + 1, sort_in_stage)
 
@@ -354,7 +273,6 @@ def main():
     else:
         stages = []
         requirements = []
-
 
     # filter out packages that we are not actually building
     filtered_stages = []
@@ -378,7 +296,7 @@ def main():
         stage_names.append(stage_name)
 
         for batch in s:
-            pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
+            pkg_jobname = "_".join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
                     "job": f"stage_{i}_job_{len(stage['jobs'])}",
@@ -421,7 +339,7 @@ def main():
         stage_names.append(stage_name)
 
         for batch in s:
-            pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
+            pkg_jobname = "_".join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
                     "job": f"stage_{i}_job_{len(stage['jobs'])}",
@@ -430,7 +348,7 @@ def main():
                             "script": azure_osx_script,
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}"
+                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
                             },
                             "displayName": f"Build {' '.join([pkg for pkg in batch])}",
                         }
@@ -463,7 +381,7 @@ def main():
         stage_names.append(stage_name)
 
         for batch in s:
-            pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
+            pkg_jobname = "_".join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
                     "job": f"stage_{i}_job_{len(stage['jobs'])}",
@@ -472,7 +390,7 @@ def main():
                             "script": azure_osx_arm64_script,
                             "env": {
                                 "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}"
+                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
                             },
                             "displayName": f"Build {' '.join([pkg for pkg in batch])}",
                         }
@@ -510,7 +428,7 @@ def main():
         stage_names.append(stage_name)
 
         for batch in s:
-            pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
+            pkg_jobname = "_".join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
                     "job": pkg_jobname,
@@ -558,7 +476,7 @@ def main():
         stage_names.append(stage_name)
 
         for batch in s:
-            pkg_jobname = '_'.join([normalize_name(pkg) for pkg in batch])
+            pkg_jobname = "_".join([normalize_name(pkg) for pkg in batch])
             stage["jobs"].append(
                 {
                     "job": f"stage_{i}_job_{len(stage['jobs'])}",
@@ -566,11 +484,11 @@ def main():
                     "steps": [
                         {
                             "powershell": 'Write-Host "##vso[task.prependpath]$env:CONDA\\Scripts"',
-                            "displayName": "Add conda to PATH"
+                            "displayName": "Add conda to PATH",
                         },
                         {
-                            "script": 'conda install -c conda-forge --yes --quiet conda-build pip mamba ruamel.yaml anaconda-client',
-                            "displayName": "Install conda-build, boa and activate environment"
+                            "script": "conda install -c conda-forge --yes --quiet conda-build pip mamba ruamel.yaml anaconda-client",
+                            "displayName": "Install conda-build, boa and activate environment",
                         },
                         {
                             "script": azure_win_preconfig_script,

@@ -1,1 +1,2 @@
 recursive-include vinca/templates *
+recursive-include vinca/azure_templates *

@@ -70,20 +70,18 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
 
             meta["build"]["number"] = build_number
 
-            recipe_dir = (Path("recipes") / o['package']['name']).absolute()
+            recipe_dir = (Path("recipes") / o["package"]["name"]).absolute()
             os.makedirs(recipe_dir, exist_ok=True)
-            with open(
-                recipe_dir / "recipe.yaml", "w"
-            ) as stream:
+            with open(recipe_dir / "recipe.yaml", "w") as stream:
                 file.dump(meta, stream)
 
-            if meta['source'].get('patches'):
-                for p in meta['source']['patches']:
+            if meta["source"].get("patches"):
+                for p in meta["source"]["patches"]:
                     patch_dir, _ = os.path.split(p)
                     os.makedirs(recipe_dir / patch_dir, exist_ok=True)
                     shutil.copyfile(p, recipe_dir / p)
 
-            for key, script in meta['build']['script'].items():
+            for key, script in meta["build"]["script"].items():
                 shutil.copyfile(script, recipe_dir / script)
             if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
                 shutil.copyfile("activate.sh", recipe_dir / "activate.sh")
@@ -95,10 +93,8 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
 def generate_template(template_in, template_out):
     import em
     from vinca.config import skip_testing, ros_distro
-    g = {
-        "ros_distro": ros_distro,
-        "skip_testing": "ON" if skip_testing else "OFF"
-    }
+
+    g = {"ros_distro": ros_distro, "skip_testing": "ON" if skip_testing else "OFF"}
     interpreter = em.Interpreter(
         output=template_out, options={em.RAW_OPT: True, em.BUFFERED_OPT: True}
     )
