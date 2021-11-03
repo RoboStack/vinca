@@ -239,7 +239,7 @@ def build_linux_pipeline(
         fo.write(yaml.dump(azure_template, sort_keys=False))
 
 
-def build_osx_pipeline(stages, trigger_branch, script=azure_osx_script):
+def build_osx_pipeline(stages, trigger_branch, outfile="osx.yml", script=azure_osx_script):
     # Build OSX pipeline
     azure_template = {"pool": {"vmImage": "macOS-10.15"}}
 
@@ -280,7 +280,7 @@ def build_osx_pipeline(stages, trigger_branch, script=azure_osx_script):
     if not len(azure_stages):
         return
 
-    with open("osx.yml", "w") as fo:
+    with open(outfile, "w") as fo:
         fo.write(yaml.dump(azure_template, sort_keys=False))
 
 
@@ -439,7 +439,7 @@ def main():
         build_osx_pipeline(stages, args.trigger_branch, script=azure_osx_script)
 
     if args.platform == "osx-arm64":
-        build_osx_pipeline(stages, args.trigger_branch, script=azure_osx_arm64_script)
+        build_osx_pipeline(stages, args.trigger_branch, outfile="osx_arm64.yml", script=azure_osx_arm64_script)
 
     if args.platform == "linux-aarch64":
         # Build aarch64 pipeline
