@@ -7,6 +7,7 @@ import os
 import argparse
 import requests
 import pkg_resources
+from .utils import literal_unicode as lu
 
 from distutils.dir_util import copy_tree
 
@@ -17,30 +18,11 @@ def read_azure_script(fn):
         return fi.read()
 
 
-class folded_unicode(str):
-    pass
-
-
-class literal_unicode(str):
-    pass
-
-
-def folded_unicode_representer(dumper, data):
-    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=">")
-
-
-def literal_unicode_representer(dumper, data):
-    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
-
-
-yaml.add_representer(folded_unicode, folded_unicode_representer)
-yaml.add_representer(literal_unicode, literal_unicode_representer)
-
-azure_linux_script = literal_unicode(read_azure_script("linux.sh"))
-azure_osx_script = literal_unicode(read_azure_script("osx_64.sh"))
-azure_osx_arm64_script = literal_unicode(read_azure_script("osx_arm64.sh"))
-azure_win_preconfig_script = literal_unicode(read_azure_script("win_preconfig.bat"))
-azure_win_script = literal_unicode(read_azure_script("win_build.bat"))
+azure_linux_script = lu(read_azure_script("linux.sh"))
+azure_osx_script = lu(read_azure_script("osx_64.sh"))
+azure_osx_arm64_script = lu(read_azure_script("osx_arm64.sh"))
+azure_win_preconfig_script = lu(read_azure_script("win_preconfig.bat"))
+azure_win_script = lu(read_azure_script("win_build.bat"))
 
 parsed_args = None
 
@@ -201,6 +183,171 @@ def add_additional_recipes(args):
             copy_tree(os.path.dirname(recipe_path), goal_folder)
 
 
+def build_linux_pipeline(
+    stages,
+    trigger_branch,
+    script=azure_linux_script,
+    azure_template=None,
+    docker_image=None,
+    outfile="linux.yml",
+):
+    # Build Linux pipeline
+    if azure_template is None:
+        azure_template = {"pool": {"vmImage": "ubuntu-latest"}}
+
+    if docker_image is None:
+        docker_image = "condaforge/linux-anvil-comp7"
+    azure_stages = []
+
+    stage_names = []
+    for i, s in enumerate(stages):
+        stage_name = f"stage_{i}"
+        stage = {"stage": stage_name, "jobs": []}
+        stage_names.append(stage_name)
+
+        for batch in s:
+            stage["jobs"].append(
+                {
+                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
+                    "steps": [
+                        {
+                            "script": script,
+                            "env": {
+                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
+                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                                "DOCKER_IMAGE": docker_image,
+                            },
+                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
+                        }
+                    ],
+                }
+            )
+
+        if len(stage["jobs"]) != 0:
+            # all packages skipped ...
+            azure_stages.append(stage)
+
+    azure_template["trigger"] = [trigger_branch]
+    azure_template["pr"] = "none"
+    if azure_stages:
+        azure_template["stages"] = azure_stages
+
+    if not len(azure_stages):
+        return
+
+    with open(outfile, "w") as fo:
+        fo.write(yaml.dump(azure_template, sort_keys=False))
+
+
+def build_osx_pipeline(stages, trigger_branch, script=azure_osx_script):
+    # Build OSX pipeline
+    azure_template = {"pool": {"vmImage": "macOS-10.15"}}
+
+    azure_stages = []
+
+    stage_names = []
+    for i, s in enumerate(stages):
+        stage_name = f"stage_{i}"
+        stage = {"stage": stage_name, "jobs": []}
+        stage_names.append(stage_name)
+
+        for batch in s:
+            stage["jobs"].append(
+                {
+                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
+                    "steps": [
+                        {
+                            "script": script,
+                            "env": {
+                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
+                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                            },
+                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
+                        }
+                    ],
+                }
+            )
+
+        if len(stage["jobs"]) != 0:
+            # all packages skipped ...
+            azure_stages.append(stage)
+
+    azure_template["trigger"] = [trigger_branch]
+    azure_template["pr"] = "none"
+    if azure_stages:
+        azure_template["stages"] = azure_stages
+
+    if not len(azure_stages):
+        return
+
+    with open("osx.yml", "w") as fo:
+        fo.write(yaml.dump(azure_template, sort_keys=False))
+
+
+def build_win_pipeline(stages, trigger_branch, outfile="win.yml"):
+    azure_template = {"pool": {"vmImage": "windows-2019"}}
+
+    azure_stages = []
+    script = azure_win_script
+
+    # overwrite with what we're finding in the repo!
+    if os.path.exists(".scripts/build_win.bat"):
+        with open(".scripts/build_win.bat", "r") as fi:
+            script = lu(fi.read())
+
+    stage_names = []
+    for i, s in enumerate(stages):
+        stage_name = f"stage_{i}"
+        stage = {"stage": stage_name, "jobs": []}
+        stage_names.append(stage_name)
+
+        for batch in s:
+            stage["jobs"].append(
+                {
+                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
+                    "variables": {"CONDA_BLD_PATH": "C:\\\\bld\\\\"},
+                    "steps": [
+                        {
+                            "powershell": 'Write-Host "##vso[task.prependpath]$env:CONDA\\Scripts"',
+                            "displayName": "Add conda to PATH",
+                        },
+                        {
+                            "script": "conda install -c conda-forge --yes --quiet conda-build pip mamba ruamel.yaml anaconda-client",
+                            "displayName": "Install conda-build, boa and activate environment",
+                        },
+                        {
+                            "script": azure_win_preconfig_script,
+                            "displayName": "conda-forge build setup",
+                        },
+                        {
+                            "script": script,
+                            "env": {
+                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
+                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                                "PYTHONUNBUFFERED": 1,
+                            },
+                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
+                        },
+                    ],
+                }
+            )
+
+        if len(stage["jobs"]) != 0:
+            # all packages skipped ...
+            azure_stages.append(stage)
+
+    azure_template["trigger"] = [trigger_branch]
+    azure_template["pr"] = "none"
+    if azure_stages:
+        azure_template["stages"] = azure_stages
+
+    if not len(azure_stages):
+        return
+
+    with open(outfile, "w") as fo:
+        fo.write(yaml.dump(azure_template, sort_keys=False))
+
+
 def main():
 
     args = parse_command_line(sys.argv)
@@ -231,7 +378,6 @@ def main():
             requirements[pkg_name] = [
                 r.split()[0] for r in reqs if (isinstance(r, str) and r in reqs)
             ]
-        print(requirements)
 
         G = nx.DiGraph()
         for pkg, reqs in requirements.items():
@@ -286,238 +432,35 @@ def main():
     stages = batch_stages(filtered_stages)
     print(stages)
 
-    # Build Linux pipeline
-    azure_template = {"pool": {"vmImage": "ubuntu-latest"}}
+    if args.platform == "linux-64":
+        build_linux_pipeline(stages, args.trigger_branch, outfile="linux.yml")
 
-    azure_stages = []
+    if args.platform == "osx-64":
+        build_osx_pipeline(stages, args.trigger_branch, script=azure_osx_script)
 
-    stage_names = []
-    for i, s in enumerate(stages):
-        stage_name = f"stage_{i}"
-        stage = {"stage": stage_name, "jobs": []}
-        stage_names.append(stage_name)
+    if args.platform == "osx-arm64":
+        build_osx_pipeline(stages, args.trigger_branch, script=azure_osx_arm64_script)
 
-        for batch in s:
-            pkg_jobname = "_".join([normalize_name(pkg) for pkg in batch])
-            stage["jobs"].append(
-                {
-                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
-                    "steps": [
-                        {
-                            "script": azure_linux_script,
-                            "env": {
-                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                                "DOCKER_IMAGE": "condaforge/linux-anvil-comp7",
-                            },
-                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
-                        }
-                    ],
-                }
-            )
-
-        if len(stage["jobs"]) != 0:
-            # all packages skipped ...
-            azure_stages.append(stage)
-
-    azure_template["trigger"] = [args.trigger_branch]
-    azure_template["pr"] = "none"
-    if azure_stages:
-        azure_template["stages"] = azure_stages
-
-    if args.platform == "linux-64" and len(azure_stages):
-        with open("linux.yml", "w") as fo:
-            fo.write(yaml.dump(azure_template, sort_keys=False))
-
-    # Build OSX pipeline
-    azure_template = {"pool": {"vmImage": "macOS-10.15"}}
-
-    azure_stages = []
-
-    stage_names = []
-    for i, s in enumerate(stages):
-        stage_name = f"stage_{i}"
-        stage = {"stage": stage_name, "jobs": []}
-        stage_names.append(stage_name)
-
-        for batch in s:
-            pkg_jobname = "_".join([normalize_name(pkg) for pkg in batch])
-            stage["jobs"].append(
-                {
-                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
-                    "steps": [
-                        {
-                            "script": azure_osx_script,
-                            "env": {
-                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                            },
-                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
-                        }
-                    ],
-                }
-            )
-
-        if len(stage["jobs"]) != 0:
-            # all packages skipped ...
-            azure_stages.append(stage)
-
-    azure_template["trigger"] = [args.trigger_branch]
-    azure_template["pr"] = "none"
-    if azure_stages:
-        azure_template["stages"] = azure_stages
-
-    if args.platform == "osx-64" and len(azure_stages):
-        with open("osx.yml", "w") as fo:
-            fo.write(yaml.dump(azure_template, sort_keys=False))
-
-    # Build OSX-arm64 pipeline
-    azure_template = {"pool": {"vmImage": "macOS-10.15"}}
-
-    azure_stages = []
-
-    stage_names = []
-    for i, s in enumerate(stages):
-        stage_name = f"stage_{i}"
-        stage = {"stage": stage_name, "jobs": []}
-        stage_names.append(stage_name)
-
-        for batch in s:
-            pkg_jobname = "_".join([normalize_name(pkg) for pkg in batch])
-            stage["jobs"].append(
-                {
-                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
-                    "steps": [
-                        {
-                            "script": azure_osx_arm64_script,
-                            "env": {
-                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                            },
-                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
-                        }
-                    ],
-                }
-            )
-
-        if len(stage["jobs"]) != 0:
-            # all packages skipped ...
-            azure_stages.append(stage)
-
-    azure_template["trigger"] = [args.trigger_branch]
-    azure_template["pr"] = "none"
-    if azure_stages:
-        azure_template["stages"] = azure_stages
-
-    if args.platform == "osx-arm64" and len(azure_stages):
-        with open("osx_arm64.yml", "w") as fo:
-            fo.write(yaml.dump(azure_template, sort_keys=False))
-
-    # Build aarch64 pipeline
-    azure_template = {
-        "pool": {
-            "name": "Default",
-            "demands": ["Agent.OS -equals linux", "Agent.OSArchitecture -equals ARM64"],
+    if args.platform == "linux-aarch64":
+        # Build aarch64 pipeline
+        aarch64_azure_template = {
+            "pool": {
+                "name": "Default",
+                "demands": [
+                    "Agent.OS -equals linux",
+                    "Agent.OSArchitecture -equals ARM64",
+                ],
+            }
         }
-    }
 
-    azure_stages = []
-
-    stage_names = []
-    for i, s in enumerate(stages):
-        stage_name = f"stage_{i}"
-        stage = {"stage": stage_name, "jobs": []}
-        stage_names.append(stage_name)
-
-        for batch in s:
-            pkg_jobname = "_".join([normalize_name(pkg) for pkg in batch])
-            stage["jobs"].append(
-                {
-                    "job": pkg_jobname,
-                    "steps": [
-                        {
-                            "script": azure_linux_script,
-                            "env": {
-                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                                "DOCKER_IMAGE": "condaforge/linux-anvil-aarch64",
-                            },
-                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
-                        }
-                    ],
-                }
-            )
-
-        if len(stage["jobs"]) != 0:
-            # all packages skipped ...
-            azure_stages.append(stage)
-
-    azure_template["trigger"] = [args.trigger_branch]
-    azure_template["pr"] = "none"
-    if azure_stages:
-        azure_template["stages"] = azure_stages
-
-    if args.platform == "linux-aarch64" and len(azure_stages):
-        with open("linux_aarch64.yml", "w") as fo:
-            fo.write(yaml.dump(azure_template, sort_keys=False))
+        build_linux_pipeline(
+            stages,
+            args.trigger_branch,
+            azure_template=aarch64_azure_template,
+            docker_image="condaforge/linux-anvil-aarch64",
+            outfile="linux_aarch64.yml",
+        )
 
     # windows
-    azure_template = {"pool": {"vmImage": "windows-2019"}}
-
-    azure_stages = []
-
-    global azure_win_script
-    if os.path.exists(".scripts/build_win.bat"):
-        with open(".scripts/build_win.bat", "r") as fi:
-            azure_win_script = literal_unicode(fi.read())
-
-    stage_names = []
-    for i, s in enumerate(stages):
-        stage_name = f"stage_{i}"
-        stage = {"stage": stage_name, "jobs": []}
-        stage_names.append(stage_name)
-
-        for batch in s:
-            pkg_jobname = "_".join([normalize_name(pkg) for pkg in batch])
-            stage["jobs"].append(
-                {
-                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
-                    "variables": {"CONDA_BLD_PATH": "C:\\\\bld\\\\"},
-                    "steps": [
-                        {
-                            "powershell": 'Write-Host "##vso[task.prependpath]$env:CONDA\\Scripts"',
-                            "displayName": "Add conda to PATH",
-                        },
-                        {
-                            "script": "conda install -c conda-forge --yes --quiet conda-build pip mamba ruamel.yaml anaconda-client",
-                            "displayName": "Install conda-build, boa and activate environment",
-                        },
-                        {
-                            "script": azure_win_preconfig_script,
-                            "displayName": "conda-forge build setup",
-                        },
-                        {
-                            "script": azure_win_script,
-                            "env": {
-                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                                "PYTHONUNBUFFERED": 1,
-                            },
-                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
-                        },
-                    ],
-                }
-            )
-
-        if len(stage["jobs"]) != 0:
-            # all packages skipped ...
-            azure_stages.append(stage)
-
-    azure_template["trigger"] = [args.trigger_branch]
-    azure_template["pr"] = "none"
-    if azure_stages:
-        azure_template["stages"] = azure_stages
-
-    if args.platform.startswith("win") and len(azure_stages):
-        with open("win.yml", "w") as fo:
-            fo.write(yaml.dump(azure_template, sort_keys=False))
+    if args.platform == "win-64":
+        build_win_pipeline(stages, args.trigger_branch, outfile="win.yml")
