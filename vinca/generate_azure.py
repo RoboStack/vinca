@@ -143,7 +143,10 @@ def get_all_ancestors(graph, node):
     current_node = node
 
     while True:
-        a = {a for a in graph[node] if a.startswith('ros-') or a.startswith('ros2')}
+        a = {a for a in graph.get(node, []) if a.startswith('ros-') or a.startswith('ros2')}
+        if not graph.get(node):
+            print(f"[yellow]{node} not found")
+
         ancestors |= a
         visited.add(current_node)
 
@@ -169,7 +172,10 @@ def add_additional_recipes(args):
 
     repodatas = get_skip_existing(vinca_conf, args.platform)
 
+    additional_recipes = []
     for recipe_path in glob.glob(additional_recipes_path + "/**/recipe.yaml"):
+        if not "ros-distro-mutex" in recipe_path:
+            continue
         with open(recipe_path) as recipe:
             additional_recipe = yaml.safe_load(recipe)
 
@@ -196,6 +202,9 @@ def add_additional_recipes(args):
             goal_folder = os.path.join(args.dir, name)
             os.makedirs(goal_folder, exist_ok=True)
             copy_tree(os.path.dirname(recipe_path), goal_folder)
+            additional_recipes.append(additional_recipe)
+
+    return additional_recipes
 
 
 def build_linux_pipeline(
@@ -392,8 +401,9 @@ def main():
 
     metas = []
 
+    additional_recipes = []
     if args.additional_recipes:
-        add_additional_recipes(args)
+        additional_recipes = add_additional_recipes(args)
 
     if not os.path.exists(args.dir):
         print(f"{args.dir} not found. Not generating a pipeline.")
@@ -406,7 +416,7 @@ def main():
     if len(metas) >= 1:
         requirements = {}
 
-        for pkg in full_tree:
+        for pkg in full_tree + additional_recipes:
             requirements[pkg["package"]["name"]] = pkg["requirements"].get(
                 "host", []
             ) + pkg["requirements"].get("run", [])
@@ -432,6 +442,7 @@ def main():
         tg = list(reversed(list(nx.topological_sort(G))))
 
         names_to_build = {pkg["package"]["name"] for pkg in metas}
+        print("Names to build: ", names_to_build)
         tg_slimmed = [el for el in tg if el in names_to_build]
 
         stages = []
@@ -471,6 +482,15 @@ def main():
 
     stages = batch_stages(filtered_stages)
     print(stages)
+
+    with open("buildorder.txt", "w") as fo:
+        order = []
+        for stage in filtered_stages:
+            for el in stage:
+                print(el)
+                order.append(el)
+
+        fo.write('\n'.join(order))
 
     if args.platform == "linux-64":
         build_linux_pipeline(stages, args.trigger_branch, outfile="linux.yml")
