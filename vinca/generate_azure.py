@@ -174,8 +174,6 @@ def add_additional_recipes(args):
 
     additional_recipes = []
     for recipe_path in glob.glob(additional_recipes_path + "/**/recipe.yaml"):
-        if not "ros-distro-mutex" in recipe_path:
-            continue
         with open(recipe_path) as recipe:
             additional_recipe = yaml.safe_load(recipe)
 
