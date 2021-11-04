@@ -6,10 +6,18 @@ import sys
 import os
 import argparse
 import pkg_resources
-from .utils import literal_unicode as lu
-
 from distutils.dir_util import copy_tree
-from .utils import get_repodata
+
+from vinca.utils import get_repodata
+from vinca.utils import literal_unicode as lu
+from vinca.distro import Distro
+from vinca.main import (
+    get_selected_packages,
+    generate_outputs,
+    read_vinca_yaml,
+    get_conda_subdir,
+)
+from vinca import config
 
 
 def read_azure_script(fn):
@@ -23,8 +31,6 @@ azure_osx_script = lu(read_azure_script("osx_64.sh"))
 azure_osx_arm64_script = lu(read_azure_script("osx_arm64.sh"))
 azure_win_preconfig_script = lu(read_azure_script("win_preconfig.bat"))
 azure_win_script = lu(read_azure_script("win_build.bat"))
-
-parsed_args = None
 
 
 def parse_command_line(argv):
@@ -61,8 +67,7 @@ def parse_command_line(argv):
     )
 
     arguments = parser.parse_args(argv[1:])
-    global parsed_args
-    parsed_args = arguments
+    config.parsed_args = arguments
     return arguments
 
 
@@ -341,9 +346,36 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml"):
         fo.write(yaml.dump(azure_template, sort_keys=False))
 
 
+def get_full_tree():
+    temp_vinca_conf = read_vinca_yaml("./vinca.yaml")
+    temp_vinca_conf["build_all"] = True
+    temp_vinca_conf["skip_built_packages"] = []
+    config.selected_platform = get_conda_subdir()
+    # {
+    #     "build_all": True,
+    #     "python_version": None,
+    #     "ros_distro": "noetic"
+    # }
+
+    # python_version = None
+    # if "python_version" in vinca_conf:
+    #     python_version = vinca_conf["python_version"]
+
+    # python_version = vinca_conf["python_version"]
+
+    distro = Distro("noetic", "3.8")
+    all_packages = get_selected_packages(distro, temp_vinca_conf)
+    temp_vinca_conf["_selected_pkgs"] = all_packages
+    all_outputs = generate_outputs(distro, temp_vinca_conf)
+    print(all_outputs)
+
+
 def main():
 
     args = parse_command_line(sys.argv)
+
+    get_full_tree()
+    return 0
 
     metas = []
 
