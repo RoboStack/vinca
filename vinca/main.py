@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 
 import argparse
-import requests
 import catkin_pkg
 import sys
 import os
-import json
 import glob
 import platform
 import ruamel.yaml
@@ -18,11 +16,10 @@ from .template import write_recipe, write_recipe_package
 from .distro import Distro
 
 from vinca import config
+from vinca.utils import get_repodata
 
 unsatisfied_deps = set()
 distro = None
-
-parsed_args = None
 
 
 def ensure_list(obj):
@@ -33,8 +30,8 @@ def ensure_list(obj):
 
 
 def get_conda_subdir():
-    if parsed_args.platform:
-        return parsed_args.platform
+    if config.parsed_args.platform:
+        return config.parsed_args.platform
 
     sys_platform = sys.platform
     machine = platform.machine()
@@ -121,8 +118,8 @@ def parse_command_line(argv):
         help="The conda platform to check existing recipes for.",
     )
     arguments = parser.parse_args(argv[1:])
-    global parsed_args, selected_platform
-    parsed_args = arguments
+    global selected_platform
+    config.parsed_args = arguments
     config.selected_platform = get_conda_subdir()
     return arguments
 
@@ -192,6 +189,10 @@ def read_vinca_yaml(filepath):
 
     config.ros_distro = vinca_conf["ros_distro"]
     config.skip_testing = vinca_conf.get("skip_testing", True)
+
+    vinca_conf["_conda_indexes"] = get_conda_index(
+        vinca_conf, os.path.dirname(filepath)
+    )
 
     return vinca_conf
 
@@ -770,7 +771,6 @@ def main():
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, "vinca.yaml")
     vinca_conf = read_vinca_yaml(vinca_yaml)
-    vinca_conf["_conda_indexes"] = get_conda_index(vinca_conf, base_dir)
 
     from .template import generate_bld_ament_cmake
     from .template import generate_bld_ament_python
@@ -829,21 +829,19 @@ def main():
             fns = list(fn)
             for fn in fns:
                 selected_bn = None
-                if "://" in fn:
-                    fn += f"{get_conda_subdir()}/repodata.json"
-                    request = requests.get(fn)
-                    print(f"Fetching repodata: {fn}")
 
-                    repodata = request.json()
+                print(f"Fetching repodata: {fn}")
+                repodata = get_repodata(fn, get_conda_subdir())
+
+                # currently we don't check the build numbers of local repodatas,
+                # only URLs
+                if "://" in fn:
                     selected_bn = vinca_conf.get("build_number", 0)
                     distro = vinca_conf["ros_distro"]
                     for pkg_name, pkg in repodata.get("packages").items():
                         if pkg_name.startswith(f"ros-{distro}"):
                             print(f"Already built {pkg_name}")
                             selected_bn = max(selected_bn, pkg["build_number"])
-                else:
-                    with open(fn) as fi:
-                        repodata = json.load(fi)
 
                 print(f"Selected build number: {selected_bn}")
 

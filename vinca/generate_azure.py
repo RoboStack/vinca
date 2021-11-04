@@ -5,11 +5,21 @@ import glob
 import sys
 import os
 import argparse
-import requests
 import pkg_resources
-from .utils import literal_unicode as lu
-
 from distutils.dir_util import copy_tree
+
+from rich import print
+
+from vinca.utils import get_repodata
+from vinca.utils import literal_unicode as lu
+from vinca.distro import Distro
+from vinca.main import (
+    get_selected_packages,
+    generate_outputs,
+    read_vinca_yaml,
+    get_conda_subdir,
+)
+from vinca import config
 
 
 def read_azure_script(fn):
@@ -23,8 +33,6 @@ azure_osx_script = lu(read_azure_script("osx_64.sh"))
 azure_osx_arm64_script = lu(read_azure_script("osx_arm64.sh"))
 azure_win_preconfig_script = lu(read_azure_script("win_preconfig.bat"))
 azure_win_script = lu(read_azure_script("win_build.bat"))
-
-parsed_args = None
 
 
 def parse_command_line(argv):
@@ -61,8 +69,7 @@ def parse_command_line(argv):
     )
 
     arguments = parser.parse_args(argv[1:])
-    global parsed_args
-    parsed_args = arguments
+    config.parsed_args = arguments
     return arguments
 
 
@@ -121,22 +128,30 @@ def get_skip_existing(vinca_conf, platform):
         fns = list(fn)
     else:
         fns = []
+
     for fn in fns:
-        if "://" in fn:
-            fn += f"{platform}/repodata.json"
-            print(f"Fetching repodata: {fn}")
-            request = requests.get(fn)
-
-            repodata = request.json()
-            repodatas.append(repodata)
-        else:
-            import json
-
-            with open(fn) as fi:
-                repodata = json.load(fi)
-                repodatas.append(repodata)
+        print(f"Fetching repodata: {fn}")
+        repodata = get_repodata(fn, platform)
+        repodatas.append(repodata)
 
     return repodatas
+
+
+def get_all_ancestors(graph, node):
+    ancestors = set()
+    visited = set()
+    current_node = node
+
+    while True:
+        a = {a for a in graph[node] if a.startswith('ros-') or a.startswith('ros2')}
+        ancestors |= a
+        visited.add(current_node)
+
+        if len(ancestors - visited) == 0:
+            print(f"Returning all ancestors for {node} : {ancestors}")
+            return ancestors
+        else:
+            current_node = list(ancestors - visited)[0]
 
 
 def add_additional_recipes(args):
@@ -239,7 +254,9 @@ def build_linux_pipeline(
         fo.write(yaml.dump(azure_template, sort_keys=False))
 
 
-def build_osx_pipeline(stages, trigger_branch, outfile="osx.yml", script=azure_osx_script):
+def build_osx_pipeline(
+    stages, trigger_branch, outfile="osx.yml", script=azure_osx_script
+):
     # Build OSX pipeline
     azure_template = {"pool": {"vmImage": "macOS-10.15"}}
 
@@ -348,9 +365,30 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml"):
         fo.write(yaml.dump(azure_template, sort_keys=False))
 
 
+def get_full_tree():
+    recipes_dir = config.parsed_args.dir
+
+    vinca_yaml = os.path.join(os.path.dirname(recipes_dir), "vinca.yaml")
+
+    temp_vinca_conf = read_vinca_yaml(vinca_yaml)
+    temp_vinca_conf["build_all"] = True
+    temp_vinca_conf["skip_built_packages"] = []
+    config.selected_platform = get_conda_subdir()
+
+    python_version = temp_vinca_conf.get("python_version", None)
+    distro = Distro(temp_vinca_conf["ros_distro"], python_version)
+
+    all_packages = get_selected_packages(distro, temp_vinca_conf)
+    temp_vinca_conf["_selected_pkgs"] = all_packages
+
+    all_outputs = generate_outputs(distro, temp_vinca_conf)
+    return all_outputs
+
 def main():
 
     args = parse_command_line(sys.argv)
+
+    full_tree = get_full_tree()
 
     metas = []
 
@@ -368,7 +406,7 @@ def main():
     if len(metas) >= 1:
         requirements = {}
 
-        for pkg in metas:
+        for pkg in full_tree:
             requirements[pkg["package"]["name"]] = pkg["requirements"].get(
                 "host", []
             ) + pkg["requirements"].get("run", [])
@@ -386,16 +424,21 @@ def main():
                 if r.startswith("ros-") or r.startswith("ros2-"):
                     G.add_edge(pkg, r)
 
+        # print(requirements)
         # import matplotlib.pyplot as plt
         # nx.draw(G, with_labels=True, font_weight='bold')
         # plt.show()
 
         tg = list(reversed(list(nx.topological_sort(G))))
 
+        names_to_build = {pkg["package"]["name"] for pkg in metas}
+        tg_slimmed = [el for el in tg if el in names_to_build]
+
         stages = []
         current_stage = []
-        for pkg in tg:
-            reqs = requirements.get(pkg, [])
+        for pkg in tg_slimmed:
+            reqs = get_all_ancestors(requirements, pkg)
+
             sort_in_stage = 0
             for r in reqs:
                 # sort up the stages, until first stage found where all requirements are fulfilled.
@@ -403,17 +446,14 @@ def main():
                     if r in stages[sidx]:
                         sort_in_stage = max(sidx + 1, sort_in_stage)
 
-                # if r in current_stage:
-                # stages.append(current_stage)
-                # current_stage = []
             if sort_in_stage >= len(stages):
                 stages.append([pkg])
             else:
                 stages[sort_in_stage].append(pkg)
-            # current_stage.append(pkg)
 
         if len(current_stage):
             stages.append(current_stage)
+
     elif len(metas) == 1:
         fn_wo_yaml = os.path.splitext(os.path.basename(all_recipes[0]))[0]
         stages = [[fn_wo_yaml]]
@@ -439,7 +479,12 @@ def main():
         build_osx_pipeline(stages, args.trigger_branch, script=azure_osx_script)
 
     if args.platform == "osx-arm64":
-        build_osx_pipeline(stages, args.trigger_branch, outfile="osx_arm64.yml", script=azure_osx_arm64_script)
+        build_osx_pipeline(
+            stages,
+            args.trigger_branch,
+            outfile="osx_arm64.yml",
+            script=azure_osx_arm64_script,
+        )
 
     if args.platform == "linux-aarch64":
         # Build aarch64 pipeline
