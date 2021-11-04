@@ -8,8 +8,9 @@ import subprocess
 import shutil
 import ruamel.yaml
 from .utils import get_repodata
-
+from vinca import config
 from vinca.distro import Distro
+from distutils.dir_util import copy_tree
 
 distro_version = None
 ros_prefix = None
@@ -114,6 +115,7 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     vinca_conf["packages_select_by_deps"] = ros_names
     vinca_conf["skip_all_deps"] = True
     vinca_conf["is_migration"] = True
+    vinca_conf["skip_existing"] = []
 
     with open("vinca.yaml", "w") as fo:
         yaml.dump(vinca_conf, fo)
@@ -121,9 +123,19 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     if os.path.exists("recipes"):
         shutil.rmtree("recipes")
 
+    mutex_path = os.path.join(config.parsed_args.dir, "additional_recipes/ros-distro-mutex")
+    if os.path.exists(mutex_path):
+        goal_folder = os.path.join(config.parsed_args.dir, "recipes", "ros-distro-mutex")
+        os.makedirs(goal_folder, exist_ok=True)
+        copy_tree(mutex_path, goal_folder)
+
+
     subprocess.check_call(
-        ["vinca", "-f", "vinca.yaml", "--multiple", "--platform", arch]
+        ["vinca", "-d", config.parsed_args.dir, "--multiple", "--platform", arch]
     )
+
+    # TODO remove hard coded build branch here!
+    recipe_dir = os.path.join(config.parsed_args.dir, "recipes")
     subprocess.check_call(
         [
             "vinca-azure",
@@ -132,9 +144,8 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
             "--trigger-branch",
             "buildbranch_linux",
             "-d",
-            "./recipes",
+            recipe_dir,
             "--additional-recipes",
-            "--sequential",
         ]
     )
 
@@ -173,8 +184,7 @@ def parse_command_line(argv):
     )
 
     arguments = parser.parse_args(argv[1:])
-    global parsed_args
-    parsed_args = arguments
+    config.parsed_args = arguments
     return arguments
 
 
