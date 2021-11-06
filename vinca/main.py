@@ -826,13 +826,21 @@ def main():
             if not fn:
                 fn = vinca_conf.get("skip_existing")
 
+            yaml = ruamel.yaml.YAML()
+            additional_recipe_names = set()
+            for add_rec in glob.glob(os.path.join(base_dir, "additional_recipes", "**", "recipe.yaml")):
+                with open(add_rec) as fi:
+                    add_rec_y = yaml.load(fi)
+                additional_recipe_names.add(add_rec_y["package"]["name"])
+
+            print("Found additional recipes: ", additional_recipe_names)
+
             fns = list(fn)
             for fn in fns:
                 selected_bn = None
 
                 print(f"Fetching repodata: {fn}")
                 repodata = get_repodata(fn, get_conda_subdir())
-
                 # currently we don't check the build numbers of local repodatas,
                 # only URLs
                 if "://" in fn:
@@ -840,7 +848,9 @@ def main():
                     distro = vinca_conf["ros_distro"]
                     for pkg_name, pkg in repodata.get("packages").items():
                         if pkg_name.startswith(f"ros-{distro}"):
-                            print(f"Already built {pkg_name}")
+                            if pkg_name.rsplit('-', 2)[0] in additional_recipe_names:
+                                print(f"Skipping additional recipe for build number computation {pkg_name}")
+                                continue
                             selected_bn = max(selected_bn, pkg["build_number"])
 
                 print(f"Selected build number: {selected_bn}")
@@ -851,24 +861,29 @@ def main():
                 ]
 
                 for _, pkg in repodata.get("packages").items():
+                    is_built = False
                     if selected_bn is not None:
                         if vinca_conf.get("full_rebuild", True):
                             if pkg["build_number"] == selected_bn:
-                                skip_built_packages.add(pkg["name"])
+                                is_built = True
                         else:
                             # remove all packages except explicitly selected ones
                             if (
                                 pkg["name"] not in explicitly_selected_pkgs
                                 or pkg["build_number"] == selected_bn
                             ):
-                                skip_built_packages.add(pkg["name"])
+                                is_built = True
                     else:
+                        is_built = True
+
+                    if is_built:
+                        print(f"Skipping {pkg['name']}")
                         skip_built_packages.add(pkg["name"])
 
                 vinca_conf["skip_built_packages"] = skip_built_packages
         else:
             vinca_conf["skip_built_packages"] = []
-
+        print("Skip built packages!", vinca_conf["skip_built_packages"])
         python_version = None
         if "python_version" in vinca_conf:
             python_version = vinca_conf["python_version"]
