@@ -288,13 +288,30 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             gdep.extract_group_members(all_pkgs)
             gdeps += gdep.members
 
+    build_tool_deps = pkg.buildtool_depends
+    build_tool_deps += pkg.buildtool_export_depends
+    build_tool_deps = [d.name for d in build_tool_deps if d.evaluated_condition]
+
     build_deps = pkg.build_depends
-    build_deps += pkg.buildtool_depends
     build_deps += pkg.build_export_depends
-    build_deps += pkg.buildtool_export_depends
     build_deps += pkg.test_depends
     build_deps = [d.name for d in build_deps if d.evaluated_condition]
     build_deps += gdeps
+
+    # we stick some build tools into the `build` section to make cross compilation work
+    # right now it's only `git`.
+    for dep in build_tool_deps:
+        resolved_dep = resolve_pkgname(dep, vinca_conf, distro)
+        if not resolved_dep:
+            unsatisfied_deps.add(dep)
+            continue
+
+        if 'git' in resolved_dep:
+            output["requirements"]["build"].extend(resolved_dep)
+        else:
+            # remove duplicate cmake
+            if dep not in ["cmake"]:
+                build_deps.append(dep)
 
     for dep in build_deps:
         if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
