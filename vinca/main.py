@@ -313,6 +313,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             if dep not in ["cmake"]:
                 build_deps.append(dep)
 
+        # Hack to add cyclonedds into build for cross compilation
+        if pkg_shortname == 'cyclonedds' or 'cyclonedds' in (build_deps + build_tool_deps):
+            output["requirements"]["build"].append({'sel(build_platform != target_platform)': f'ros-{config.ros_distro}-cyclonedds'})
+
     for dep in build_deps:
         if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
             output["requirements"]["host"].append(dep)
@@ -323,6 +327,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             unsatisfied_deps.add(dep)
             continue
         output["requirements"]["host"].extend(resolved_dep)
+
 
     run_deps = pkg.run_depends
     run_deps += pkg.exec_depends
