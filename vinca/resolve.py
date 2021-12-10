@@ -31,7 +31,9 @@ def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
         if pkg_shortname in i:
             sys_platform = map_platform_python_to_conda[config.selected_platform]
             if "robostack" in i[pkg_shortname].keys():
-                if sys_platform in i[pkg_shortname]["robostack"]:
+                if config.selected_platform in i[pkg_shortname]["robostack"]:
+                    return i[pkg_shortname]["robostack"][config.selected_platform]
+                elif sys_platform in i[pkg_shortname]["robostack"]:
                     return i[pkg_shortname]["robostack"][sys_platform]
                 else:
                     return i[pkg_shortname]["robostack"]
