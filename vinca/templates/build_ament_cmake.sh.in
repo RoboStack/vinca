@@ -21,6 +21,7 @@ cmake \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_BUILD_TYPE=Release \
     -DPYTHON_EXECUTABLE=$PREFIX/bin/python \
+    -DPython_EXECUTABLE=$PREFIX/bin/python \
     -DPython3_EXECUTABLE=$PREFIX/bin/python \
     -DPYTHON_INSTALL_DIR=$SP_DIR \
     -DSETUPTOOLS_DEB_LAYOUT=OFF \

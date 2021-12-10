@@ -373,6 +373,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         output["requirements"]["build"] += [
             {"sel(build_platform != target_platform)": "numpy"}
         ]
+    if f'ros-{config.ros_distro}-pybind11-vendor' in output["requirements"]["host"]:
+        output["requirements"]["host"] += [
+            "pybind11"
+        ]
     if "pybind11" in output["requirements"]["host"]:
         output["requirements"]["build"] += [
             {"sel(build_platform != target_platform)": "pybind11"}
