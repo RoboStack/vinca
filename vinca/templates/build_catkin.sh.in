@@ -45,6 +45,7 @@ fi
 export CXXFLAGS="$CXXFLAGS -DBOOST_ERROR_CODE_HEADER_ONLY"
 
 if [[ $target_platform =~ linux.* ]]; then
+    export CFLAGS="$CFLAGS -D__STDC_FORMAT_MACROS=1";
     export CXXFLAGS="$CXXFLAGS -D__STDC_FORMAT_MACROS=1";
     # I am too scared to turn this on for now ...
     # export LDFLAGS="$LDFLAGS -lrt";
@@ -87,13 +88,14 @@ if [ "${PKG_NAME}" == "ros-@(ros_distro)-catkin" ]; then
         mkdir -p "${PREFIX}/etc/conda/${CHANGE}.d"
         cp "${RECIPE_DIR}/${CHANGE}.sh" "${PREFIX}/etc/conda/${CHANGE}.d/${PKG_NAME}_${CHANGE}.sh"
     done
+fi
 
-   if [ "${PKG_NAME}" == "ros-@(ros_distro)-environment" ]; then
-       for SCRIPT in "1.ros_distro.sh" "1.ros_etc_dir.sh" "1.ros_package_path.sh" "1.ros_python_version.sh" "1.ros_version.sh"
-       do
-           cp "${PREFIX}/etc/catkin/profile.d/${SCRIPT}" "${PREFIX}/etc/conda/activate.d/${SCRIPT}"
-       done
-   fi
+if [ "${PKG_NAME}" == "ros-@(ros_distro)-environment" ]; then
+   for SCRIPT in "1.ros_distro.sh" "1.ros_etc_dir.sh" "1.ros_package_path.sh" "1.ros_python_version.sh" "1.ros_version.sh"
+   do
+       mkdir -p "${PREFIX}/etc/conda/activate.d"
+       cp "${PREFIX}/etc/catkin/profile.d/${SCRIPT}" "${PREFIX}/etc/conda/activate.d/${SCRIPT}"
+   done
 fi
 
 if [ "${PKG_NAME}" == "ros-@(ros_distro)-ros-workspace" ]; then
