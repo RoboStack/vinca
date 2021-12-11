@@ -414,8 +414,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             output["requirements"]["host"].remove("REQUIRE_OPENGL")
 
         output["requirements"]["build"] += [
-            {"sel(unix)": "{{ cdt('mesa-libgl-devel') }}"},
-            {"sel(unix)": "{{ cdt('mesa-dri-drivers') }}"},
+            {"sel(linux)": "{{ cdt('mesa-libgl-devel') }}"},
+            {"sel(linux)": "{{ cdt('mesa-dri-drivers') }}"},
             {"sel(linux)": "{{ cdt('libselinux') }}"},
             {"sel(linux)": "{{ cdt('libxdamage') }}"},
             {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
@@ -447,8 +447,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             output["requirements"]["host"].remove("REQUIRE_GL")
 
         output["requirements"]["build"] += [
-            {"sel(unix)": "{{ cdt('mesa-libgl-devel') }}"},
-            {"sel(unix)": "{{ cdt('mesa-dri-drivers') }}"},
+            {"sel(linux)": "{{ cdt('mesa-libgl-devel') }}"},
+            {"sel(linux)": "{{ cdt('mesa-dri-drivers') }}"},
             {"sel(linux)": "{{ cdt('libselinux') }}"},
             {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
         ]
@@ -750,8 +750,8 @@ def parse_package(pkg, distro, vinca_conf, path):
             recipe["requirements"]["host"].remove("REQUIRE_OPENGL")
 
         recipe["requirements"]["build"] += [
-            {"sel(unix)": "{{ cdt('mesa-libgl-devel') }}"},
-            {"sel(unix)": "{{ cdt('mesa-dri-drivers') }}"},
+            {"sel(linux)": "{{ cdt('mesa-libgl-devel') }}"},
+            {"sel(linux)": "{{ cdt('mesa-dri-drivers') }}"},
             {"sel(linux)": "{{ cdt('libselinux') }}"},
             {"sel(linux)": "{{ cdt('libxdamage') }}"},
             {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
@@ -780,8 +780,8 @@ def parse_package(pkg, distro, vinca_conf, path):
             recipe["requirements"]["host"].remove("REQUIRE_GL")
 
         recipe["requirements"]["build"] += [
-            {"sel(unix)": "{{ cdt('mesa-libgl-devel') }}"},
-            {"sel(unix)": "{{ cdt('mesa-dri-drivers') }}"},
+            {"sel(linux)": "{{ cdt('mesa-libgl-devel') }}"},
+            {"sel(linux)": "{{ cdt('mesa-dri-drivers') }}"},
             {"sel(linux)": "{{ cdt('libselinux') }}"},
             {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
         ]
