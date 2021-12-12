@@ -354,6 +354,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             while dep in output["requirements"][dep_type]:
                 output["requirements"][dep_type].remove(dep)
 
+    # workaround as rosidl-generator-py cmake needs numpy
+    if f'ros-{config.ros_distro}-rosidl-generator-py' in output["requirements"]["host"]:
+        output["requirements"]["host"].append("numpy")
+
     def sortkey(k):
         if isinstance(k, dict):
             return list(k.values())[0]
