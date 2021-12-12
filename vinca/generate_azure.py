@@ -262,10 +262,10 @@ def build_linux_pipeline(
 
 
 def build_osx_pipeline(
-    stages, trigger_branch, outfile="osx.yml", script=azure_osx_script
+    stages, trigger_branch, vm_imagename="macOS-10.15", outfile="osx.yml", script=azure_osx_script
 ):
     # Build OSX pipeline
-    azure_template = {"pool": {"vmImage": "macOS-10.15"}}
+    azure_template = {"pool": {"vmImage": vm_imagename}}
 
     azure_stages = []
 
@@ -494,12 +494,17 @@ def main():
         build_linux_pipeline(stages, args.trigger_branch, outfile="linux.yml")
 
     if args.platform == "osx-64":
-        build_osx_pipeline(stages, args.trigger_branch, script=azure_osx_script)
+        build_osx_pipeline(
+            stages,
+            args.trigger_branch,
+            script=azure_osx_script,
+        )
 
     if args.platform == "osx-arm64":
         build_osx_pipeline(
             stages,
             args.trigger_branch,
+            vm_imagename="macOS-11",
             outfile="osx_arm64.yml",
             script=azure_osx_arm64_script,
         )
