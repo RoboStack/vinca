@@ -39,6 +39,10 @@ class Distro(object):
 
     def get_depends(self, pkg, ignore_pkgs=None):
         dependencies = set()
+        if pkg not in self._distro.release_packages:
+            print(f"{pkg} not in released packages anymore")
+            return dependencies
+
         dependencies |= self._walker.get_recursive_depends(
             pkg,
             [

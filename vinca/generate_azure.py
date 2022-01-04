@@ -143,7 +143,11 @@ def get_all_ancestors(graph, node):
     current_node = node
 
     while True:
-        a = {a for a in graph.get(node, []) if a.startswith('ros-') or a.startswith('ros2')}
+        a = {
+            a
+            for a in graph.get(node, [])
+            if a.startswith("ros-") or a.startswith("ros2")
+        }
         if not graph.get(node):
             print(f"[yellow]{node} not found")
 
@@ -262,7 +266,11 @@ def build_linux_pipeline(
 
 
 def build_osx_pipeline(
-    stages, trigger_branch, vm_imagename="macOS-10.15", outfile="osx.yml", script=azure_osx_script
+    stages,
+    trigger_branch,
+    vm_imagename="macOS-10.15",
+    outfile="osx.yml",
+    script=azure_osx_script,
 ):
     # Build OSX pipeline
     azure_template = {"pool": {"vmImage": vm_imagename}}
@@ -391,6 +399,7 @@ def get_full_tree():
     all_outputs = generate_outputs(distro, temp_vinca_conf)
     return all_outputs
 
+
 def main():
 
     args = parse_command_line(sys.argv)
@@ -488,16 +497,14 @@ def main():
                 print(el)
                 order.append(el)
 
-        fo.write('\n'.join(order))
+        fo.write("\n".join(order))
 
     if args.platform == "linux-64":
         build_linux_pipeline(stages, args.trigger_branch, outfile="linux.yml")
 
     if args.platform == "osx-64":
         build_osx_pipeline(
-            stages,
-            args.trigger_branch,
-            script=azure_osx_script,
+            stages, args.trigger_branch, script=azure_osx_script,
         )
 
     if args.platform == "osx-arm64":
