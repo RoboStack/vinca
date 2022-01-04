@@ -123,12 +123,15 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     if os.path.exists("recipes"):
         shutil.rmtree("recipes")
 
-    mutex_path = os.path.join(config.parsed_args.dir, "additional_recipes/ros-distro-mutex")
+    mutex_path = os.path.join(
+        config.parsed_args.dir, "additional_recipes/ros-distro-mutex"
+    )
     if os.path.exists(mutex_path):
-        goal_folder = os.path.join(config.parsed_args.dir, "recipes", "ros-distro-mutex")
+        goal_folder = os.path.join(
+            config.parsed_args.dir, "recipes", "ros-distro-mutex"
+        )
         os.makedirs(goal_folder, exist_ok=True)
         copy_tree(mutex_path, goal_folder)
-
 
     subprocess.check_call(
         ["vinca", "-d", config.parsed_args.dir, "--multiple", "--platform", arch]

@@ -306,7 +306,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             unsatisfied_deps.add(dep)
             continue
 
-        if 'git' in resolved_dep:
+        if "git" in resolved_dep:
             output["requirements"]["build"].extend(resolved_dep)
         else:
             # remove duplicate cmake
@@ -314,8 +314,14 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 build_deps.append(dep)
 
         # Hack to add cyclonedds into build for cross compilation
-        if pkg_shortname == 'cyclonedds' or 'cyclonedds' in (build_deps + build_tool_deps):
-            output["requirements"]["build"].append({'sel(build_platform != target_platform)': f'ros-{config.ros_distro}-cyclonedds'})
+        if pkg_shortname == "cyclonedds" or "cyclonedds" in (
+            build_deps + build_tool_deps
+        ):
+            output["requirements"]["build"].append(
+                {
+                    "sel(build_platform != target_platform)": f"ros-{config.ros_distro}-cyclonedds"
+                }
+            )
 
     for dep in build_deps:
         if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
@@ -327,7 +333,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             unsatisfied_deps.add(dep)
             continue
         output["requirements"]["host"].extend(resolved_dep)
-
 
     run_deps = pkg.run_depends
     run_deps += pkg.exec_depends
@@ -355,7 +360,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 output["requirements"][dep_type].remove(dep)
 
     # workaround as rosidl-generator-py cmake needs numpy
-    if f'ros-{config.ros_distro}-rosidl-generator-py' in output["requirements"]["host"] or f'ros-{config.ros_distro}-rosidl-default-generators' in output["requirements"]["host"]:
+    if (
+        f"ros-{config.ros_distro}-rosidl-generator-py" in output["requirements"]["host"]
+        or f"ros-{config.ros_distro}-rosidl-default-generators"
+        in output["requirements"]["host"]
+    ):
         output["requirements"]["host"].append("numpy")
 
     def sortkey(k):
@@ -377,10 +386,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         output["requirements"]["build"] += [
             {"sel(build_platform != target_platform)": "numpy"}
         ]
-    if f'ros-{config.ros_distro}-pybind11-vendor' in output["requirements"]["host"]:
-        output["requirements"]["host"] += [
-            "pybind11"
-        ]
+    if f"ros-{config.ros_distro}-pybind11-vendor" in output["requirements"]["host"]:
+        output["requirements"]["host"] += ["pybind11"]
     if "pybind11" in output["requirements"]["host"]:
         output["requirements"]["build"] += [
             {"sel(build_platform != target_platform)": "pybind11"}
@@ -483,6 +490,10 @@ def generate_outputs(distro, vinca_conf):
     all_pkgs = [get_pkg(pkg) for pkg in distro.get_depends("ros_base")]
 
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
+        if not distro.check_package(pkg_shortname):
+            print(f"Could not generate output for {pkg_shortname}")
+            continue
+
         try:
             output = generate_output(
                 pkg_shortname,
@@ -518,6 +529,10 @@ def generate_outputs_version(distro, vinca_conf):
 def generate_source(distro, vinca_conf):
     source = {}
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
+        if not distro.check_package(pkg_shortname):
+            print(f"Could not generate source for {pkg_shortname}")
+            continue
+
         url, version = distro.get_released_repo(pkg_shortname)
         entry = {}
         entry["git_url"] = url
@@ -550,6 +565,10 @@ def generate_source(distro, vinca_conf):
 def generate_source_version(distro, vinca_conf):
     source = {}
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
+        if not distro.check_package(pkg_shortname):
+            print(f"Could not generate source for {pkg_shortname}")
+            continue
+
         url, version = distro.get_released_repo(pkg_shortname)
         if (
             vinca_conf["package_version"]
@@ -586,6 +605,10 @@ def generate_source_version(distro, vinca_conf):
 def generate_fat_source(distro, vinca_conf):
     source = []
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
+        if not distro.check_package(pkg_shortname):
+            print(f"Could not generate source for {pkg_shortname}")
+            continue
+
         url, version = distro.get_released_repo(pkg_shortname)
         entry = {}
         entry["git_url"] = url
@@ -858,7 +881,9 @@ def main():
 
             yaml = ruamel.yaml.YAML()
             additional_recipe_names = set()
-            for add_rec in glob.glob(os.path.join(base_dir, "additional_recipes", "**", "recipe.yaml")):
+            for add_rec in glob.glob(
+                os.path.join(base_dir, "additional_recipes", "**", "recipe.yaml")
+            ):
                 with open(add_rec) as fi:
                     add_rec_y = yaml.load(fi)
                 additional_recipe_names.add(add_rec_y["package"]["name"])
@@ -878,8 +903,10 @@ def main():
                     distro = vinca_conf["ros_distro"]
                     for pkg_name, pkg in repodata.get("packages").items():
                         if pkg_name.startswith(f"ros-{distro}"):
-                            if pkg_name.rsplit('-', 2)[0] in additional_recipe_names:
-                                print(f"Skipping additional recipe for build number computation {pkg_name}")
+                            if pkg_name.rsplit("-", 2)[0] in additional_recipe_names:
+                                print(
+                                    f"Skipping additional recipe for build number computation {pkg_name}"
+                                )
                                 continue
                             selected_bn = max(selected_bn, pkg["build_number"])
 
