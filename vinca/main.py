@@ -402,7 +402,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         output["requirements"]["host"] += [
             {"sel(build_platform == target_platform)": "pkg-config"}
         ]
-     if "pyqt-builder" in output["requirements"]["host"]:
+    if "pyqt-builder" in output["requirements"]["host"]:
         output["requirements"]["build"] += [
             {"sel(build_platform != target_platform)": "pyqt-builder"}
         ]
