@@ -392,7 +392,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         output["requirements"]["build"] += [
             {"sel(build_platform != target_platform)": "pybind11"}
         ]
-    # pkg-config must be in build, not host for cross-compile
+    # pkg-config + pyqt-builder must be in build, not host for cross-compile
     if "pkg-config" in output["requirements"]["host"]:
         output["requirements"]["build"] += [
             {"sel(build_platform != target_platform)": "pkg-config"}
@@ -402,6 +402,15 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         output["requirements"]["host"] += [
             {"sel(build_platform == target_platform)": "pkg-config"}
         ]
+     if "pyqt-builder" in output["requirements"]["host"]:
+        output["requirements"]["build"] += [
+            {"sel(build_platform != target_platform)": "pyqt-builder"}
+        ]
+        while "pyqt-builder" in output["requirements"]["host"]:
+            output["requirements"]["host"].remove("pyqt-builder")
+        output["requirements"]["host"] += [
+            {"sel(build_platform == target_platform)": "pyqt-builder"}
+        ]   
 
     # fixup problems with udev (which is mapped to libusb):
     if (
