@@ -13,7 +13,7 @@ for /f "usebackq tokens=*" %%a in ('%LIBRARY_PREFIX%') do (
   set _LIBRARY_PREFIX_ROOT=%%~da\
 )
 
-set DISTRONAME="ros-@(ros_distro)"
+set DISTRONAME=ros-@(ros_distro)
 echo %DISTRONAME%
 call set PKG_NAME_NO_DISTRO=%%PKG_NAME:%DISTRONAME%-=%%
 echo %PKG_NAME_NO_DISTRO%
