@@ -13,9 +13,12 @@ for /f "usebackq tokens=*" %%a in ('%LIBRARY_PREFIX%') do (
   set _LIBRARY_PREFIX_ROOT=%%~da\
 )
 
+PKG_NAME_NO_DISTRO=%PKG_NAME:ros-@(ros_distro)-=%
+PKG_NAME_NO_DISTRO_UNDERSCORE=%PKG_NAME_NO_DISTRO:-=_%
+
 %PYTHON% setup.py install ^
     --prefix=%_LIBRARY_PREFIX_PATH% ^
-    --install-scripts=%_LIBRARY_PREFIX_PATH%\lib\%PKG_NAME% ^
+    --install-scripts=%_LIBRARY_PREFIX_PATH%\lib\%PKG_NAME_NO_DISTRO_UNDERSCORE% ^
     --root=%_LIBRARY_PREFIX_ROOT%
 
 if errorlevel 1 exit 1
