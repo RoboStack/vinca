@@ -2,13 +2,4 @@
 # DO NOT EDIT!
 
 pushd $SRC_DIR/$PKG_NAME/src/work
-
-INSTALL_SCRIPTS_ARG=--install-scripts=$PREFIX/lib
-if grep -q "install[-_]scripts" setup.cfg; then
-  unset INSTALL_SCRIPTS_ARG
-fi
-
-$PYTHON setup.py install \
-	--prefix $PREFIX \
-	--install-lib $SP_DIR \
-	$INSTALL_SCRIPTS_ARG
+$PYTHON -m pip install . --no-deps -vvv
