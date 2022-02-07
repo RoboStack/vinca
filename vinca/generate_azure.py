@@ -222,7 +222,7 @@ def build_linux_pipeline(
         azure_template = {"pool": {"vmImage": "ubuntu-latest"}}
 
     if docker_image is None:
-        docker_image = "condaforge/linux-anvil-comp7"
+        docker_image = "condaforge/linux-anvil-cos7-x86_64"
     azure_stages = []
 
     stage_names = []
