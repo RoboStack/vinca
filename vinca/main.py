@@ -220,6 +220,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 "ninja",
                 {"sel(unix)": "make"},
                 {"sel(osx)": "tapi"},
+                {"sel(linux)": "sysroot_linux-64 2.17"},
                 "cmake",
                 {"sel(build_platform != target_platform)": "python"},
                 {
