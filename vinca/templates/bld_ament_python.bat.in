@@ -6,23 +6,17 @@ set "PYTHONPATH=%LIBRARY_PREFIX%\lib\site-packages;%SP_DIR%"
 
 pushd %SRC_DIR%\%PKG_NAME%\src\work
 
-mkdir %LIBRARY_PREFIX%\lib\site-packages
-
-for /f "usebackq tokens=*" %%a in ('%LIBRARY_PREFIX%') do (
-  set _LIBRARY_PREFIX_PATH=%%~pna
-  set _LIBRARY_PREFIX_ROOT=%%~da\
+:: If there is a setup.cfg that contains install-scripts then we should not
+:: set it here
+set "INSTALL_SCRIPTS_ARG=--install-scripts=%_LIBRARY_PREFIX_PATH%\bin"
+findstr install[-_]scripts setup.cfg
+if "%errorlevel%" == "0" (
+  set INSTALL_SCRIPTS_ARG=
 )
 
-set DISTRONAME=ros-@(ros_distro)
-echo %DISTRONAME%
-call set PKG_NAME_NO_DISTRO=%%PKG_NAME:%DISTRONAME%-=%%
-echo %PKG_NAME_NO_DISTRO%
-call set PKG_NAME_NO_DISTRO_UNDERSCORE=%%PKG_NAME_NO_DISTRO%:-=_%%
-echo %PKG_NAME_NO_DISTRO_UNDERSCORE%
-
 %PYTHON% setup.py install ^
-    --prefix=%_LIBRARY_PREFIX_PATH% ^
-    --install-scripts=%_LIBRARY_PREFIX_PATH%\lib\%PKG_NAME_NO_DISTRO_UNDERSCORE% ^
-    --root=%_LIBRARY_PREFIX_ROOT%
+    --prefix=%LIBRARY_PREFIX% ^
+    --install-lib=%SP_DIR% ^
+    %INSTALL_SCRIPTS_ARG%
 
 if errorlevel 1 exit 1
