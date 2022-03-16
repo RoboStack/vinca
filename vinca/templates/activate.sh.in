@@ -15,8 +15,8 @@ else
 fi
 
 case "$OSTYPE" in
-  darwin*)  export ROS_OS_OVERRIDE="robostack:osx";;
-  linux*)   export ROS_OS_OVERRIDE="robostack:linux";;
+  darwin*)  export ROS_OS_OVERRIDE="conda:osx";;
+  linux*)   export ROS_OS_OVERRIDE="conda:linux";;
 esac
 
 export ROS_ETC_DIR=$CONDA_PREFIX/etc/ros
