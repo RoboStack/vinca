@@ -261,7 +261,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             "sel(win)": "bld_ament_python.bat",
             "sel(unix)": "build_ament_python.sh",
         }
-        resolved_setuptools = resolve_pkgname("setuptools", vinca_conf, distro)
+        resolved_setuptools = resolve_pkgname("python-setuptools", vinca_conf, distro)
         output["requirements"]["host"].extend(resolved_setuptools)
     else:
         return None
