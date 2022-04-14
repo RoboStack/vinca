@@ -411,7 +411,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             output["requirements"]["host"].remove("pyqt-builder")
         output["requirements"]["host"] += [
             {"sel(build_platform == target_platform)": "pyqt-builder"}
-        ]   
+        ]
 
     # fixup problems with udev (which is mapped to libusb):
     if (
@@ -529,6 +529,7 @@ def get_version(distro, vinca_conf, pkg_shortname):
 
     return version
 
+
 def generate_outputs_version(distro, vinca_conf):
     outputs = []
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
@@ -599,7 +600,10 @@ def generate_source_version(distro, vinca_conf):
         entry["git_url"] = url
         entry["git_rev"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-        if not pkg_names or (pkg_names[0], version) in vinca_conf["skip_built_packages"]:
+        if (
+            not pkg_names
+            or (pkg_names[0], version) in vinca_conf["skip_built_packages"]
+        ):
             continue
         pkg_name = pkg_names[0]
         entry["folder"] = "%s/src/work" % pkg_name
