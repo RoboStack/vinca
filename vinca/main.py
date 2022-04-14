@@ -208,7 +208,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     if not pkg_names:
         return None
 
-    if pkg_names[0] in vinca_conf["skip_built_packages"]:
+    if (pkg_names[0], version) in vinca_conf["skip_built_packages"]:
         return None
 
     output = {
@@ -519,16 +519,20 @@ def generate_outputs(distro, vinca_conf):
     return outputs
 
 
+def get_version(distro, vinca_conf, pkg_shortname):
+    version = distro.get_version(pkg_shortname)
+    if (
+        vinca_conf.get("package_version")
+        and vinca_conf["package_version"][pkg_shortname]
+    ):
+        version = vinca_conf["package_version"][pkg_shortname]["version"]
+
+    return version
+
 def generate_outputs_version(distro, vinca_conf):
     outputs = []
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
-        version = distro.get_version(pkg_shortname)
-        if (
-            vinca_conf["package_version"]
-            and vinca_conf["package_version"][pkg_shortname]
-        ):
-            version = vinca_conf["package_version"][pkg_shortname]["version"]
-
+        version = get_version(distro, vinca_conf, pkg_shortname)
         output = generate_output(pkg_shortname, vinca_conf, distro, version)
         if output is not None:
             outputs.append(output)
@@ -548,7 +552,11 @@ def generate_source(distro, vinca_conf):
         entry["git_url"] = url
         entry["git_rev"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-        if not pkg_names or pkg_names[0] in vinca_conf["skip_built_packages"]:
+        pkg_version = get_version(distro, vinca_conf, pkg_shortname)
+        print("Checking ", pkg_shortname, pkg_version)
+        if not pkg_names:
+            continue
+        if (pkg_names[0], pkg_version) in vinca_conf["skip_built_packages"]:
             continue
         pkg_name = pkg_names[0]
         entry["folder"] = "%s/src/work" % pkg_name
@@ -591,7 +599,7 @@ def generate_source_version(distro, vinca_conf):
         entry["git_url"] = url
         entry["git_rev"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-        if not pkg_names or pkg_names[0] in vinca_conf["skip_built_packages"]:
+        if not pkg_names or (pkg_names[0], version) in vinca_conf["skip_built_packages"]:
             continue
         pkg_name = pkg_names[0]
         entry["folder"] = "%s/src/work" % pkg_name
@@ -945,7 +953,7 @@ def main():
 
                     if is_built:
                         print(f"Skipping {pkg['name']}")
-                        skip_built_packages.add(pkg["name"])
+                        skip_built_packages.add((pkg["name"], pkg["version"]))
 
                 vinca_conf["skip_built_packages"] = skip_built_packages
         else:
