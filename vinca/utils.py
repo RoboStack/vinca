@@ -25,6 +25,16 @@ def literal_unicode_representer(dumper, data):
 yaml.add_representer(folded_unicode, folded_unicode_representer)
 yaml.add_representer(literal_unicode, literal_unicode_representer)
 
+class NoAliasDumper(yaml.SafeDumper):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.add_representer(folded_unicode, folded_unicode_representer)
+        self.add_representer(literal_unicode, literal_unicode_representer)
+
+    def ignore_aliases(self, data):
+        return True
 
 def get_repodata(url_or_path, platform=None):
     if platform:
