@@ -290,7 +290,7 @@ def build_linux_pipeline(
 
         prev_batch_keys = batch_keys
 
-    if len(azure_template["jobs"]) == 0:
+    if len(azure_template.get("jobs", [])) == 0:
         return
 
     azure_template["on"] = {"push": {"branches": [trigger_branch]}}
@@ -352,7 +352,7 @@ def build_osx_pipeline(
 
         prev_batch_keys = batch_keys
 
-    if len(azure_template["jobs"]) == 0:
+    if len(azure_template.get("jobs", [])) == 0:
         return
 
     azure_template["on"] = {"push": {"branches": [trigger_branch]}}
@@ -433,7 +433,7 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
 
         prev_batch_keys = batch_keys
 
-    if len(azure_template["jobs"]) == 0:
+    if len(azure_template.get("jobs", [])) == 0:
         return
 
     azure_template["on"] = {"push": {"branches": [trigger_branch]}}
