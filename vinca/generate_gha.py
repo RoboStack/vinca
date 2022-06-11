@@ -407,11 +407,9 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                         {
                             "uses": "conda-incubator/setup-miniconda@v2",
                             "with": {
-                                "python-version": "3.9",
                                 "mamba-version": "*",
                                 "channels": "conda-forge",
-                                "channel-priority": "true",
-                                "activate-environment": "base"
+                                "channel-priority": "true"
                             }
                         },
                         {
