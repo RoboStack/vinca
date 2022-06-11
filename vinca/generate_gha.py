@@ -407,8 +407,10 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                         {
                             "uses": "conda-incubator/setup-miniconda@v2",
                             "with": {
-                                "mamba-version": "*",
                                 "channels": "conda-forge",
+                                "miniforge-variant": "Mambaforge",
+                                "miniforge-version": "latest",
+                                "use-mamba": "true",
                                 "channel-priority": "true"
                             }
                         },
