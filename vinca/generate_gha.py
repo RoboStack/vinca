@@ -290,6 +290,9 @@ def build_linux_pipeline(
 
         prev_batch_keys = batch_keys
 
+    if len(azure_template.get("jobs", [])) == 0:
+        return
+
     azure_template["on"] = {"push": {"branches": [trigger_branch]}}
 
     dump_for_gha(azure_template, outfile)
@@ -349,6 +352,9 @@ def build_osx_pipeline(
 
         prev_batch_keys = batch_keys
 
+    if len(azure_template.get("jobs", [])) == 0:
+        return
+
     azure_template["on"] = {"push": {"branches": [trigger_branch]}}
 
     dump_for_gha(azure_template, outfile)
@@ -399,9 +405,14 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                             "uses": "actions/checkout@v2"
                         },
                         {
-                            "shell": "bash",
-                            "run": "echo \"$CONDA\\Scripts\" >> $GITHUB_PATH",
-                            "name": "Add conda to PATH",
+                            "uses": "conda-incubator/setup-miniconda@v2",
+                            "with": {
+                                "python-version": "3.9",
+                                "mamba-version": "*",
+                                "channels": "conda-forge",
+                                "channel-priority": "true",
+                                "activate-environment": "base"
+                            }
                         },
                         {
                             "run": "conda install -c conda-forge --yes --quiet conda-build pip mamba ruamel.yaml anaconda-client",
@@ -426,6 +437,9 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                 }
 
         prev_batch_keys = batch_keys
+
+    if len(azure_template.get("jobs", [])) == 0:
+        return
 
     azure_template["on"] = {"push": {"branches": [trigger_branch]}}
 
