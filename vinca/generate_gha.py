@@ -562,13 +562,8 @@ def main():
     if args.platform == "linux-aarch64":
         # Build aarch64 pipeline
         aarch64_azure_template = {
-            "pool": {
-                "name": "Default",
-                "demands": [
-                    "Agent.OS -equals linux",
-                    "Agent.OSArchitecture -equals ARM64",
-                ],
-            }
+            "runs-on": ["self-hosted", "linux", "ARM64"],
+            "jobs": {}
         }
 
         build_linux_pipeline(
