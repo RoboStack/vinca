@@ -351,7 +351,7 @@ urllib.request.urlretrieve(url, path)"""),
                             },
                         },
                         {
-                            "script": lu("""start /wait "" %BUILD_ARTIFACTSTAGINGDIRECTORY%\\Miniforge.exe /InstallationType=JustMe /RegisterPython=0 /S /D=C:\\fMiniforge"""),
+                            "script": lu("""start /wait "" %BUILD_ARTIFACTSTAGINGDIRECTORY%\\Miniforge.exe /InstallationType=JustMe /RegisterPython=0 /S /D=C:\\Miniforge"""),
                             "displayName": "Install Miniforge",
                         },
                         {
