@@ -221,14 +221,15 @@ def dump_for_gha(doc, f):
     with open(f, "w") as fo:
         fo.write(s)
 
+
 def get_stage_name(batch):
     stage_name = []
     for pkg in batch:
-        if len(pkg.split('-')) > 2:
-            stage_name.append('-'.join(pkg.split('-')[2:]))
+        if len(pkg.split("-")) > 2:
+            stage_name.append("-".join(pkg.split("-")[2:]))
         else:
             stage_name.append(pkg)
-    return ' '.join(stage_name)
+    return " ".join(stage_name)
 
 
 def build_linux_pipeline(
@@ -240,10 +241,7 @@ def build_linux_pipeline(
     outfile="linux.yml",
 ):
 
-    blurb = { 
-        "jobs": {
-        }
-    }
+    blurb = {"jobs": {}}
 
     # Build Linux pipeline
     if azure_template is None:
@@ -265,28 +263,23 @@ def build_linux_pipeline(
 
             pretty_stage_name = get_stage_name(batch)
             azure_template["jobs"][batch_key] = {
-                    "name": pretty_stage_name,
-                    "runs-on": "ubuntu-latest",
-                    "strategy": {
-                        "fail-fast": False
-                    },
-                    "needs": prev_batch_keys,
-                    "steps": [
-                        {
-                            "name": "Checkout code",
-                            "uses": "actions/checkout@v2"
+                "name": pretty_stage_name,
+                "runs-on": "ubuntu-latest",
+                "strategy": {"fail-fast": False},
+                "needs": prev_batch_keys,
+                "steps": [
+                    {"name": "Checkout code", "uses": "actions/checkout@v2"},
+                    {
+                        "name": f"Build {' '.join([pkg for pkg in batch])}",
+                        "env": {
+                            "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
+                            "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                            "DOCKER_IMAGE": docker_image,
                         },
-                        {
-                            "name": f"Build {' '.join([pkg for pkg in batch])}",
-                            "env": {
-                                "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                                "DOCKER_IMAGE": docker_image,
-                            },
-                            "run": script,
-                        }
-                    ],
-                }
+                        "run": script,
+                    },
+                ],
+            }
 
         prev_batch_keys = batch_keys
 
@@ -307,10 +300,7 @@ def build_osx_pipeline(
     script=azure_osx_script,
 ):
     # Build OSX pipeline
-    blurb = { 
-        "jobs": {
-        }
-    }
+    blurb = {"jobs": {}}
 
     # Build Linux pipeline
     if azure_template is None:
@@ -328,27 +318,22 @@ def build_osx_pipeline(
 
             pretty_stage_name = get_stage_name(batch)
             azure_template["jobs"][batch_key] = {
-                    "name": pretty_stage_name,
-                    "runs-on": vm_imagename,
-                    "strategy": {
-                        "fail-fast": False
-                    },
-                    "needs": prev_batch_keys,
-                    "steps": [
-                        {
-                            "name": "Checkout code",
-                            "uses": "actions/checkout@v2"
+                "name": pretty_stage_name,
+                "runs-on": vm_imagename,
+                "strategy": {"fail-fast": False},
+                "needs": prev_batch_keys,
+                "steps": [
+                    {"name": "Checkout code", "uses": "actions/checkout@v2"},
+                    {
+                        "name": f"Build {' '.join([pkg for pkg in batch])}",
+                        "env": {
+                            "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
+                            "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
                         },
-                        {
-                            "name": f"Build {' '.join([pkg for pkg in batch])}",
-                            "env": {
-                                "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                            },
-                            "run": script,
-                        }
-                    ],
-                }
+                        "run": script,
+                    },
+                ],
+            }
 
         prev_batch_keys = batch_keys
 
@@ -364,10 +349,7 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
 
     vm_imagename = "windows-2019"
     # Build OSX pipeline
-    blurb = { 
-        "jobs": {
-        }
-    }
+    blurb = {"jobs": {}}
 
     # Build Linux pipeline
     if azure_template is None:
@@ -392,49 +374,44 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
 
             pretty_stage_name = get_stage_name(batch)
             azure_template["jobs"][batch_key] = {
-                    "name": pretty_stage_name,
-                    "runs-on": vm_imagename,
-                    "strategy": {
-                        "fail-fast": False
+                "name": pretty_stage_name,
+                "runs-on": vm_imagename,
+                "strategy": {"fail-fast": False},
+                "needs": prev_batch_keys,
+                "env": {"CONDA_BLD_PATH": "C:\\\\bld\\\\"},
+                "steps": [
+                    {"name": "Checkout code", "uses": "actions/checkout@v2"},
+                    {
+                        "uses": "conda-incubator/setup-miniconda@v2",
+                        "with": {
+                            "channels": "conda-forge",
+                            "miniforge-variant": "Mambaforge",
+                            "miniforge-version": "latest",
+                            "use-mamba": "true",
+                            "channel-priority": "true",
+                        },
                     },
-                    "needs": prev_batch_keys,
-                    "env": {"CONDA_BLD_PATH": "C:\\\\bld\\\\"},
-                    "steps": [
-                        {
-                            "name": "Checkout code",
-                            "uses": "actions/checkout@v2"
+                    {
+                        "run": "conda install -c conda-forge -n base --yes --quiet conda-build pip mamba ruamel.yaml anaconda-client",
+                        "name": "Install conda-build, boa and activate environment",
+                    },
+                    {
+                        "shell": "cmd",
+                        "run": azure_win_preconfig_script,
+                        "name": "conda-forge build setup",
+                    },
+                    {
+                        "shell": "cmd",
+                        "run": script,
+                        "env": {
+                            "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
+                            "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                            "PYTHONUNBUFFERED": 1,
                         },
-                        {
-                            "uses": "conda-incubator/setup-miniconda@v2",
-                            "with": {
-                                "channels": "conda-forge",
-                                "miniforge-variant": "Mambaforge",
-                                "miniforge-version": "latest",
-                                "use-mamba": "true",
-                                "channel-priority": "true"
-                            }
-                        },
-                        {
-                            "run": "conda install -c conda-forge -n base --yes --quiet conda-build pip mamba ruamel.yaml anaconda-client",
-                            "name": "Install conda-build, boa and activate environment",
-                        },
-                        {
-                            "shell": "cmd",
-                            "run": azure_win_preconfig_script,
-                            "name": "conda-forge build setup",
-                        },
-                        {
-                            "shell": "cmd",
-                            "run": script,
-                            "env": {
-                                "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                                "PYTHONUNBUFFERED": 1,
-                            },
-                            "name": f"Build {' '.join([pkg for pkg in batch])}",
-                        },
-                    ],
-                }
+                        "name": f"Build {' '.join([pkg for pkg in batch])}",
+                    },
+                ],
+            }
 
         prev_batch_keys = batch_keys
 

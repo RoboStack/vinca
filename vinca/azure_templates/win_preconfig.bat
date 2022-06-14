@@ -1,6 +1,5 @@
 set "CI=azure"
-call %CONDA%\\condabin\\conda_hook.bat
-call %CONDA%\\condabin\\conda.bat activate base
+call activate base
 
 :: 2 cores available on Appveyor workers: https://www.appveyor.com/docs/build-environment/#build-vm-configurations
 :: CPU_COUNT is passed through conda build: https://github.com/conda/conda-build/pull/1149
