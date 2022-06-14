@@ -238,10 +238,14 @@ def build_linux_pipeline(
     script=azure_linux_script,
     azure_template=None,
     docker_image=None,
+    runs_on=None,
     outfile="linux.yml",
 ):
 
     blurb = {"jobs": {}}
+
+    if runs_on is None:
+        runs_on = "ubuntu-latest"
 
     # Build Linux pipeline
     if azure_template is None:
@@ -264,7 +268,7 @@ def build_linux_pipeline(
             pretty_stage_name = get_stage_name(batch)
             azure_template["jobs"][batch_key] = {
                 "name": pretty_stage_name,
-                "runs-on": "ubuntu-latest",
+                "runs-on": runs_on,
                 "strategy": {"fail-fast": False},
                 "needs": prev_batch_keys,
                 "steps": [
@@ -561,15 +565,10 @@ def main():
 
     if args.platform == "linux-aarch64":
         # Build aarch64 pipeline
-        aarch64_azure_template = {
-            "runs-on": ["self-hosted", "linux", "ARM64"],
-            "jobs": {}
-        }
-
         build_linux_pipeline(
             stages,
             args.trigger_branch,
-            azure_template=aarch64_azure_template,
+            runs_on=["self-hosted", "linux", "ARM64"],
             docker_image="condaforge/linux-anvil-aarch64",
             outfile="linux_aarch64.yml",
         )

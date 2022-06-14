@@ -344,14 +344,18 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml"):
                             "displayName": "Download Miniforge",
                             "inputs": {
                                 "scriptSource": "inline",
-                                "script": lu("""import urllib.request
+                                "script": lu(
+                                    """import urllib.request
 url = 'https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Windows-x86_64.exe'
 path = r"$(Build.ArtifactStagingDirectory)/Miniforge.exe"
-urllib.request.urlretrieve(url, path)"""),
+urllib.request.urlretrieve(url, path)"""
+                                ),
                             },
                         },
                         {
-                            "script": lu("""start /wait "" %BUILD_ARTIFACTSTAGINGDIRECTORY%\\Miniforge.exe /InstallationType=JustMe /RegisterPython=0 /S /D=C:\\Miniforge"""),
+                            "script": lu(
+                                """start /wait "" %BUILD_ARTIFACTSTAGINGDIRECTORY%\\Miniforge.exe /InstallationType=JustMe /RegisterPython=0 /S /D=C:\\Miniforge"""
+                            ),
                             "displayName": "Install Miniforge",
                         },
                         {
@@ -359,8 +363,10 @@ urllib.request.urlretrieve(url, path)"""),
                             "displayName": "Add conda to PATH",
                         },
                         {
-                            "script": lu("""call activate base
-mamba.exe install -c conda-forge --yes --quiet conda-build pip ruamel.yaml anaconda-client"""),
+                            "script": lu(
+                                """call activate base
+mamba.exe install -c conda-forge --yes --quiet conda-build pip ruamel.yaml anaconda-client"""
+                            ),
                             "displayName": "Install conda-build, boa and activate environment",
                         },
                         {
