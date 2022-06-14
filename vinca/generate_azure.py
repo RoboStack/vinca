@@ -359,7 +359,8 @@ urllib.request.urlretrieve(url, path)"""),
                             "displayName": "Add conda to PATH",
                         },
                         {
-                            "script": "mamba.exe install -c conda-forge --yes --quiet conda-build pip ruamel.yaml anaconda-client",
+                            "script": lu("""call activate base
+mamba.exe install -c conda-forge --yes --quiet conda-build pip ruamel.yaml anaconda-client"""),
                             "displayName": "Install conda-build, boa and activate environment",
                         },
                         {
