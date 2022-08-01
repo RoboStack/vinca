@@ -37,6 +37,10 @@ if [[ $target_platform =~ linux.* ]]; then
     export CXXFLAGS="${CXXFLAGS} -D__STDC_FORMAT_MACROS=1"
 fi;
 
+# Needed for qt-gui-cpp ..
+ln -s $GCC $BUILD_PREFIX/bin/gcc
+ln -s $GXX $BUILD_PREFIX/bin/g++
+
 cmake \
     -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX=$PREFIX \
