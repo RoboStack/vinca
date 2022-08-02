@@ -38,8 +38,13 @@ if [[ $target_platform =~ linux.* ]]; then
 fi;
 
 # Needed for qt-gui-cpp ..
-ln -s $GCC $BUILD_PREFIX/bin/gcc
-ln -s $GXX $BUILD_PREFIX/bin/g++
+if [[ $target_platform =~ linux.* ]]; then
+  ln -s $GCC $BUILD_PREFIX/bin/gcc
+  ln -s $GXX $BUILD_PREFIX/bin/g++
+else
+  ln -s $CC $BUILD_PREFIX/bin/clang
+  ln -s $CXX $BUILD_PREFIX/bin/clang++
+fi;
 
 cmake \
     -G "Ninja" \
