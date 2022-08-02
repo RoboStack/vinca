@@ -42,8 +42,8 @@ if [[ $target_platform =~ linux.* ]]; then
   ln -s $GCC $BUILD_PREFIX/bin/gcc
   ln -s $GXX $BUILD_PREFIX/bin/g++
 else
-  ln -s $CC $BUILD_PREFIX/bin/clang
-  ln -s $CXX $BUILD_PREFIX/bin/clang++
+  ln -s $CC_FOR_BUILD $BUILD_PREFIX/bin/clang
+  ln -s $CXX_FOR_BUILD $BUILD_PREFIX/bin/clang++
 fi;
 
 cmake \
