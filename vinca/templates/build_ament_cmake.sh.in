@@ -39,11 +39,8 @@ fi;
 
 # Needed for qt-gui-cpp ..
 if [[ $target_platform =~ linux.* ]]; then
-  ln -s $GCC $BUILD_PREFIX/bin/gcc || echo "Failed to create symlink to gcc"
-  ln -s $GXX $BUILD_PREFIX/bin/g++ || echo "Failed to create symlink to g++"
-else
-  ln -s $CC_FOR_BUILD $BUILD_PREFIX/bin/clang || echo "Failed to create symlink to clang"
-  ln -s $CXX_FOR_BUILD $BUILD_PREFIX/bin/clang++ || echo "Failed to create symlink to clang++"
+  ln -s $GCC $BUILD_PREFIX/bin/gcc
+  ln -s $GXX $BUILD_PREFIX/bin/g++
 fi;
 
 cmake \
