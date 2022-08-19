@@ -242,7 +242,7 @@ def build_linux_pipeline(
     outfile="linux.yml",
 ):
 
-    blurb = {"jobs": {}}
+    blurb = {"jobs": {}, "name": "build_linux"}
 
     if runs_on is None:
         runs_on = "ubuntu-latest"
@@ -304,7 +304,7 @@ def build_osx_pipeline(
     script=azure_osx_script,
 ):
     # Build OSX pipeline
-    blurb = {"jobs": {}}
+    blurb = {"jobs": {}, "name": "build_osx"}
 
     # Build Linux pipeline
     if azure_template is None:
@@ -352,10 +352,9 @@ def build_osx_pipeline(
 def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template=None):
 
     vm_imagename = "windows-2019"
-    # Build OSX pipeline
-    blurb = {"jobs": {}}
+    # Build Win pipeline
+    blurb = {"jobs": {}, "name": "build_win"}
 
-    # Build Linux pipeline
     if azure_template is None:
         azure_template = blurb
 
