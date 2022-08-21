@@ -73,6 +73,7 @@ def parse_command_line(argv):
         "--batch_size",
         dest="batch_size",
         default=5,
+        type=int,
         help="How many packages to build at most per stage",
     )
 
