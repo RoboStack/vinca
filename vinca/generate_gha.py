@@ -67,6 +67,14 @@ def parse_command_line(argv):
         action="store_true",
         help="search for additional_recipes folder?",
     )
+    
+    parser.add_argument(
+        "-b",
+        "--batch_size",
+        dest="batch_size",
+        default=5,
+        help="How many packages to build at most per stage",
+    )
 
     arguments = parser.parse_args(argv[1:])
     config.parsed_args = arguments
@@ -533,7 +541,7 @@ def main():
         if len(filtered):
             filtered_stages.append(filtered)
 
-    stages = batch_stages(filtered_stages)
+    stages = batch_stages(filtered_stages, args.batch_size)
     print(stages)
 
     with open("buildorder.txt", "w") as fo:
