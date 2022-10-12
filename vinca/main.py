@@ -101,6 +101,15 @@ def parse_command_line(argv):
         help="Create one recipe for package.",
     )
     parser.add_argument(
+        "-n",
+        "--trigger-new-versions",
+        dest="trigger_new_versions",
+        action="store_const",
+        const=True,
+        default=False,
+        help="Trigger the build of packages that have new versions available.",
+    )
+    parser.add_argument(
         "--source",
         dest="source",
         action="store_const",
@@ -208,8 +217,12 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     if not pkg_names:
         return None
 
-    if (pkg_names[0], version) in vinca_conf["skip_built_packages"]:
-        return None
+    if vinca_conf["trigger_new_versions"]:
+        if (pkg_names[0], version) in vinca_conf["skip_built_packages"]:
+            return None
+    else:
+        if pkg_names[0] in vinca_conf["skip_built_packages"]:
+            return None
 
     # TODO: Remove hardcoded cmake version after building new versions of ament_cmake_export_target
     # see: https://github.com/ament/ament_cmake/commit/796cef7d7df2ddb806f774a9889e608cc82285d3
@@ -568,8 +581,12 @@ def generate_source(distro, vinca_conf):
         print("Checking ", pkg_shortname, pkg_version)
         if not pkg_names:
             continue
-        if (pkg_names[0], pkg_version) in vinca_conf["skip_built_packages"]:
-            continue
+        if vinca_conf["trigger_new_versions"]:
+            if (pkg_names[0], pkg_version) in vinca_conf["skip_built_packages"]:
+                continue
+        else:
+            if pkg_names[0] in vinca_conf["skip_built_packages"]:
+                continue
         pkg_name = pkg_names[0]
         entry["folder"] = "%s/src/work" % pkg_name
 
@@ -611,11 +628,15 @@ def generate_source_version(distro, vinca_conf):
         entry["git_url"] = url
         entry["git_rev"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-        if (
-            not pkg_names
-            or (pkg_names[0], version) in vinca_conf["skip_built_packages"]
-        ):
-            continue
+        if vinca_conf["trigger_new_versions"]:
+            if (
+                not pkg_names
+                or (pkg_names[0], version) in vinca_conf["skip_built_packages"]
+            ):
+                continue
+        else:
+            if not pkg_names or pkg_names[0] in vinca_conf["skip_built_packages"]:
+                continue            
         pkg_name = pkg_names[0]
         entry["folder"] = "%s/src/work" % pkg_name
 
@@ -871,6 +892,9 @@ def main():
     generate_bld_colcon_merge()
     generate_bld_catkin_merge()
     generate_activate_hook()
+    
+    if arguments.trigger_new_versions:
+        vinca_conf["trigger_new_versions"] = True
 
     if arguments.package:
         pkg_files = glob.glob(arguments.package)
@@ -968,7 +992,10 @@ def main():
 
                     if is_built:
                         print(f"Skipping {pkg['name']}")
-                        skip_built_packages.add((pkg["name"], pkg["version"]))
+                        if vinca_conf["trigger_new_versions"]:
+                            skip_built_packages.add((pkg["name"], pkg["version"]))
+                        else:
+                            skip_built_packages.add(pkg["name"])
 
                 vinca_conf["skip_built_packages"] = skip_built_packages
         else:
