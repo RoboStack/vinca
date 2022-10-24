@@ -40,9 +40,9 @@ if [[ "$CONDA_BUILD_CROSS_COMPILATION" == "1" ]]; then
   find $PREFIX/share/rosidl* -type f -exec sed -i "s~\${_IMPORT_PREFIX}/lib/python$ROS_PYTHON_VERSION/site-packages~$BUILD_PREFIX/lib/python$ROS_PYTHON_VERSION/site-packages~g" {} + || true
   find $PREFIX/lib/cmake -type f -exec sed -i "s~message(FATAL_ERROR \"The imported target~message(WARNING \"The imported target~g" {} + || true
   # way around bad CPU type issues
-  rm $PREFIX/bin/doxygen || echo "doxygen not found"
-  rm $PREFIX/bin/dia || echo "dia not found"
-  rm $PREFIX/bin/dot || echo "dot not found"
+  # rm $PREFIX/bin/doxygen || echo "doxygen not found"
+  # rm $PREFIX/bin/dia || echo "dia not found"
+  # rm $PREFIX/bin/dot || echo "dot not found"
 fi
 
 # NOTE: there might be undefined references occurring
