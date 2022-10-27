@@ -203,6 +203,8 @@ def read_vinca_yaml(filepath):
         vinca_conf, os.path.dirname(filepath)
     )
 
+    vinca_conf["trigger_new_versions"] = vinca_conf.get("trigger_new_versions", False)
+
     return vinca_conf
 
 
@@ -217,7 +219,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     if not pkg_names:
         return None
 
-    if vinca_conf["trigger_new_versions"]:
+    if vinca_conf.get("trigger_new_versions"):
         if (pkg_names[0], version) in vinca_conf["skip_built_packages"]:
             return None
     else:
@@ -590,7 +592,7 @@ def generate_source(distro, vinca_conf):
         print("Checking ", pkg_shortname, pkg_version)
         if not pkg_names:
             continue
-        if vinca_conf["trigger_new_versions"]:
+        if vinca_conf.get("trigger_new_versions"):
             if (pkg_names[0], pkg_version) in vinca_conf["skip_built_packages"]:
                 continue
         else:
@@ -637,7 +639,7 @@ def generate_source_version(distro, vinca_conf):
         entry["git_url"] = url
         entry["git_rev"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-        if vinca_conf["trigger_new_versions"]:
+        if vinca_conf.get("trigger_new_versions"):
             if (
                 not pkg_names
                 or (pkg_names[0], version) in vinca_conf["skip_built_packages"]
