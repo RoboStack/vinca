@@ -237,15 +237,18 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 "ninja",
                 {"sel(unix)": "make"},
                 {"sel(osx)": "tapi"},
+                {"sel(build_platform != target_platform)": "pkg-config"}
                 # {"sel(linux)": "sysroot_linux-64 2.17"},
-                "cmake 3.23",
+                "cmake",
                 {"sel(build_platform != target_platform)": "python"},
                 {
                     "sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"
                 },
                 {"sel(build_platform != target_platform)": "cython"},
             ],
-            "host": [],
+            "host": [
+                {"sel(build_platform == target_platform)": "pkg-config"}
+            ],
             "run": [],
         },
         "build": {"script": ""},
@@ -411,20 +414,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             {"sel(build_platform != target_platform)": "pybind11"}
         ]
     # pkg-config + pyqt-builder + git + doxygen must be in build, not host for cross-compile
-    if "pkg-config" in output["requirements"]["host"]:
-        output["requirements"]["build"] += [
-            {"sel(build_platform != target_platform)": "pkg-config"}
-        ]
-        while "pkg-config" in output["requirements"]["host"]:
-            output["requirements"]["host"].remove("pkg-config")
-        output["requirements"]["host"] += [
-            {"sel(build_platform == target_platform)": "pkg-config"}
-        ]
     if "doxygen" in output["requirements"]["host"]:
         output["requirements"]["build"] += [
             {"sel(build_platform != target_platform)": "doxygen"}
         ]
-        while "pkg-config" in output["requirements"]["host"]:
+        while "doxygen" in output["requirements"]["host"]:
             output["requirements"]["host"].remove("doxygen")
         output["requirements"]["host"] += [
             {"sel(build_platform == target_platform)": "doxygen"}
