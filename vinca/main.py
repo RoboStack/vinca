@@ -235,7 +235,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 "{{ compiler('cxx') }}",
                 "{{ compiler('c') }}",
                 "ninja",
-                "pip",
                 "setuptools",
                 {"sel(unix)": "make"},
                 {"sel(osx)": "tapi"},
@@ -252,6 +251,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             "host": [
                 {"sel(build_platform == target_platform)": "pkg-config"},
                 "numpy",
+                "pip",
             ],
             "run": [],
         },
