@@ -236,7 +236,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 "{{ compiler('c') }}",
                 "ninja",
                 "pip",
-                "setuptools"
+                "setuptools",
                 {"sel(unix)": "make"},
                 {"sel(osx)": "tapi"},
                 {"sel(build_platform != target_platform)": "pkg-config"},
