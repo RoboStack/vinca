@@ -235,6 +235,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 "{{ compiler('cxx') }}",
                 "{{ compiler('c') }}",
                 "ninja",
+                "pip",
+                "setuptools"
                 {"sel(unix)": "make"},
                 {"sel(osx)": "tapi"},
                 {"sel(build_platform != target_platform)": "pkg-config"},
@@ -245,9 +247,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                     "sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"
                 },
                 {"sel(build_platform != target_platform)": "cython"},
+                {"sel(build_platform != target_platform)": "numpy"},
             ],
             "host": [
                 {"sel(build_platform == target_platform)": "pkg-config"},
+                "numpy",
             ],
             "run": [],
         },
@@ -380,14 +384,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             while dep in output["requirements"][dep_type]:
                 output["requirements"][dep_type].remove(dep)
 
-    # workaround as rosidl-generator-py cmake needs numpy
-    if (
-        f"ros-{config.ros_distro}-rosidl-generator-py" in output["requirements"]["host"]
-        or f"ros-{config.ros_distro}-rosidl-default-generators"
-        in output["requirements"]["host"]
-    ):
-        output["requirements"]["host"].append("numpy")
-
     def sortkey(k):
         if isinstance(k, dict):
             return list(k.values())[0]
@@ -402,11 +398,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         }
     ]
 
-    # add cross-platform stuff; only do if needed otherwise weird segfaults may occur
-    if "numpy" in output["requirements"]["host"]:
-        output["requirements"]["build"] += [
-            {"sel(build_platform != target_platform)": "numpy"}
-        ]
     if f"ros-{config.ros_distro}-pybind11-vendor" in output["requirements"]["host"]:
         output["requirements"]["host"] += ["pybind11"]
     if "pybind11" in output["requirements"]["host"]:
