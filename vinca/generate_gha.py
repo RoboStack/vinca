@@ -281,7 +281,7 @@ def build_linux_pipeline(
                 "strategy": {"fail-fast": False},
                 "needs": prev_batch_keys,
                 "steps": [
-                    {"name": "Checkout code", "uses": "actions/checkout@v2"},
+                    {"name": "Checkout code", "uses": "actions/checkout@v3"},
                     {
                         "name": f"Build {' '.join([pkg for pkg in batch])}",
                         "env": {
