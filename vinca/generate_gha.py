@@ -576,7 +576,7 @@ def main():
         build_linux_pipeline(
             stages,
             args.trigger_branch,
-            runs_on=["self-hosted", "linux", "ARM64"],
+            runs_on="cirun-linux-aarch64--${{ github.run_id }}",
             docker_image="condaforge/linux-anvil-aarch64",
             outfile="linux_aarch64.yml",
         )
