@@ -15,7 +15,7 @@ else
 fi
 
 case "$OSTYPE" in
-  darwin*)  export ROS_OS_OVERRIDE="conda:osx";;
+  darwin*)  export ROS_OS_OVERRIDE="conda:osx"; export RMW_IMPLEMENTATION="rmw_cyclonedds_cpp";;
   linux*)   export ROS_OS_OVERRIDE="conda:linux";;
 esac
 
