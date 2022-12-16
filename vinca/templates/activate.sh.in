@@ -15,16 +15,12 @@ else
 fi
 
 case "$OSTYPE" in
-  darwin*)  export ROS_OS_OVERRIDE="conda:osx";;
+  darwin*)  export ROS_OS_OVERRIDE="conda:osx"; export RMW_IMPLEMENTATION="rmw_cyclonedds_cpp";;
   linux*)   export ROS_OS_OVERRIDE="conda:linux";;
 esac
 
 export ROS_ETC_DIR=$CONDA_PREFIX/etc/ros
 export AMENT_PREFIX_PATH=$CONDA_PREFIX
-
-if [ "$OSTYPE" = "darwin*" ]; then
-    export RMW_IMPLEMENTATION="rmw_cyclonedds_cpp"
-fi
 
 # Looks unnecessary for UNIX
 # unset PYTHONHOME=
