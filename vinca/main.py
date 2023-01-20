@@ -239,7 +239,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 {"sel(unix)": "make"},
                 {"sel(osx)": "tapi"},
                 {"sel(build_platform != target_platform)": "pkg-config"},
-                {"sel(linux)": "sysroot_linux-64 2.17"},
+                # Does not yet work: https://github.com/mamba-org/boa/issues/284
+                # {"sel(linux)": "sysroot_linux-64 2.17"},
                 "cmake",
                 {"sel(build_platform != target_platform)": "python"},
                 {
