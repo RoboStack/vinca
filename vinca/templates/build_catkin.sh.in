@@ -56,6 +56,8 @@ if [[ $target_platform =~ linux.* ]]; then
     export CXXFLAGS="$CXXFLAGS -D__STDC_FORMAT_MACROS=1";
     # I am too scared to turn this on for now ...
     # export LDFLAGS="$LDFLAGS -lrt";
+    # Some qt stuff uses g++ directly - fix these use cases
+    ln -s $GXX $BUILD_PREFIX/bin/g++
 fi
 
 export SKIP_TESTING=@(skip_testing)
