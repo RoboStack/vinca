@@ -237,6 +237,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 "ninja",
                 "setuptools",
                 {"sel(unix)": "make"},
+                {"sel(unix)": "coreutils"},
                 {"sel(osx)": "tapi"},
                 {"sel(build_platform != target_platform)": "pkg-config"},
                 # Does not yet work: https://github.com/mamba-org/boa/issues/284
@@ -736,6 +737,7 @@ def parse_package(pkg, distro, vinca_conf, path):
                 "{{ compiler('c') }}",
                 "ninja",
                 {"sel(unix)": "make"},
+                {"sel(unix)": "coreutils"},
                 "cmake",
                 {"sel(build_platform != target_platform)": "python"},
                 {
