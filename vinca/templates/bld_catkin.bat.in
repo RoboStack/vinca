@@ -7,6 +7,13 @@ set "PYTHONPATH=%LIBRARY_PREFIX%\lib\site-packages;%SP_DIR%"
 set CC=cl.exe
 set CXX=cl.exe
 
+:: ROS_BUILD_SHARED_LIBS is always defined in CMake by catkin
+:: if ROS (1) is build as shared library . However, some packages are not
+:: passing compilation flags from CMake to other build systems (such as qmake),
+:: so we enable it explicitly via the CL environment variable, see
+:: https://learn.microsoft.com/en-us/cpp/build/reference/cl-environment-variables?view=msvc-170
+set CL=/DROS_BUILD_SHARED_LIBS=1
+
 set "CATKIN_BUILD_BINARY_PACKAGE_ARGS=-DCATKIN_BUILD_BINARY_PACKAGE=1"
 if "%PKG_NAME%" == "ros-@(ros_distro)-catkin" (
     :: create catkin cookie to make it is a catkin workspace
