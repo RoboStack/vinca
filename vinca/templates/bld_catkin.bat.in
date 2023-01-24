@@ -6,7 +6,7 @@ set "PYTHONPATH=%LIBRARY_PREFIX%\lib\site-packages;%SP_DIR%"
 :: MSVC is preferred.
 set CC=cl.exe
 set CXX=cl.exe
-https://learn.microsoft.com/en-us/cpp/build/reference/cl-environment-variables?view=msvc-170
+
 :: ROS_BUILD_SHARED_LIBS is always defined in CMake by catkin
 :: if ROS (1) is build as shared library . However, some packages are not
 :: passing compilation flags from CMake to other build systems (such as qmake),
