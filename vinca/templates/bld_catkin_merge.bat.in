@@ -11,7 +11,7 @@ set CXX=cl.exe
 :: passing compilation flags from CMake to other build systems (such as qmake),
 :: so we enable it explicitly via the CL environment variable, see
 :: https://learn.microsoft.com/en-us/cpp/build/reference/cl-environment-variables?view=msvc-170
-set CL=/DROS_BUILD_SHARED_LIBS=1
+set CL=/DROS_BUILD_SHARED_LIBS=1 /DNOGDI=1
 
 set CATKIN_MAKE_ISOLATED=src\ros-@(ros_distro)-catkin\bin\catkin_make_isolated
 set CMAKE_PREFIX_PATH=%CMAKE_PREFIX_PATH:\=/%
