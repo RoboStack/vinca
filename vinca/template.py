@@ -85,8 +85,10 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
             if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
                 shutil.copyfile("activate.sh", recipe_dir / "activate.sh")
                 shutil.copyfile("activate.bat", recipe_dir / "activate.bat")
+                shutil.copyfile("activate.ps1", recipe_dir / "activate.ps1")
                 shutil.copyfile("deactivate.sh", recipe_dir / "deactivate.sh")
                 shutil.copyfile("deactivate.bat", recipe_dir / "deactivate.bat")
+                shutil.copyfile("deactivate.ps1", recipe_dir / "deactivate.ps1")
 
 
 def generate_template(template_in, template_out):
@@ -164,10 +166,14 @@ def generate_activate_hook():
 
     template_in = pkg_resources.resource_filename("vinca", "templates/activate.bat.in")
     generate_template(template_in, open("activate.bat", "w"))
-    template_in = pkg_resources.resource_filename(
-        "vinca", "templates/deactivate.bat.in"
-    )
+    template_in = pkg_resources.resource_filename("vinca", "templates/deactivate.bat.in")
     generate_template(template_in, open("deactivate.bat", "w"))
+    
+    template_in = pkg_resources.resource_filename("vinca", "templates/activate.ps1.in")
+    generate_template(template_in, open("activate.ps1", "w"))
+    template_in = pkg_resources.resource_filename("vinca", "templates/deactivate.ps1.in")
+    generate_template(template_in, open("deactivate.ps1", "w"))
+    
     template_in = pkg_resources.resource_filename("vinca", "templates/activate.sh.in")
     generate_template(template_in, open("activate.sh", "w"))
     template_in = pkg_resources.resource_filename("vinca", "templates/deactivate.sh.in")
