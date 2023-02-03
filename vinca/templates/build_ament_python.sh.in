@@ -8,7 +8,11 @@ grep -q "install[-_]scripts" setup.cfg
 if [ $? -eq 0 ]; then
   INSTALL_SCRIPTS_ARG=""
 else
-  INSTALL_SCRIPTS_ARG="--install-scripts=$PREFIX/lib/$PKG_NAME"
+  # this is not quite what we want as PKG_NAME contains ros-humble- ..
+  # INSTALL_SCRIPTS_ARG="--install-scripts=$PREFIX/lib/$PKG_NAME"
+  # therefore for now throw an error as packages should have a setup.cfg
+  echo "This package is missing a setup.cfg, stopping."
+  exit 1
 fi
 
 # Old: This installs the binaries in the wrong location - see https://github.com/RoboStack/ros-humble/issues/41
