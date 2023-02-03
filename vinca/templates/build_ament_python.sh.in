@@ -2,4 +2,15 @@
 # DO NOT EDIT!
 
 pushd $SRC_DIR/$PKG_NAME/src/work
-$PYTHON -m pip install . --no-deps -vvv
+
+# If there is a setup.cfg that contains install-scripts then we should not set it here
+grep -q "install[-_]scripts" setup.cfg
+if [ $? -eq 0 ]; then
+  INSTALL_SCRIPTS_ARG=""
+else
+  INSTALL_SCRIPTS_ARG="--install-scripts=$PREFIX/lib/$PKG_NAME"
+fi
+
+# Old: This installs the binaries in the wrong location - see https://github.com/RoboStack/ros-humble/issues/41
+# $PYTHON -m pip install . --no-deps -vvv
+$PYTHON setup.py install --prefix="$PREFIX" --install-lib="$SP_DIR" $INSTALL_SCRIPTS_ARG
