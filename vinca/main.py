@@ -234,6 +234,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             "build": [
                 "{{ compiler('cxx') }}",
                 "{{ compiler('c') }}",
+                {"sel(linux64)": "sysroot_linux-64 2.17"},
                 "ninja",
                 "setuptools",
                 {"sel(unix)": "make"},
@@ -735,6 +736,7 @@ def parse_package(pkg, distro, vinca_conf, path):
             "build": [
                 "{{ compiler('cxx') }}",
                 "{{ compiler('c') }}",
+                {"sel(linux64)": "sysroot_linux-64 2.17"},
                 "ninja",
                 {"sel(unix)": "make"},
                 {"sel(unix)": "coreutils"},
