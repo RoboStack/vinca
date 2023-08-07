@@ -24,27 +24,7 @@ echo "USING PKG_CONFIG_EXECUTABLE=${PKG_CONFIG_EXECUTABLE}"
 export ROS_PYTHON_VERSION=`$PYTHON_EXECUTABLE -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
 
 if [[ $target_platform =~ emscripten.* ]]; then
-  # Use emcmake to configure cmake correctly for cross compilation
-  # export CMAKE_CMD="emcmake ${CMAKE_CMD}"
-  # Set python exe to the binary installed to the build_env
-  # export PYTHON_EXECUTABLE=$BUILD_PREFIX/bin/python
-  # export PYTHONHOME="$BUILD_PREFIX"
-  # export PYTHONPATH="$BUILD_PREFIX:$BUILD_PREFIX/lib/python${ROS_PYTHON_VERSION}/site-packages"
-  # echo "Doing some tests with python"
-  # $PYTHON_EXECUTABLE -c "import sys; print('sys.prefix:', sys.prefix)"
-  # $PYTHON_EXECUTABLE -c "import sys; print('sys.exec_prefix:', sys.exec_prefix)"
-  # $PYTHON_EXECUTABLE -c "import sys; print('sys.path:', sys.path)"
-  # $PYTHON_EXECUTABLE -c "import site; print('site-packages:', site.getsitepackages())"
-  # $PYTHON_EXECUTABLE -c "import site; print('user site-packages:', site.getusersitepackages())"
-  # $PYTHON_EXECUTABLE -c "import os; print('os.environ', os.environ)"
-  # $PYTHON_EXECUTABLE -c "import ament_package; print(ament_package)"
-  # echo "Finished tests with python"
-
-  export EXTRA_CMAKE_ARGS="\
-    -DCMAKE_TOOLCHAIN_FILE=~/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake \
-    -DTHREADS_PREFER_PTHREAD_FLAG=TRUE \
-    -DCMAKE_CROSSCOMPILING=TRUE "
-
+  export EXTRA_CMAKE_ARGS="-DTHREADS_PREFER_PTHREAD_FLAG=TRUE"
    #  -DCMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH=TRUE \
    #  -DCMAKE_FIND_USE_CMAKE_PATH=TRUE \
    #  -DPython_SITELIB=$SP_DIR \
@@ -52,6 +32,13 @@ if [[ $target_platform =~ emscripten.* ]]; then
    #  --debug-output \
    #  --debug-trycompile \
    # "
+else
+  export EXTRA_CMAKE_ARGS=" \
+    -DPYTHON_EXECUTABLE=$PYTHON_EXECUTABLE \
+    -DPython_EXECUTABLE=$PYTHON_EXECUTABLE \
+    -DPython3_EXECUTABLE=$PYTHON_EXECUTABLE \
+    -DPYTHON_INSTALL_DIR=$SP_DIR \
+    "
 fi;
 
 export ROS_PYTHON_SP=`$PYTHON_EXECUTABLE -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())"`
@@ -86,11 +73,7 @@ cmake \
     -DAMENT_PREFIX_PATH=$PREFIX \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_BUILD_TYPE=Release \
-    -DPYTHON_EXECUTABLE=$PYTHON_EXECUTABLE \
-    -DPython_EXECUTABLE=$PYTHON_EXECUTABLE \
-    -DPython3_EXECUTABLE=$PYTHON_EXECUTABLE \
     -DPKG_CONFIG_EXECUTABLE=$PKG_CONFIG_EXECUTABLE \
-    -DPYTHON_INSTALL_DIR=$SP_DIR \
     -DSETUPTOOLS_DEB_LAYOUT=OFF \
     -DCATKIN_SKIP_TESTING=$SKIP_TESTING \
     -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=True \

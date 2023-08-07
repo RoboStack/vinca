@@ -177,9 +177,9 @@ def read_vinca_yaml(filepath):
     for x in glob.glob(os.path.join(vinca_conf["_patch_dir"], "*.patch")):
         splitted = os.path.basename(x).split(".")
         if splitted[0] not in patches:
-            patches[splitted[0]] = {"any": [], "osx": [], "linux": [], "win": [], "emscripten-32": []}
+            patches[splitted[0]] = {"any": [], "osx": [], "linux": [], "win": [], "emscripten": []}
         if len(splitted) == 3:
-            if splitted[1] in ("osx", "linux", "win" , "emscripten-32"):
+            if splitted[1] in ("osx", "linux", "win" , "emscripten"):
                 patches[splitted[0]][splitted[1]].append(x)
                 continue
             if splitted[1] == "unix":
