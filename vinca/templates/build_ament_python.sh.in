@@ -17,6 +17,12 @@ else
   echo "WARNING: setup.cfg not set, will set INSTALL_SCRIPTS_ARG to: $INSTALL_SCRIPTS_ARG"
 fi
 
-# Old: This installs the binaries in the wrong location - see https://github.com/RoboStack/ros-humble/issues/41
-# $PYTHON -m pip install . --no-deps -vvv
-$PYTHON setup.py install --prefix="$PREFIX" --install-lib="$SP_DIR" $INSTALL_SCRIPTS_ARG
+if [[ "$PKG_NAME" =~ ament-* ]]; then
+  # Old: This installs the binaries in the wrong location - see https://github.com/RoboStack/ros-humble/issues/41
+  #
+  # CMakeLists in some ament_* packages expect the python packages to be installed in a subfolder of the site-packages path.
+  # Running the setup.py packages the python lib into a .egg breaking these scripts.
+  $PYTHON -m pip install . --no-deps -vvv
+else
+  $PYTHON setup.py install --prefix="$PREFIX" --install-lib="$SP_DIR" $INSTALL_SCRIPTS_ARG
+fi
