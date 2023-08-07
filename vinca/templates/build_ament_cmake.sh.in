@@ -24,7 +24,12 @@ echo "USING PKG_CONFIG_EXECUTABLE=${PKG_CONFIG_EXECUTABLE}"
 export ROS_PYTHON_VERSION=`$PYTHON_EXECUTABLE -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
 
 if [[ $target_platform =~ emscripten.* ]]; then
-  export EXTRA_CMAKE_ARGS="-DTHREADS_PREFER_PTHREAD_FLAG=TRUE"
+  export EXTRA_CMAKE_ARGS="-DTHREADS_PREFER_PTHREAD_FLAG=TRUE\
+    -DCMAKE_INSTALL_PREFIX=$BUILD_PREFIX \
+    -DCMAKE_PREFIX_PATH=$BUILD_PREFIX \
+    -DAMENT_PREFIX_PATH=$BUILD_PREFIX \
+    "
+
    #  -DCMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH=TRUE \
    #  -DCMAKE_FIND_USE_CMAKE_PATH=TRUE \
    #  -DPython_SITELIB=$SP_DIR \
@@ -32,13 +37,23 @@ if [[ $target_platform =~ emscripten.* ]]; then
    #  --debug-output \
    #  --debug-trycompile \
    # "
+
+   unset -f cmake
+   export CMAKE_GEN="emcmake cmake"
+   export CMAKE_BLD="cmake"
 else
   export EXTRA_CMAKE_ARGS=" \
     -DPYTHON_EXECUTABLE=$PYTHON_EXECUTABLE \
     -DPython_EXECUTABLE=$PYTHON_EXECUTABLE \
     -DPython3_EXECUTABLE=$PYTHON_EXECUTABLE \
     -DPYTHON_INSTALL_DIR=$SP_DIR \
+    -DCMAKE_INSTALL_PREFIX=$PREFIX \
+    -DCMAKE_PREFIX_PATH=$PREFIX \
+    -DAMENT_PREFIX_PATH=$PREFIX \
     "
+
+   export CMAKE_GEN="cmake"
+   export CMAKE_BLD="cmake"
 fi;
 
 export ROS_PYTHON_SP=`$PYTHON_EXECUTABLE -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())"`
@@ -66,11 +81,8 @@ if [[ $target_platform =~ linux.* ]]; then
   ln -s $GXX ${BUILD_PREFIX}/bin/g++
 fi;
 
-cmake \
+$CMAKE_GEN \
     -G "Ninja" \
-    -DCMAKE_INSTALL_PREFIX=$PREFIX \
-    -DCMAKE_PREFIX_PATH=$PREFIX \
-    -DAMENT_PREFIX_PATH=$PREFIX \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_BUILD_TYPE=Release \
     -DPKG_CONFIG_EXECUTABLE=$PKG_CONFIG_EXECUTABLE \
@@ -83,4 +95,4 @@ cmake \
     $EXTRA_CMAKE_ARGS \
     $SRC_DIR/$PKG_NAME/src/work
 
-cmake --build . --config Release --target install
+$CMAKE_BLD --build . --config Release --target install

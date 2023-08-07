@@ -33,6 +33,32 @@ echo "USING PKG_CONFIG_EXECUTABLE=${PKG_CONFIG_EXECUTABLE}"
 export ROS_PYTHON_VERSION=`$PYTHON_EXECUTABLE -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
 echo "Using Python $ROS_PYTHON_VERSION"
 
+if [[ $target_platform =~ emscripten.* ]]; then
+  export EXTRA_CMAKE_ARGS="-DTHREADS_PREFER_PTHREAD_FLAG=TRUE\
+    -DCMAKE_INSTALL_PREFIX=$BUILD_PREFIX \
+    -DCMAKE_PREFIX_PATH=$BUILD_PREFIX \
+    -DAMENT_PREFIX_PATH=$BUILD_PREFIX \
+    "
+
+   #  -DCMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH=TRUE \
+   #  -DCMAKE_FIND_USE_CMAKE_PATH=TRUE \
+   #  -DPython_SITELIB=$SP_DIR \
+   #  -DPYTHONHOME=$BUILD_PREFIX \
+   #  --debug-output \
+   #  --debug-trycompile \
+   # "
+
+   unset -f cmake
+   export CMAKE_GEN="emcmake cmake"
+   export CMAKE_BLD="cmake"
+else
+  export EXTRA_CMAKE_ARGS=" \
+    "
+
+   export CMAKE_GEN="cmake"
+   export CMAKE_BLD="cmake"
+fi;
+
 # see https://github.com/conda-forge/cross-python-feedstock/issues/24
 if [[ "$CONDA_BUILD_CROSS_COMPILATION" == "1" ]]; then
   find $PREFIX/lib/cmake -type f -exec sed -i "s~\${_IMPORT_PREFIX}/lib/python$ROS_PYTHON_VERSION/site-packages~$BUILD_PREFIX/lib/python$ROS_PYTHON_VERSION/site-packages~g" {} + || true
@@ -62,17 +88,13 @@ fi
 
 export SKIP_TESTING=@(skip_testing)
 
-cmake ${CMAKE_ARGS} -DCMAKE_INSTALL_PREFIX=$PREFIX \
-         -DCMAKE_PREFIX_PATH=$PREFIX \
+$CMAKE_GEN ${CMAKE_ARGS} \
+         $EXTRA_CMAKE_ARGS \
          -DCMAKE_BUILD_TYPE=Release \
          -DCMAKE_INSTALL_LIBDIR=lib \
          -DCMAKE_NO_SYSTEM_FROM_IMPORTED=ON \
          -DCMAKE_FIND_FRAMEWORK=LAST \
          -DBUILD_SHARED_LIBS=ON \
-         -DPYTHON_EXECUTABLE=$PYTHON_EXECUTABLE \
-         -DPython_EXECUTABLE=$PYTHON_EXECUTABLE \
-         -DPython3_EXECUTABLE=$PYTHON_EXECUTABLE \
-         -DPYTHON_INSTALL_DIR=$SP_DIR \
          -DPKG_CONFIG_EXECUTABLE=$PKG_CONFIG_EXECUTABLE \
          -DSETUPTOOLS_DEB_LAYOUT=OFF \
          -DCATKIN_SKIP_TESTING=$SKIP_TESTING \
@@ -81,13 +103,13 @@ cmake ${CMAKE_ARGS} -DCMAKE_INSTALL_PREFIX=$PREFIX \
          -G "Ninja" \
          $SRC_DIR/$PKG_NAME/src/work
 
-cmake --build . --config Release --target all
+$CMAKE_BLD --build . --config Release --target all
 
 if [[ "$SKIP_TESTING" == "OFF" ]]; then
-    cmake --build . --config Release --target run_tests
+    $CMAKE_BLD --build . --config Release --target run_tests
 fi
 
-cmake --build . --config Release --target install
+$CMAKE_BLD --build . --config Release --target install
 
 if [ "${PKG_NAME}" == "ros-@(ros_distro)-catkin" ]; then
     # Copy the [de]activate scripts to $PREFIX/etc/conda/[de]activate.d.
