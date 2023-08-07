@@ -22,8 +22,43 @@ echo "USING PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}"
 echo "USING PKG_CONFIG_EXECUTABLE=${PKG_CONFIG_EXECUTABLE}"
 
 export ROS_PYTHON_VERSION=`$PYTHON_EXECUTABLE -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
+
+if [[ $target_platform =~ emscripten.* ]]; then
+  # Use emcmake to configure cmake correctly for cross compilation
+  # export CMAKE_CMD="emcmake ${CMAKE_CMD}"
+  # Set python exe to the binary installed to the build_env
+  # export PYTHON_EXECUTABLE=$BUILD_PREFIX/bin/python
+  # export PYTHONHOME="$BUILD_PREFIX"
+  # export PYTHONPATH="$BUILD_PREFIX:$BUILD_PREFIX/lib/python${ROS_PYTHON_VERSION}/site-packages"
+  # echo "Doing some tests with python"
+  # $PYTHON_EXECUTABLE -c "import sys; print('sys.prefix:', sys.prefix)"
+  # $PYTHON_EXECUTABLE -c "import sys; print('sys.exec_prefix:', sys.exec_prefix)"
+  # $PYTHON_EXECUTABLE -c "import sys; print('sys.path:', sys.path)"
+  # $PYTHON_EXECUTABLE -c "import site; print('site-packages:', site.getsitepackages())"
+  # $PYTHON_EXECUTABLE -c "import site; print('user site-packages:', site.getusersitepackages())"
+  # $PYTHON_EXECUTABLE -c "import os; print('os.environ', os.environ)"
+  # $PYTHON_EXECUTABLE -c "import ament_package; print(ament_package)"
+  # echo "Finished tests with python"
+
+  export EXTRA_CMAKE_ARGS="\
+    -DCMAKE_TOOLCHAIN_FILE=~/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake \
+    -DTHREADS_PREFER_PTHREAD_FLAG=TRUE \
+    -DCMAKE_CROSSCOMPILING=TRUE "
+
+   #  -DCMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH=TRUE \
+   #  -DCMAKE_FIND_USE_CMAKE_PATH=TRUE \
+   #  -DPython_SITELIB=$SP_DIR \
+   #  -DPYTHONHOME=$BUILD_PREFIX \
+   #  --debug-output \
+   #  --debug-trycompile \
+   # "
+fi;
+
+export ROS_PYTHON_SP=`$PYTHON_EXECUTABLE -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())"`
+
 echo "Using Python ${ROS_PYTHON_VERSION}"
-echo "Using site-package dir ${SP_DIR}"
+echo "ROS_PYTHON_SP site-package dir ${ROS_PYTHON_SP}"
+echo "SP_DIR site-package dir ${SP_DIR}"
 
 # see https://github.com/conda-forge/cross-python-feedstock/issues/24
 if [[ "$CONDA_BUILD_CROSS_COMPILATION" == "1" ]]; then
@@ -62,6 +97,7 @@ cmake \
     -DBUILD_SHARED_LIBS=ON  \
     -DBUILD_TESTING=OFF \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
+    $EXTRA_CMAKE_ARGS \
     $SRC_DIR/$PKG_NAME/src/work
 
 cmake --build . --config Release --target install
