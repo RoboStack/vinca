@@ -34,15 +34,26 @@ export ROS_PYTHON_VERSION=`$PYTHON_EXECUTABLE -c "import sys; print('%i.%i' % (s
 echo "Using Python $ROS_PYTHON_VERSION"
 
 if [[ $target_platform =~ emscripten.* ]]; then
-  export EXTRA_CMAKE_ARGS="-DTHREADS_PREFER_PTHREAD_FLAG=TRUE\
-    -DCMAKE_INSTALL_PREFIX=$BUILD_PREFIX \
-    -DCMAKE_PREFIX_PATH=$BUILD_PREFIX \
-    -DAMENT_PREFIX_PATH=$BUILD_PREFIX \
+  export CONDA_BUILD_CROSS_COMPILATION="1"
+  # export CMAKE_PREFIX_PATH=$BUILD_PREFIX
+  # export CMAKE_SYSTEM_PREFIX_PATH=$BUILD_PREFIX
+  export USE_WASM=ON
+  export USE_WASM=ON
+  export Python_EXECUTABLE="$BUILD_PREFIX/bin/python"
+  export Python_INCLUDE_DIR="$PREFIX/include/python3.10"
+  export Python_LIBRARY="$PREFIX/lib/python3.10"
+  export EXTRA_CMAKE_ARGS=" \
+      -DTHREADS_PREFER_PTHREAD_FLAG=TRUE\
+      -DPython_SITELIB=$SP_DIR       \
+      -DCMAKE_PREFIX_PATH=$PREFIX    \
+      -DCMAKE_INSTALL_PREFIX=$PREFIX \
+      -DCMAKE_PREFIX_PATH=$PREFIX    \
+      -DCMAKE_INSTALL_PREFIX=$PREFIX \
+      -DCMAKE_FIND_ROOT_PATH=$PREFIX \
+      -DAMENT_PREFIX_PATH=$PREFIX \
     "
-
    #  -DCMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH=TRUE \
    #  -DCMAKE_FIND_USE_CMAKE_PATH=TRUE \
-   #  -DPython_SITELIB=$SP_DIR \
    #  -DPYTHONHOME=$BUILD_PREFIX \
    #  --debug-output \
    #  --debug-trycompile \
@@ -53,6 +64,13 @@ if [[ $target_platform =~ emscripten.* ]]; then
    export CMAKE_BLD="cmake"
 else
   export EXTRA_CMAKE_ARGS=" \
+    -DPYTHON_EXECUTABLE=$PYTHON_EXECUTABLE \
+    -DPython_EXECUTABLE=$PYTHON_EXECUTABLE \
+    -DPython3_EXECUTABLE=$PYTHON_EXECUTABLE \
+    -DPYTHON_INSTALL_DIR=$SP_DIR \
+    -DCMAKE_INSTALL_PREFIX=$PREFIX \
+    -DCMAKE_PREFIX_PATH=$PREFIX \
+    -DAMENT_PREFIX_PATH=$PREFIX \
     "
 
    export CMAKE_GEN="cmake"
@@ -88,8 +106,8 @@ fi
 
 export SKIP_TESTING=@(skip_testing)
 
-$CMAKE_GEN ${CMAKE_ARGS} \
-         $EXTRA_CMAKE_ARGS \
+$CMAKE_GEN \
+         -G "Ninja" \
          -DCMAKE_BUILD_TYPE=Release \
          -DCMAKE_INSTALL_LIBDIR=lib \
          -DCMAKE_NO_SYSTEM_FROM_IMPORTED=ON \
@@ -100,7 +118,7 @@ $CMAKE_GEN ${CMAKE_ARGS} \
          -DCATKIN_SKIP_TESTING=$SKIP_TESTING \
          -DCATKIN_BUILD_BINARY_PACKAGE=$CATKIN_BUILD_BINARY_PACKAGE \
          -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
-         -G "Ninja" \
+         $EXTRA_CMAKE_ARGS \
          $SRC_DIR/$PKG_NAME/src/work
 
 $CMAKE_BLD --build . --config Release --target all
