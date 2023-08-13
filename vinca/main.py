@@ -324,7 +324,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
 
     build_deps = pkg.build_depends
     build_deps += pkg.build_export_depends
-    build_deps += pkg.test_depends
+
+    if not config.skip_testing:
+        print('Ignoring test_depends in output')
+        build_deps += pkg.test_depends
+
     build_deps = [d.name for d in build_deps if d.evaluated_condition]
     build_deps += gdeps
 
@@ -693,6 +697,7 @@ def generate_fat_source(distro, vinca_conf):
 def get_selected_packages(distro, vinca_conf):
     selected_packages = set()
     skipped_packages = set()
+    skipped_dep_types = [ 'test' ] if config.skip_testing else []
 
     if vinca_conf.get("build_all", False):
         selected_packages = set(distro._distro.release_packages.keys())
@@ -712,10 +717,10 @@ def get_selected_packages(distro, vinca_conf):
                 if i in skipped_packages:
                     continue
                 try:
-                    pkgs = distro.get_depends(i, ignore_pkgs=skipped_packages)
+                    pkgs = distro.get_depends(i, ignore_pkgs=skipped_packages, ignore_dep_type=skipped_dep_types)
                 except KeyError:
                     # handle (rare) package names that use "-" as separator
-                    pkgs = distro.get_depends(i.replace("_", "-"))
+                    pkgs = distro.get_depends(i.replace("_", "-"), ignore_dep_type=skipped_dep_types)
                     selected_packages.remove(i)
                     selected_packages.add(i.replace("_", "-"))
                 selected_packages = selected_packages.union(pkgs)

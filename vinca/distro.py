@@ -37,23 +37,28 @@ class Distro(object):
     def add_packages(self, packages):
         self.build_packages = set(packages)
 
-    def get_depends(self, pkg, ignore_pkgs=None):
+    def get_depends(self, pkg, ignore_pkgs=None, ignore_dep_type=[]):
         dependencies = set()
         if pkg not in self._distro.release_packages:
             print(f"{pkg} not in released packages anymore")
             return dependencies
 
+        dep_types = [
+            "buildtool",
+            "buildtool_export",
+            "build",
+            "build_export",
+            "run",
+            "test",
+            "exec"
+        ]
+        
+        for dep_type in ignore_dep_type:
+            dep_types.remove(dep_type)
+
         dependencies |= self._walker.get_recursive_depends(
             pkg,
-            [
-                "buildtool",
-                "buildtool_export",
-                "build",
-                "build_export",
-                "run",
-                "test",
-                "exec",
-            ],
+            dep_types,
             ros_packages_only=True,
             ignore_pkgs=ignore_pkgs,
         )
