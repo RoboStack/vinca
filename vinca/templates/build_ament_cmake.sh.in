@@ -37,8 +37,6 @@ if [[ $target_platform =~ emscripten.* ]]; then
       -DPython_SITELIB=$SP_DIR       \
       -DCMAKE_PREFIX_PATH=$PREFIX    \
       -DCMAKE_INSTALL_PREFIX=$PREFIX \
-      -DCMAKE_PREFIX_PATH=$PREFIX    \
-      -DCMAKE_INSTALL_PREFIX=$PREFIX \
       -DCMAKE_FIND_ROOT_PATH=$PREFIX \
       -DAMENT_PREFIX_PATH=$PREFIX \
     "
