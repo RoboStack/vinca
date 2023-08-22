@@ -325,9 +325,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     build_deps = pkg.build_depends
     build_deps += pkg.build_export_depends
 
-    if not config.skip_testing:
-        print('Ignoring test_depends in output')
-        build_deps += pkg.test_depends
+    build_deps += pkg.test_depends
+
+    # if not config.skip_testing:
+    #     print('Ignoring test_depends in output')
+    #     build_deps += pkg.test_depends
 
     build_deps = [d.name for d in build_deps if d.evaluated_condition]
     build_deps += gdeps
@@ -404,6 +406,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     if "cmake" in output["requirements"]["run"]:
         output["requirements"]["run"].remove("cmake")
         output["requirements"]["run"].append({"sel(target_platform != 'emscripten-32')": "cmake"})
+    if "cmake" in output["requirements"]["host"]:
+        output["requirements"]["host"].remove("cmake")
+        if "cmake" not in output["requirements"]["build"]:
+            output["requirements"]["build"].append("cmake")
 
     output["requirements"]["run"] = sorted(output["requirements"]["run"], key=sortkey)
     output["requirements"]["host"] = sorted(output["requirements"]["host"], key=sortkey)
