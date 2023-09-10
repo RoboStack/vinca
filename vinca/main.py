@@ -406,10 +406,19 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     if "cmake" in output["requirements"]["run"]:
         output["requirements"]["run"].remove("cmake")
         output["requirements"]["run"].append({"sel(target_platform != 'emscripten-32')": "cmake"})
+
     if "cmake" in output["requirements"]["host"]:
         output["requirements"]["host"].remove("cmake")
         if "cmake" not in output["requirements"]["build"]:
             output["requirements"]["build"].append("cmake")
+
+    if f"ros-{config.ros_distro}-mimick-vendor" in output["requirements"]["build"]:
+        output["requirements"]["build"].remove(f"ros-{config.ros_distro}-mimick-vendor")
+        output["requirements"]["build"].append({"sel(target_platform != 'emscripten-32')": f"ros-{config.ros_distro}-mimick-vendor"})
+
+    if f"ros-{config.ros_distro}-mimick-vendor" in output["requirements"]["host"]:
+        output["requirements"]["host"].remove(f"ros-{config.ros_distro}-mimick-vendor")
+        output["requirements"]["host"].append({"sel(target_platform != 'emscripten-32')": f"ros-{config.ros_distro}-mimick-vendor"})
 
     output["requirements"]["run"] = sorted(output["requirements"]["run"], key=sortkey)
     output["requirements"]["host"] = sorted(output["requirements"]["host"], key=sortkey)
@@ -419,7 +428,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             "sel(osx and x86_64)": "__osx >={{ MACOSX_DEPLOYMENT_TARGET|default('10.14') }}"
         }
     ]
-    
 
     if f"ros-{config.ros_distro}-pybind11-vendor" in output["requirements"]["host"]:
         output["requirements"]["host"] += ["pybind11"]
@@ -703,7 +711,8 @@ def generate_fat_source(distro, vinca_conf):
 def get_selected_packages(distro, vinca_conf):
     selected_packages = set()
     skipped_packages = set()
-    skipped_dep_types = [ 'test' ] if config.skip_testing else []
+    skipped_dep_types = []
+    #skipped_dep_types = [ 'test' ] if config.skip_testing else []
 
     if vinca_conf.get("build_all", False):
         selected_packages = set(distro._distro.release_packages.keys())
