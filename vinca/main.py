@@ -244,11 +244,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 # Does not yet work: https://github.com/mamba-org/boa/issues/284
                 # {"sel(linux)": "sysroot_linux-64 2.17"},
                 "cmake",
+                "cython",
                 {"sel(build_platform != target_platform)": "python"},
                 {
                     "sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"
                 },
-                {"sel(build_platform != target_platform)": "cython"},
                 {"sel(build_platform != target_platform)": "numpy"},
             ],
             "host": [
