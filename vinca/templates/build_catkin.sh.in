@@ -41,21 +41,12 @@ if [[ $target_platform =~ emscripten.* ]]; then
   echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s SIDE_MODULE=1\")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_STRIP FALSE)  # used by default in pybind11 on .so modules">> $SRC_DIR/__vinca_shared_lib_patch.cmake
 
-  export USE_WASM=ON
-
-  export Python_EXECUTABLE="$BUILD_PREFIX/bin/python"
-  export Python_INCLUDE_DIR="$PREFIX/include/python3.10"
-  export Python_LIBRARY="$PREFIX/lib/python3.10"
-
   export EXTRA_CMAKE_ARGS=" \
-      -DTHREADS_PREFER_PTHREAD_FLAG=TRUE\
-      -DPython_SITELIB=$SP_DIR       \
-      -DCMAKE_PREFIX_PATH=$PREFIX    \
-      -DCMAKE_INSTALL_PREFIX=$PREFIX \
-      -DCMAKE_PREFIX_PATH=$PREFIX    \
-      -DCMAKE_INSTALL_PREFIX=$PREFIX \
-      -DCMAKE_FIND_ROOT_PATH=$PREFIX \
-      -DAMENT_PREFIX_PATH=$PREFIX \
+      -DRMW_IMPLEMENTATION=rmw_wasm_cpp
+      -DCMAKE_INSTALL_PREFIX=$PREFIX    \
+      -DCMAKE_FIND_ROOT_PATH=$PREFIX    \
+      -DAMENT_PREFIX_PATH=$PREFIX       \
+      -DPYTHON_INSTALL_DIR=$PREFIX/lib/python3.10 \
       -DCMAKE_PROJECT_INCLUDE=$SRC_DIR/__vinca_shared_lib_patch.cmake \
     "
 
@@ -71,6 +62,8 @@ else
     -DCMAKE_INSTALL_PREFIX=$PREFIX \
     -DCMAKE_PREFIX_PATH=$PREFIX \
     -DAMENT_PREFIX_PATH=$PREFIX \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DPKG_CONFIG_EXECUTABLE=$PKG_CONFIG_EXECUTABLE \
     "
 
    export CMAKE_GEN="cmake"
@@ -109,13 +102,13 @@ export SKIP_TESTING=@(skip_testing)
 $CMAKE_GEN \
          -G "Ninja" \
          -DCMAKE_BUILD_TYPE=Release \
-         -DCMAKE_INSTALL_LIBDIR=lib \
          -DCMAKE_NO_SYSTEM_FROM_IMPORTED=ON \
          -DCMAKE_FIND_FRAMEWORK=LAST \
          -DBUILD_SHARED_LIBS=ON \
-         -DPKG_CONFIG_EXECUTABLE=$PKG_CONFIG_EXECUTABLE \
          -DSETUPTOOLS_DEB_LAYOUT=OFF \
+         -DBUILD_TESTING=OFF \
          -DCATKIN_SKIP_TESTING=$SKIP_TESTING \
+         -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=True \
          -DCATKIN_BUILD_BINARY_PACKAGE=$CATKIN_BUILD_BINARY_PACKAGE \
          -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
          $EXTRA_CMAKE_ARGS \
