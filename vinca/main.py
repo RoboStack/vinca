@@ -420,6 +420,9 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         output["requirements"]["host"].remove(f"ros-{config.ros_distro}-mimick-vendor")
         output["requirements"]["host"].append({"sel(target_platform != 'emscripten-32')": f"ros-{config.ros_distro}-mimick-vendor"})
 
+    if f"ros-{config.ros_distro}-rosidl-default-generators" in output["requirements"]["host"]:
+        output["requirements"]["build"].append({"sel(target_platform == 'emscripten-32')": f"ros-{config.ros_distro}-rosidl-default-generators"})
+
     output["requirements"]["run"] = sorted(output["requirements"]["run"], key=sortkey)
     output["requirements"]["host"] = sorted(output["requirements"]["host"], key=sortkey)
 

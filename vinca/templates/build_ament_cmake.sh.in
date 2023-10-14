@@ -26,10 +26,11 @@ export ROS_PYTHON_VERSION=`$PYTHON_EXECUTABLE -c "import sys; print('%i.%i' % (s
 if [[ $target_platform =~ emscripten.* ]]; then
   export CONDA_BUILD_CROSS_COMPILATION="1"
 
-  echo "set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)"> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s SIDE_MODULE=1\")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s SIDE_MODULE=1\")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_STRIP FALSE)  # used by default in pybind11 on .so modules">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_EXE_LINKER_FLAGS \"\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
 
   # export USE_WASM=ON
   # export Python_EXECUTABLE="$BUILD_PREFIX/bin/python"
@@ -43,6 +44,8 @@ if [[ $target_platform =~ emscripten.* ]]; then
       -DCMAKE_FIND_ROOT_PATH=$PREFIX    \
       -DAMENT_PREFIX_PATH=$PREFIX       \
       -DPYTHON_INSTALL_DIR=$PREFIX/lib/python3.10 \
+      -DBUILD_SHARED_LIBS=OFF \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE \
       -DCMAKE_PROJECT_INCLUDE=$SRC_DIR/__vinca_shared_lib_patch.cmake \
     "
 
@@ -62,6 +65,7 @@ else
     -DPKG_CONFIG_EXECUTABLE=$PKG_CONFIG_EXECUTABLE \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
+    -DBUILD_SHARED_LIBS=ON \
     "
 
    export CMAKE_GEN="cmake"
@@ -98,7 +102,6 @@ $CMAKE_GEN \
     -DCMAKE_BUILD_TYPE=Release \
     -DCATKIN_SKIP_TESTING=$SKIP_TESTING \
     -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=True \
-    -DBUILD_SHARED_LIBS=ON \
     -DBUILD_TESTING=OFF \
     $EXTRA_CMAKE_ARGS \
     $SRC_DIR/$PKG_NAME/src/work
