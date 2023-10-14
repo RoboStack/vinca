@@ -48,6 +48,8 @@ if [[ $target_platform =~ emscripten.* ]]; then
       -DCMAKE_FIND_ROOT_PATH=$PREFIX    \
       -DAMENT_PREFIX_PATH=$PREFIX       \
       -DPYTHON_INSTALL_DIR=$PREFIX/lib/python3.10 \
+      -DBUILD_SHARED_LIBS=OFF \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE \
       -DCMAKE_PROJECT_INCLUDE=$SRC_DIR/__vinca_shared_lib_patch.cmake \
     "
 
@@ -64,6 +66,7 @@ else
     -DCMAKE_PREFIX_PATH=$PREFIX \
     -DAMENT_PREFIX_PATH=$PREFIX \
     -DCMAKE_INSTALL_LIBDIR=lib \
+    -DBUILD_SHARED_LIBS=ON \
     -DPKG_CONFIG_EXECUTABLE=$PKG_CONFIG_EXECUTABLE \
     "
 
@@ -105,7 +108,6 @@ $CMAKE_GEN \
          -DCMAKE_BUILD_TYPE=Release \
          -DCMAKE_NO_SYSTEM_FROM_IMPORTED=ON \
          -DCMAKE_FIND_FRAMEWORK=LAST \
-         -DBUILD_SHARED_LIBS=ON \
          -DSETUPTOOLS_DEB_LAYOUT=OFF \
          -DBUILD_TESTING=OFF \
          -DCATKIN_SKIP_TESTING=$SKIP_TESTING \
