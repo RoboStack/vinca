@@ -42,6 +42,13 @@ if [[ $target_platform =~ emscripten.* ]]; then
   echo "set(CMAKE_STRIP FALSE)  # used by default in pybind11 on .so modules">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_EXE_LINKER_FLAGS \"\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
 
+  BUILD_SHARED_LIBS="OFF"
+
+  if [[ "$PKG_NAME" =~ rosidl-* ]]; then
+    # rosidl needs to be build as a shared-lib
+    BUILD_SHARED_LIBS="ON"
+  fi;
+
   export EXTRA_CMAKE_ARGS=" \
       -DRMW_IMPLEMENTATION=rmw_wasm_cpp
       -DCMAKE_INSTALL_PREFIX=$PREFIX    \
@@ -50,7 +57,7 @@ if [[ $target_platform =~ emscripten.* ]]; then
       -DPYTHON_INSTALL_DIR=$PREFIX/lib/python3.10 \
       -DBUILD_TESTING=OFF \
       -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=True \
-      -DBUILD_SHARED_LIBS=OFF \
+      -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS} \
       -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE \
       -DCMAKE_PROJECT_INCLUDE=$SRC_DIR/__vinca_shared_lib_patch.cmake \
     "
