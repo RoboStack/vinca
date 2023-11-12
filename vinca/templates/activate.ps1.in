@@ -13,4 +13,4 @@ $Env:PYTHONHOME=''
 $Env:ROS_OS_OVERRIDE='conda:win64'
 $Env:ROS_ETC_DIR="${env:CONDA_PREFIX}\Library\etc\ros"
 $Env:AMENT_PREFIX_PATH="${env:CONDA_PREFIX}\Library"
-$Env:AMENT_PYTHON_EXECUTABLE="${env:CONDA_PREFIX}\Library\python.exe"
+$Env:AMENT_PYTHON_EXECUTABLE="${env:CONDA_PREFIX}\python.exe"

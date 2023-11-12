@@ -226,8 +226,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         if pkg_names[0] in vinca_conf["skip_built_packages"]:
             return None
 
-    # TODO: Remove hardcoded cmake version after building new versions of ament_cmake_export_target
-    # see: https://github.com/ament/ament_cmake/commit/796cef7d7df2ddb806f774a9889e608cc82285d3
     output = {
         "package": {"name": pkg_names[0], "version": version},
         "requirements": {
@@ -242,8 +240,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 {"sel(unix)": "coreutils"},
                 {"sel(osx)": "tapi"},
                 {"sel(build_platform != target_platform)": "pkg-config"},
-                # Does not yet work: https://github.com/mamba-org/boa/issues/284
-                # {"sel(linux)": "sysroot_linux-64 2.17"},
                 "cmake",
                 {"sel(build_platform != target_platform)": "python"},
                 {"sel(build_platform != target_platform)": "cross-python_{{ target_platform }}" },
