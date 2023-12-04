@@ -230,9 +230,9 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         "package": {"name": pkg_names[0], "version": version},
         "requirements": {
             "build": [
-                {"sel(target_platform != 'emscripten-32')": "{{ compiler('cxx') }}"},
-                {"sel(target_platform != 'emscripten-32')": "{{ compiler('c') }}"},
-                {"sel(target_platform == 'emscripten-32')": "emscripten_emscripten-32"},
+                {"sel(target_platform != 'emscripten-wasm32')": "{{ compiler('cxx') }}"},
+                {"sel(target_platform != 'emscripten-wasm32')": "{{ compiler('c') }}"},
+                {"sel(target_platform == 'emscripten-wasm32')": "emscripten_emscripten-wasm32"},
                 {"sel(linux64)": "sysroot_linux-64 2.17"},
                 "ninja",
                 "setuptools",
@@ -271,20 +271,20 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         output["build"]["script"] = {
             "sel(win)": "bld_catkin.bat",
             "sel(unix)": "build_catkin.sh",
-            "sel(emscripten-32)": "build_catkin.sh",
+            "sel(emscripten-wasm32)": "build_catkin.sh",
         }
 
     elif pkg.get_build_type() in ["ament_cmake"]:
         output["build"]["script"] = {
             "sel(win)": "bld_ament_cmake.bat",
             "sel(unix)": "build_ament_cmake.sh",
-            "sel(emscripten-32)": "build_ament_cmake.sh",
+            "sel(emscripten-wasm32)": "build_ament_cmake.sh",
         }
     elif pkg.get_build_type() in ["ament_python"]:
         output["build"]["script"] = {
             "sel(win)": "bld_ament_python.bat",
             "sel(unix)": "build_ament_python.sh",
-            "sel(emscripten-32)": "build_ament_python.sh",
+            "sel(emscripten-wasm32)": "build_ament_python.sh",
         }
         resolved_setuptools = resolve_pkgname("python-setuptools", vinca_conf, distro)
         output["requirements"]["host"].extend(resolved_setuptools)
@@ -401,7 +401,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     # TODO: Add cmake to emscripten-forge
     if "cmake" in output["requirements"]["run"]:
         output["requirements"]["run"].remove("cmake")
-        output["requirements"]["run"].append({"sel(target_platform != 'emscripten-32')": "cmake"})
+        output["requirements"]["run"].append({"sel(target_platform != 'emscripten-wasm32')": "cmake"})
 
     if "cmake" in output["requirements"]["host"]:
         output["requirements"]["host"].remove("cmake")
@@ -410,14 +410,14 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
 
     if f"ros-{config.ros_distro}-mimick-vendor" in output["requirements"]["build"]:
         output["requirements"]["build"].remove(f"ros-{config.ros_distro}-mimick-vendor")
-        output["requirements"]["build"].append({"sel(target_platform != 'emscripten-32')": f"ros-{config.ros_distro}-mimick-vendor"})
+        output["requirements"]["build"].append({"sel(target_platform != 'emscripten-wasm32')": f"ros-{config.ros_distro}-mimick-vendor"})
 
     if f"ros-{config.ros_distro}-mimick-vendor" in output["requirements"]["host"]:
         output["requirements"]["host"].remove(f"ros-{config.ros_distro}-mimick-vendor")
-        output["requirements"]["host"].append({"sel(target_platform != 'emscripten-32')": f"ros-{config.ros_distro}-mimick-vendor"})
+        output["requirements"]["host"].append({"sel(target_platform != 'emscripten-wasm32')": f"ros-{config.ros_distro}-mimick-vendor"})
 
     if f"ros-{config.ros_distro}-rosidl-default-generators" in output["requirements"]["host"]:
-        output["requirements"]["build"].append({"sel(target_platform == 'emscripten-32')": f"ros-{config.ros_distro}-rosidl-default-generators"})
+        output["requirements"]["build"].append({"sel(target_platform == 'emscripten-wasm32')": f"ros-{config.ros_distro}-rosidl-default-generators"})
 
     output["requirements"]["run"] = sorted(output["requirements"]["run"], key=sortkey)
     output["requirements"]["host"] = sorted(output["requirements"]["host"], key=sortkey)
@@ -763,9 +763,9 @@ def parse_package(pkg, distro, vinca_conf, path):
         "source": {},
         "requirements": {
             "build": [
-                {"sel(target_platform != 'emscripten-32')": "{{ compiler('cxx') }}"},
-                {"sel(target_platform != 'emscripten-32')": "{{ compiler('c') }}"},
-                {"sel(target_platform == 'emscripten-32')": "emscripten_emscripten-32"},
+                {"sel(target_platform != 'emscripten-wasm32')": "{{ compiler('cxx') }}"},
+                {"sel(target_platform != 'emscripten-wasm32')": "{{ compiler('c') }}"},
+                {"sel(target_platform == 'emscripten-wasm32')": "emscripten_emscripten-wasm32"},
                 {"sel(linux64)": "sysroot_linux-64 2.17"},
                 "ninja",
                 {"sel(unix)": "make"},

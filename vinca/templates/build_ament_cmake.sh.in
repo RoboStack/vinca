@@ -27,10 +27,10 @@ if [[ $target_platform =~ emscripten.* ]]; then
   export CONDA_BUILD_CROSS_COMPILATION="1"
 
   echo "set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)"> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s SIDE_MODULE=1\")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s SIDE_MODULE=1\")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s SIDE_MODULE=1 -sWASM_BIGINT \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s SIDE_MODULE=1 -sWASM_BIGINT \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_STRIP FALSE)  # used by default in pybind11 on .so modules">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sASYNCIFY -O3 -sALLOW_MEMORY_GROWTH=1 -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sWASM_BIGINT -sASYNCIFY -O3 -sALLOW_MEMORY_GROWTH=1 -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
 
   BUILD_SHARED_LIBS="ON"
 
@@ -41,8 +41,8 @@ if [[ $target_platform =~ emscripten.* ]]; then
 
   # export USE_WASM=ON
   # export Python_EXECUTABLE="$BUILD_PREFIX/bin/python"
-  # export Python_INCLUDE_DIR="$PREFIX/include/python3.10"
-  # export Python_LIBRARY="$PREFIX/lib/python3.10"
+  # export Python_INCLUDE_DIR="$PREFIX/include/python3.11"
+  # export Python_LIBRARY="$PREFIX/lib/python3.11"
   # -DTHREADS_PREFER_PTHREAD_FLAG=TRUE\
   # -DPython_SITELIB=$SP_DIR          \
   export EXTRA_CMAKE_ARGS=" \
@@ -50,7 +50,7 @@ if [[ $target_platform =~ emscripten.* ]]; then
       -DCMAKE_INSTALL_PREFIX=$PREFIX    \
       -DCMAKE_FIND_ROOT_PATH=$PREFIX    \
       -DAMENT_PREFIX_PATH=$PREFIX       \
-      -DPYTHON_INSTALL_DIR=$PREFIX/lib/python3.10 \
+      -DPYTHON_INSTALL_DIR=$PREFIX/lib/python3.11 \
       -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS} \
       -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE \
       -DCMAKE_PROJECT_INCLUDE=$SRC_DIR/__vinca_shared_lib_patch.cmake \

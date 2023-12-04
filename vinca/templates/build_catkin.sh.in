@@ -37,10 +37,10 @@ if [[ $target_platform =~ emscripten.* ]]; then
   export CONDA_BUILD_CROSS_COMPILATION="1"
   
   echo "set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)"> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s SIDE_MODULE=1\")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s SIDE_MODULE=1\")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s SIDE_MODULE=1 -sWASM_BIGINT \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s SIDE_MODULE=1 -sWASM_BIGINT \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_STRIP FALSE)  # used by default in pybind11 on .so modules">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sASYNCIFY -O3 -sALLOW_MEMORY_GROWTH=1 -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sWASM_BIGINT -sASYNCIFY -O3 -sALLOW_MEMORY_GROWTH=1 -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
 
   BUILD_SHARED_LIBS="ON"
 
@@ -54,7 +54,7 @@ if [[ $target_platform =~ emscripten.* ]]; then
       -DCMAKE_INSTALL_PREFIX=$PREFIX    \
       -DCMAKE_FIND_ROOT_PATH=$PREFIX    \
       -DAMENT_PREFIX_PATH=$PREFIX       \
-      -DPYTHON_INSTALL_DIR=$PREFIX/lib/python3.10 \
+      -DPYTHON_INSTALL_DIR=$PREFIX/lib/python3.11 \
       -DBUILD_TESTING=OFF \
       -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=True \
       -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS} \
