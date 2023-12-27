@@ -234,7 +234,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             "build": [
                 "{{ compiler('cxx') }}",
                 "{{ compiler('c') }}",
-                {"sel(linux64)": "sysroot_linux-64 2.17"},
+                {"sel(linux64)": "sysroot_linux-64 2.12"},
                 "ninja",
                 "setuptools",
                 {"sel(unix)": "make"},
@@ -242,7 +242,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 {"sel(osx)": "tapi"},
                 {"sel(build_platform != target_platform)": "pkg-config"},
                 # Does not yet work: https://github.com/mamba-org/boa/issues/284
-                # {"sel(linux)": "sysroot_linux-64 2.17"},
+                # {"sel(linux)": "sysroot_linux-64 2.12"},
                 "cmake",
                 "cython",
                 {"sel(build_platform != target_platform)": "python"},
@@ -736,7 +736,7 @@ def parse_package(pkg, distro, vinca_conf, path):
             "build": [
                 "{{ compiler('cxx') }}",
                 "{{ compiler('c') }}",
-                {"sel(linux64)": "sysroot_linux-64 2.17"},
+                {"sel(linux64)": "sysroot_linux-64 2.12"},
                 "ninja",
                 {"sel(unix)": "make"},
                 {"sel(unix)": "coreutils"},
