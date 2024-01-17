@@ -241,8 +241,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 {"sel(unix)": "coreutils"},
                 {"sel(osx)": "tapi"},
                 {"sel(build_platform != target_platform)": "pkg-config"},
-                # Does not yet work: https://github.com/mamba-org/boa/issues/284
-                # {"sel(linux)": "sysroot_linux-64 2.17"},
                 "cmake",
                 "cython",
                 {"sel(build_platform != target_platform)": "python"},
@@ -271,13 +269,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     output["requirements"]["run"].extend(resolved_python)
     output["requirements"]["host"].extend(resolved_python)
     if pkg.get_build_type() in ["cmake", "catkin"]:
-        # TODO find a way to get the conda "comments" with ruamel
-        # output['script'] = ['bld_catkin.bat  # [win]', 'build_catkin.sh  # [unix]']
         output["build"]["script"] = {
             "sel(win)": "bld_catkin.bat",
             "sel(unix)": "build_catkin.sh",
         }
-
     elif pkg.get_build_type() in ["ament_cmake"]:
         output["build"]["script"] = {
             "sel(win)": "bld_ament_cmake.bat",
