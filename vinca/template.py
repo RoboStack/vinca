@@ -6,6 +6,8 @@ from ruamel import yaml
 from pathlib import Path
 
 TEMPLATE = """\
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
 package:
   name: ros
   version: 0.0.1
@@ -16,7 +18,7 @@ build:
   number: 0
 
 about:
-  home: https://www.ros.org/
+  homepage: https://www.ros.org/
   license: BSD-3-Clause
   summary: |
     Robot Operating System
@@ -80,7 +82,12 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
                     os.makedirs(recipe_dir / patch_dir, exist_ok=True)
                     shutil.copyfile(p, recipe_dir / p)
 
-            for _, script in meta["build"]["script"].items():
+            build_scripts = []
+            for item in meta["build"]["script"]:
+                for filename in item['then']:
+                    build_scripts.append(filename)
+
+            for script in build_scripts:
                 shutil.copyfile(script, recipe_dir / script)
             if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
                 shutil.copyfile("activate.sh", recipe_dir / "activate.sh")
