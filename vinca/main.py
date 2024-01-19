@@ -243,7 +243,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 {"if": "build_platform != target_platform", "then": ["python"]},
                 {
                     "if": "build_platform != target_platform",
-                    "then": ["cross-python_{{ target_platform }}"]
+                    "then": ["cross-python_${{ target_platform }}"]
                 },
                 {"if": "build_platform != target_platform", "then": ["numpy"]},
             ],
@@ -267,20 +267,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     output["requirements"]["run"].extend(resolved_python)
     output["requirements"]["host"].extend(resolved_python)
     if pkg.get_build_type() in ["cmake", "catkin"]:
-        output["build"]["script"] = [
-            {"if": "win", "then": ["bld_catkin.bat"]},
-            {"if": "unix", "then": ["build_catkin.sh"]},
-        ]
+        output["build"]["script"] = "${{ 'build_catkin.sh' if unix else 'build_catkin.bat' }}"
     elif pkg.get_build_type() in ["ament_cmake"]:
-        output["build"]["script"] = [
-            {"if": "win", "then": ["bld_ament_cmake.bat"]},
-            {"if": "unix", "then": ["build_ament_cmake.sh"]},
-        ]
+        output["build"]["script"] = "${{ 'build_ament_cmake.sh' if unix else 'bld_ament_cmake.bat' }}"
     elif pkg.get_build_type() in ["ament_python"]:
-        output["build"]["script"] = [
-            {"if": "win", "then": ["bld_ament_python.bat"]},
-            {"if": "unix", "then": ["build_ament_python.sh"]},
-        ]
+        output["build"]["script"] = "${{ 'build_ament_python.sh' if unix else 'bld_ament_python.bat' }}"
         resolved_setuptools = resolve_pkgname("python-setuptools", vinca_conf, distro)
         output["requirements"]["host"].extend(resolved_setuptools)
     else:
@@ -388,7 +379,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     output["requirements"]["host"] = sorted(output["requirements"]["host"], key=sortkey)
 
     output["requirements"]["run"] += [
-        {"if": "osx and x86_64", "then": ["__osx >={{ MACOSX_DEPLOYMENT_TARGET|default('10.14') }}"]}
+        {"if": "osx and x86_64", "then": ["__osx >=${{ MACOSX_DEPLOYMENT_TARGET|default('10.14') }}"]}
     ]
 
     if f"ros-{config.ros_distro}-pybind11-vendor" in output["requirements"]["host"]:
@@ -696,7 +687,7 @@ def parse_package(pkg, distro, vinca_conf, path):
                 {"if": "build_platform != target_platform", "then": ["python"]},
                 {
                     "if": "build_platform != target_platform",
-                    "then": ["cross-python_{{ target_platform }}"]
+                    "then": ["cross-python_${{ target_platform }}"]
                 },
                 {"if": "build_platform != target_platform", "then": ["cython"]},
                 {"if": "build_platform != target_platform", "then": ["numpy"]},
@@ -764,10 +755,7 @@ def parse_package(pkg, distro, vinca_conf, path):
         )
 
     if pkg.get_build_type() in ["cmake", "catkin"]:
-        recipe["build"]["script"] = [
-            {"if": "win", "then": ["bld_catkin.bat"]},
-            {"if": "unix", "then": ["build_catkin.sh"]},
-        ]
+        recipe["build"]["script"] = "${{ 'build_catkin.sh' if unix else 'build_catkin.bat' }}"
 
     # fix up OPENGL support for Unix
     if (

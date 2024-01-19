@@ -52,6 +52,8 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
         meta["source"] = [source[k] for k in source]
         meta["outputs"] = outputs
         meta["package"]["version"] = f"{datetime.datetime.now():%Y.%m.%d}"
+        meta["recipe"] = meta["package"]
+        del meta["package"]
         meta["build"]["number"] = build_number
         with open("recipe.yaml", "w") as stream:
             file.dump(meta, stream)
