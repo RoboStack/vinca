@@ -1,6 +1,7 @@
 import datetime
 import shutil
 import os
+import re
 
 from ruamel import yaml
 from pathlib import Path
@@ -84,11 +85,7 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
                     os.makedirs(recipe_dir / patch_dir, exist_ok=True)
                     shutil.copyfile(p, recipe_dir / p)
 
-            build_scripts = []
-            for item in meta["build"]["script"]:
-                for filename in item['then']:
-                    build_scripts.append(filename)
-
+            build_scripts = re.findall(r"'(.*?)'", meta["build"]["script"])
             for script in build_scripts:
                 shutil.copyfile(script, recipe_dir / script)
             if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
