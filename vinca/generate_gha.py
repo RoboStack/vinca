@@ -479,9 +479,13 @@ def main():
         requirements = {}
 
         for pkg in full_tree + additional_recipes:
-            requirements[pkg["package"]["name"]] = pkg["requirements"].get(
+            if "outputs" in pkg:
+                req_section = pkg["outputs"][0]["requirements"]
+            else:
+                req_section = pkg["requirements"]
+            requirements[pkg["package"]["name"]] = req_section.get(
                 "host", []
-            ) + pkg["requirements"].get("run", [])
+            ) + req_section.get("run", [])
 
         # sort out requirements that are not built in this run
         for pkg_name, reqs in requirements.items():
