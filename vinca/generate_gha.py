@@ -281,7 +281,7 @@ def build_linux_pipeline(
                 "strategy": {"fail-fast": False},
                 "needs": prev_batch_keys,
                 "steps": [
-                    {"name": "Checkout code", "uses": "actions/checkout@v3"},
+                    {"name": "Checkout code", "uses": "actions/checkout@v4"},
                     {
                         "name": f"Build {' '.join([pkg for pkg in batch])}",
                         "env": {
@@ -336,7 +336,7 @@ def build_osx_pipeline(
                 "strategy": {"fail-fast": False},
                 "needs": prev_batch_keys,
                 "steps": [
-                    {"name": "Checkout code", "uses": "actions/checkout@v3"},
+                    {"name": "Checkout code", "uses": "actions/checkout@v4"},
                     {
                         "name": f"Build {' '.join([pkg for pkg in batch])}",
                         "env": {
@@ -392,9 +392,9 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                 "needs": prev_batch_keys,
                 "env": {"CONDA_BLD_PATH": "C:\\\\bld\\\\"},
                 "steps": [
-                    {"name": "Checkout code", "uses": "actions/checkout@v3"},
+                    {"name": "Checkout code", "uses": "actions/checkout@v4"},
                     {
-                        "uses": "conda-incubator/setup-miniconda@v2",
+                        "uses": "conda-incubator/setup-miniconda@v3",
                         "with": {
                             "channels": "conda-forge",
                             "miniforge-variant": "Mambaforge",
