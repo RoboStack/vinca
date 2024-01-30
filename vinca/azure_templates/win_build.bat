@@ -4,7 +4,7 @@ call activate base
 set "FEEDSTOCK_ROOT=%cd%"
 
 call conda config --add channels conda-forge
-call conda config --add channels robostack
+call conda config --add channels robostack-staging
 call conda config --set channel_priority strict
 
 :: Enable long path names on Windows

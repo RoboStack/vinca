@@ -406,7 +406,7 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                         },
                     },
                     {
-                        "run": "conda install -c conda-forge -n base --yes --quiet conda-build=3.25 pip mamba ruamel.yaml anaconda-client boa",
+                        "run": "mamba install -c conda-forge -n base --yes --quiet conda-build=3.25 pip mamba ruamel.yaml anaconda-client boa",
                         "name": "Install conda-build, boa and activate environment",
                     },
                     {
