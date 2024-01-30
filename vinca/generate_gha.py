@@ -572,7 +572,7 @@ def main():
         build_osx_pipeline(
             stages,
             args.trigger_branch,
-            vm_imagename="macOS-11",
+            vm_imagename="macos-14",
             outfile="osx_arm64.yml",
             script=azure_osx_arm64_script,
         )
