@@ -402,6 +402,7 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                             "use-mamba": "true",
                             "channel-priority": "true",
                             "python-version": "3.11",
+                            "activate-environment": "test",
                         },
                     },
                     {
