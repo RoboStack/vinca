@@ -401,10 +401,11 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                             "miniforge-version": "latest",
                             "use-mamba": "true",
                             "channel-priority": "true",
+                            "python-version": "3.11",
                         },
                     },
                     {
-                        "run": "conda install -c conda-forge -n base --yes --quiet conda-build=3.25 pip mamba ruamel.yaml anaconda-client",
+                        "run": "conda install -c conda-forge -n base --yes --quiet conda-build=3.25 pip mamba ruamel.yaml anaconda-client boa",
                         "name": "Install conda-build, boa and activate environment",
                     },
                     {
