@@ -11,11 +11,12 @@ findstr install[-_]scripts setup.cfg
 if "%errorlevel%" == "0" (
     %PYTHON% -m pip install . --no-deps -vvv
 ) else (
-    set "INSTALL_SCRIPTS_ARG=--install-scripts=%LIBRARY_PREFIX%\bin"
-    %PYTHON% setup.py install ^
-        --prefix=%LIBRARY_PREFIX% ^
-        --install-lib=%SP_DIR% ^
-        %INSTALL_SCRIPTS_ARG%
+    :: set "INSTALL_SCRIPTS_ARG=--install-scripts=%LIBRARY_PREFIX%\bin"
+    :: %PYTHON% setup.py install ^
+    ::     --prefix=%LIBRARY_PREFIX% ^
+    ::     --install-lib=%SP_DIR% ^
+    ::     %INSTALL_SCRIPTS_ARG%
+    pip install . --prefix=%LIBRARY_PREFIX% --install-option="--install-scripts=%LIBRARY_PREFIX%\bin"
 )
 
 if errorlevel 1 exit 1
