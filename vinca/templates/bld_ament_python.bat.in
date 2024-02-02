@@ -12,7 +12,7 @@ if "%errorlevel%" == "0" (
     %PYTHON% -m pip install . --no-deps -vvv
 ) else (
     set "INSTALL_SCRIPTS_ARG=--install-scripts=%LIBRARY_PREFIX%\bin"
-    %PYTHON% setup.py install --single-version-externally-managed ^
+    %PYTHON% setup.py install --single-version-externally-managed --record=files.txt ^
         --prefix=%LIBRARY_PREFIX% ^
         --install-lib=%SP_DIR% ^
         %INSTALL_SCRIPTS_ARG%
