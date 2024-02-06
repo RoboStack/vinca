@@ -4,8 +4,8 @@
 pushd $SRC_DIR/$PKG_NAME/src/work
 
 # If there is a setup.cfg that contains install-scripts then we should not set it here
-result=$?
 grep -q "install[-_]scripts" setup.cfg || true
+result=$?
 if [ $result -eq 0 ]; then
   $PYTHON -m pip install . --no-deps -vvv
 else
