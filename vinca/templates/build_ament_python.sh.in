@@ -4,8 +4,7 @@
 pushd $SRC_DIR/$PKG_NAME/src/work
 
 # If there is a setup.cfg that contains install-scripts then we should not set it here
-grep -q "install[-_]scripts" setup.cfg
-if [ $? -eq 0 ]; then
+if [ -f setup.cfg ] && grep -q "install[-_]scripts" setup.cfg; then
   $PYTHON -m pip install . --no-deps -vvv
 else
   # Remove e.g. ros-humble- from PKG_NAME
