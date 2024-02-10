@@ -23,9 +23,6 @@ echo "USING PKG_CONFIG_EXECUTABLE=${PKG_CONFIG_EXECUTABLE}"
 
 export ROS_PYTHON_VERSION=`$PYTHON_EXECUTABLE -c "import sys; print('%i.%i' % (sys.version_info[0:2]))"`
 echo "Using Python ${ROS_PYTHON_VERSION}"
-# Fix up SP_DIR which for some reason might contain a path to a wrong Python version
-FIXED_SP_DIR=$(echo $SP_DIR | sed -E "s/python[0-9]+\.[0-9]+/python$ROS_PYTHON_VERSION/")
-echo "Using site-package dir ${FIXED_SP_DIR}"
 
 # see https://github.com/conda-forge/cross-python-feedstock/issues/24
 if [[ "$CONDA_BUILD_CROSS_COMPILATION" == "1" ]]; then
@@ -46,6 +43,13 @@ if [[ $target_platform =~ linux.* ]]; then
   ln -s $GXX ${BUILD_PREFIX}/bin/g++
 fi;
 
+# PYTHON_INSTALL_DIR should be a relative path, see
+# https://github.com/ament/ament_cmake/blob/2.3.2/ament_cmake_python/README.md
+# So we compute the relative path of $SP_DIR w.r.t. to $PREFIX,
+# but it is not trivial to do this in bash scripting, so let's do it via python
+export PYTHON_INSTALL_DIR=`python -c "import os;print(os.path.relpath(os.environ['SP_DIR'],os.environ['PREFIX']))"`
+echo "Using site_packages: $PYTHON_INSTALL_DIR"
+
 cmake \
     -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX=$PREFIX \
@@ -58,7 +62,7 @@ cmake \
     -DPython3_EXECUTABLE=$PYTHON_EXECUTABLE \
     -DPython3_FIND_STRATEGY=LOCATION \
     -DPKG_CONFIG_EXECUTABLE=$PKG_CONFIG_EXECUTABLE \
-    -DPYTHON_INSTALL_DIR=$FIXED_SP_DIR \
+    -DPYTHON_INSTALL_DIR=$PYTHON_INSTALL_DIR \
     -DSETUPTOOLS_DEB_LAYOUT=OFF \
     -DCATKIN_SKIP_TESTING=$SKIP_TESTING \
     -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=True \
