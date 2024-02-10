@@ -30,6 +30,7 @@ set SKIP_TESTING=@(skip_testing)
 
 cmake ^
     -G "Ninja" ^
+    --compile-no-warning-as-error ^
     -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ^
     -DCMAKE_BUILD_TYPE=Release ^
     -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=ON ^
