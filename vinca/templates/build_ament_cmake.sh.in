@@ -44,6 +44,12 @@ if [[ $target_platform =~ linux.* ]]; then
   ln -s $GXX ${BUILD_PREFIX}/bin/g++
 fi;
 
+# PYTHON_INSTALL_DIR should be a relative path, see
+# https://github.com/ament/ament_cmake/blob/2.3.2/ament_cmake_python/README.md
+# So we compute the relative path of $SP_DIR w.r.t. to $PREFIX,
+# but it is not trivial to do this in bash scripting, so let's do it via python
+export PYTHON_INSTALL_DIR=`python -c "import os;print(os.path.relpath(os.environ['SP_DIR'],os.environ['PREFIX']))"`
+
 cmake \
     -G "Ninja" \
     -DCMAKE_INSTALL_PREFIX=$PREFIX \
@@ -56,7 +62,7 @@ cmake \
     -DPython3_EXECUTABLE=$PYTHON_EXECUTABLE \
     -DPython3_FIND_STRATEGY=LOCATION \
     -DPKG_CONFIG_EXECUTABLE=$PKG_CONFIG_EXECUTABLE \
-    -DPYTHON_INSTALL_DIR=$SP_DIR \
+    -DPYTHON_INSTALL_DIR=$PYTHON_INSTALL_DIR \
     -DSETUPTOOLS_DEB_LAYOUT=OFF \
     -DCATKIN_SKIP_TESTING=$SKIP_TESTING \
     -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=True \
