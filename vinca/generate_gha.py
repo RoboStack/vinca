@@ -409,7 +409,12 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                         "run": "mamba install -c conda-forge -n base --yes --quiet conda-build=3.27 pip mamba ruamel.yaml anaconda-client boa",
                         "name": "Install conda-build, boa and activate environment",
                     },
-                    {"name": "Clean up PATH", "uses": "egor-tensin/cleanup-path@v4", "with": {"dirs": "'C:\Program Files\Git\usr\bin;C:\Program Files\Git\bin;C:\Program Files\Git\cmd;C:\Program Files\Git\mingw64\bin'"}},
+                    {
+                        "uses": "egor-tensin/cleanup-path@v4",
+                        "with": {
+                            "dirs": "C:\Program Files\Git\usr\bin;C:\Program Files\Git\bin;C:\Program Files\Git\cmd;C:\Program Files\Git\mingw64\bin"
+                        },
+                    },
                     {
                         "shell": "cmd",
                         "run": azure_win_preconfig_script,
