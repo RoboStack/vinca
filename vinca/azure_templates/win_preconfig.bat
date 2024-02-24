@@ -1,9 +1,9 @@
 set "CI=azure"
 call activate base
 
-:: 2 cores available on Appveyor workers: https://www.appveyor.com/docs/build-environment/#build-vm-configurations
+:: 4 cores available on GHA: https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners
 :: CPU_COUNT is passed through conda build: https://github.com/conda/conda-build/pull/1149
-set CPU_COUNT=2
+set CPU_COUNT=4
 
 set PYTHONUNBUFFERED=1
 
@@ -17,21 +17,6 @@ call setup_x64
 if "%CONDA_BLD_PATH%" == "" (
     set "CONDA_BLD_PATH=C:\\bld\\"
 )
-
-:: Remove some directories from PATH
-set "PATH=%PATH:C:\\ProgramData\\Chocolatey\\bin;=%"
-set "PATH=%PATH:C:\\Program Files (x86)\\sbt\\bin;=%"
-set "PATH=%PATH:C:\\Rust\\.cargo\\bin;=%"
-set "PATH=%PATH:C:\\Program Files\\Git\\usr\\bin;=%"
-set "PATH=%PATH:C:\\Program Files\\Git\\cmd;=%"
-set "PATH=%PATH:C:\\Program Files\\Git\\mingw64\\bin;=%"
-set "PATH=%PATH:C:\\Program Files (x86)\\Subversion\\bin;=%"
-set "PATH=%PATH:C:\\Program Files\\CMake\\bin;=%"
-set "PATH=%PATH:C:\\Program Files\\OpenSSL\\bin;=%"
-set "PATH=%PATH:C:\\Strawberry\\c\\bin;=%"
-set "PATH=%PATH:C:\\Strawberry\\perl\\bin;=%"
-set "PATH=%PATH:C:\\Strawberry\\perl\\site\\bin;=%"
-set "PATH=%PATH:c:\\tools\\php;=%"
 
 :: On azure, there are libcrypto*.dll & libssl*.dll under
 :: C:\\Windows\\System32, which should not be there (no vendor dlls in windows folder).
