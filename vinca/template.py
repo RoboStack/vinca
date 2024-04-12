@@ -30,6 +30,24 @@ extra:
 
 """
 
+post_process_items = [
+    {
+        "files": ["*.pc"],
+        "regex": '(?:-L|-I)?"?([^;\\s]+/sysroot/)',
+        "replacement": "$(CONDA_BUILD_SYSROOT_S)",
+    },
+    {
+        "files": ["*.cmake"],
+        "regex": '([^;\\s"]+/sysroot)',
+        "replacement": "$ENV{CONDA_BUILD_SYSROOT}",
+    },
+    {
+        "files": ["*.cmake"],
+        "regex": '([^;\\s"]+/MacOSX\\d*\\.?\\d*\\.sdk)',
+        "replacement": "$ENV{CONDA_BUILD_SYSROOT}",
+    },
+]
+
 
 def write_recipe_package(recipe):
     file = yaml.YAML()
@@ -56,6 +74,7 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
         meta["recipe"] = meta["package"]
         del meta["package"]
         meta["build"]["number"] = build_number
+        meta["build"]["post_process"] = post_process_items
         with open("recipe.yaml", "w") as stream:
             file.dump(meta, stream)
     else:
@@ -73,7 +92,7 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
             meta["package"]["version"] = o["package"]["version"]
 
             meta["build"]["number"] = build_number
-
+            meta["build"]["post_process"] = post_process_items
             recipe_dir = (Path("recipes") / o["package"]["name"]).absolute()
             os.makedirs(recipe_dir, exist_ok=True)
             with open(recipe_dir / "recipe.yaml", "w") as stream:
@@ -172,14 +191,18 @@ def generate_activate_hook():
 
     template_in = pkg_resources.resource_filename("vinca", "templates/activate.bat.in")
     generate_template(template_in, open("activate.bat", "w"))
-    template_in = pkg_resources.resource_filename("vinca", "templates/deactivate.bat.in")
+    template_in = pkg_resources.resource_filename(
+        "vinca", "templates/deactivate.bat.in"
+    )
     generate_template(template_in, open("deactivate.bat", "w"))
-    
+
     template_in = pkg_resources.resource_filename("vinca", "templates/activate.ps1.in")
     generate_template(template_in, open("activate.ps1", "w"))
-    template_in = pkg_resources.resource_filename("vinca", "templates/deactivate.ps1.in")
+    template_in = pkg_resources.resource_filename(
+        "vinca", "templates/deactivate.ps1.in"
+    )
     generate_template(template_in, open("deactivate.ps1", "w"))
-    
+
     template_in = pkg_resources.resource_filename("vinca", "templates/activate.sh.in")
     generate_template(template_in, open("activate.sh", "w"))
     template_in = pkg_resources.resource_filename("vinca", "templates/deactivate.sh.in")

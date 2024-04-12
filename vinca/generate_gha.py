@@ -67,7 +67,7 @@ def parse_command_line(argv):
         action="store_true",
         help="search for additional_recipes folder?",
     )
-    
+
     parser.add_argument(
         "-b",
         "--batch_size",
@@ -571,7 +571,9 @@ def main():
 
     if args.platform == "osx-64":
         build_osx_pipeline(
-            stages, args.trigger_branch, script=azure_osx_script,
+            stages,
+            args.trigger_branch,
+            script=azure_osx_script,
         )
 
     if args.platform == "osx-arm64":
