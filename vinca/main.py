@@ -191,6 +191,12 @@ def read_vinca_yaml(filepath):
 
     vinca_conf["_patches"] = patches
 
+    tests = {}
+    test_dir = Path(filepath).parent / "tests"
+    for x in test_dir.glob("*.yaml"):
+        tests[os.path.basename(x).split(".")[0]] = x
+    vinca_conf["_tests"] = tests
+
     if (patch_dir / "dependencies.yaml").exists():
         vinca_conf["depmods"] = yaml.load(open(patch_dir / "dependencies.yaml"))
     if not vinca_conf.get("depmods"):
@@ -688,9 +694,9 @@ def get_selected_packages(distro, vinca_conf):
 
 
 def parse_package(pkg, distro, vinca_conf, path):
-
     name = pkg["name"].replace("_", "-")
     final_name = f"ros-{distro.name}-{name}"
+
     recipe = {
         "package": {"name": final_name, "version": pkg["version"]},
         "about": {
@@ -726,6 +732,12 @@ def parse_package(pkg, distro, vinca_conf, path):
             "run": [],
         },
     }
+
+    if test := vinca_conf.get("_tests", {}).get(final_name):
+        # parse as yaml
+        text = test.read_text()
+        test_content = ruamel.yaml.safe_load(text)
+        recipe["test"] = test_content
 
     for p in pkg["authors"]:
         name = p.name + " (" + p.email + ")" if p.email else p.name
@@ -907,7 +919,7 @@ def main():
             for o in outputs:
                 sources[o["package"]["name"]] = o["source"]
                 del o["source"]
-            write_recipe(sources, outputs)
+            write_recipe(sources, outputs, vinca_conf)
 
     else:
         if arguments.skip_already_built_repodata or vinca_conf.get("skip_existing"):
@@ -999,9 +1011,9 @@ def main():
             outputs = generate_outputs(distro, vinca_conf)
 
         if arguments.multiple_file:
-            write_recipe(source, outputs, vinca_conf.get("build_number", 0), False)
+            write_recipe(source, outputs, vinca_conf, False)
         else:
-            write_recipe(source, outputs, vinca_conf.get("build_number", 0))
+            write_recipe(source, outputs, vinca_conf)
 
         if unsatisfied_deps:
             print("Unsatisfied dependencies:", unsatisfied_deps)

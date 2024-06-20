@@ -60,7 +60,8 @@ def write_recipe_package(recipe):
         file.dump(recipe, stream)
 
 
-def write_recipe(source, outputs, build_number=0, single_file=True):
+def write_recipe(source, outputs, vinca_conf, single_file=True):
+    build_number = vinca_conf.get("build_number", 0)
     # single_file = False
     if single_file:
         file = yaml.YAML()
@@ -93,6 +94,13 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
 
             meta["build"]["number"] = build_number
             meta["build"]["post_process"] = post_process_items
+
+            if test := vinca_conf["_tests"].get(o["package"]["name"]):
+                print("Using test: ", test)
+                text = test.read_text()
+                test_content = yaml.safe_load(text)
+                meta["tests"] = test_content["tests"]
+
             recipe_dir = (Path("recipes") / o["package"]["name"]).absolute()
             os.makedirs(recipe_dir, exist_ok=True)
             with open(recipe_dir / "recipe.yaml", "w") as stream:
