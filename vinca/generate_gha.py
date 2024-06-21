@@ -263,8 +263,6 @@ def build_linux_pipeline(
     if docker_image is None:
         docker_image = "condaforge/linux-anvil-cos7-x86_64"
 
-    jobs = []
-    job_names = []
     prev_batch_keys = []
 
     for i, s in enumerate(stages):
@@ -319,8 +317,6 @@ def build_osx_pipeline(
     if azure_template is None:
         azure_template = blurb
 
-    jobs = []
-    job_names = []
     prev_batch_keys = []
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"

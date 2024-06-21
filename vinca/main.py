@@ -965,7 +965,8 @@ def main():
                     f"ros-{distro}-{pkg.replace('_', '-')}"
                     for pkg in ensure_list(vinca_conf["packages_select_by_deps"])
                 ]
-
+                all_pkgs = repodata.get("packages", {})
+                all_pkgs.update(repodata.get("packages.conda", {}))
                 for _, pkg in repodata.get("packages").items():
                     is_built = False
                     if selected_bn is not None:
