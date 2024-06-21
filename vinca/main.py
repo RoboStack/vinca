@@ -882,7 +882,7 @@ def main():
     if arguments.trigger_new_versions:
         vinca_conf["trigger_new_versions"] = True
     else:
-        vinca_conf["trigger_new_versions"] = False
+        vinca_conf["trigger_new_versions"] = vinca_conf.get("trigger_new_versions", False)
 
     if arguments.package:
         pkg_files = glob.glob(arguments.package)
