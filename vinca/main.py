@@ -286,6 +286,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         resolved_setuptools = resolve_pkgname("python-setuptools", vinca_conf, distro)
         output["requirements"]["host"].extend(resolved_setuptools)
     else:
+        print(f"Unknown build type for {pkg_shortname}: {pkg.get_build_type()}")
         return None
 
     if vinca_conf.get("mutex_package"):
