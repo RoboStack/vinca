@@ -526,7 +526,9 @@ def main():
 
     if args.platform == "osx-64":
         build_osx_pipeline(
-            stages, args.trigger_branch, script=azure_osx_script,
+            stages,
+            args.trigger_branch,
+            script=azure_osx_script,
         )
 
     if args.platform == "osx-arm64":

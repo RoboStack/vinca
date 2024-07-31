@@ -46,6 +46,7 @@ def get_repodata(url_or_path, platform=None):
     if "://" not in url_or_path:
         with open(url_or_path) as fi:
             return json.load(fi)
+    print("Downloading repodata from ", url_or_path)
 
     m = hashlib.md5(url_or_path.encode("utf-8")).hexdigest()[:10]
     # print(tempfile.gettempdir())
