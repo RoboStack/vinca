@@ -126,6 +126,13 @@ def parse_command_line(argv):
         default=None,
         help="The conda platform to check existing recipes for.",
     )
+    parser.add_argument(
+        "-z",
+        "--snapshot",
+        dest="snapshot",
+        default=None,
+        help="The version snapshot file (default: None)."
+    )
     arguments = parser.parse_args(argv[1:])
     global selected_platform
     config.parsed_args = arguments
@@ -206,6 +213,15 @@ def read_vinca_yaml(filepath):
     vinca_conf["trigger_new_versions"] = vinca_conf.get("trigger_new_versions", False)
 
     return vinca_conf
+
+
+def read_snapshot(filepath):
+    if not filepath:
+        return None
+
+    yaml = ruamel.yaml.YAML()
+    snapshot = yaml.load(open(filepath, "r"))
+    return snapshot
 
 
 def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
@@ -534,7 +550,7 @@ def get_version(distro, vinca_conf, pkg_shortname):
         vinca_conf.get("package_version")
         and vinca_conf["package_version"][pkg_shortname]
     ):
-        version = vinca_conf["package_version"][pkg_shortname]["version"]
+        version = vinca_conf["package_version"][pkg_shortname]["version"] # TODO: What is this for?
 
     return version
 
@@ -607,7 +623,7 @@ def generate_source_version(distro, vinca_conf):
             and vinca_conf["package_version"][pkg_shortname]
         ):
             url = vinca_conf["package_version"][pkg_shortname]["url"]
-            version = vinca_conf["package_version"][pkg_shortname]["version"]
+            version = vinca_conf["package_version"][pkg_shortname]["version"] # TODO: What is this for?
 
         entry = {}
         entry["git_url"] = url
@@ -865,6 +881,7 @@ def main():
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, "vinca.yaml")
     vinca_conf = read_vinca_yaml(vinca_yaml)
+    snapshot = read_snapshot(arguments.snapshot)
 
     from .template import generate_bld_ament_cmake
     from .template import generate_bld_ament_python
@@ -879,7 +896,7 @@ def main():
     generate_bld_colcon_merge()
     generate_bld_catkin_merge()
     generate_activate_hook()
-    
+
     if arguments.trigger_new_versions:
         vinca_conf["trigger_new_versions"] = True
     else:
@@ -892,7 +909,7 @@ def main():
         if "python_version" in vinca_conf:
             python_version = vinca_conf["python_version"]
 
-        distro = Distro(vinca_conf["ros_distro"], python_version)
+        distro = Distro(vinca_conf["ros_distro"], python_version, snapshot)
         additional_pkgs, parsed_pkgs = [], []
         for f in pkg_files:
             parsed_pkg = catkin_pkg.package.parse_package(f)
@@ -994,7 +1011,7 @@ def main():
         if "python_version" in vinca_conf:
             python_version = vinca_conf["python_version"]
 
-        distro = Distro(vinca_conf["ros_distro"], python_version)
+        distro = Distro(vinca_conf["ros_distro"], python_version, snapshot)
 
         selected_pkgs = get_selected_packages(distro, vinca_conf)
 

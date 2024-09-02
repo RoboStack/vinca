@@ -6,10 +6,11 @@ from rosdistro.manifest_provider import get_release_tag
 
 
 class Distro(object):
-    def __init__(self, distro_name, python_version=None):
+    def __init__(self, distro_name, python_version=None, snapshot=None):
         index = get_index(get_index_url())
         self._distro = get_cached_distribution(index, distro_name)
         self.distro_name = distro_name
+        self.snapshot = snapshot
         # set up ROS environments
         if python_version is None:
             python_version = index.distributions[distro_name]["python_version"]
@@ -60,6 +61,12 @@ class Distro(object):
         return dependencies
 
     def get_released_repo(self, pkg_name):
+        if pkg_name in self.snapshot:
+            return (
+                self.snapshot[pkg_name].get("url", None),
+                self.snapshot[pkg_name].get("tag", None),
+            )
+
         pkg = self._distro.release_packages[pkg_name]
         repo = self._distro.repositories[pkg.repository_name].release_repository
         release_tag = get_release_tag(repo, pkg_name)
@@ -74,6 +81,9 @@ class Distro(object):
             return False
 
     def get_version(self, pkg_name):
+        if pkg_name in self.snapshot:
+            return self.snapshot[pkg_name].get("version", None)
+
         pkg = self._distro.release_packages[pkg_name]
         repo = self._distro.repositories[pkg.repository_name].release_repository
         return repo.version.split("-")[0]
