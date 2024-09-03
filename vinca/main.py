@@ -544,21 +544,10 @@ def generate_outputs(distro, vinca_conf):
     return outputs
 
 
-def get_version(distro, vinca_conf, pkg_shortname):
-    version = distro.get_version(pkg_shortname)
-    if (
-        vinca_conf.get("package_version")
-        and vinca_conf["package_version"][pkg_shortname]
-    ):
-        version = vinca_conf["package_version"][pkg_shortname]["version"] # TODO: What is this for?
-
-    return version
-
-
 def generate_outputs_version(distro, vinca_conf):
     outputs = []
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
-        version = get_version(distro, vinca_conf, pkg_shortname)
+        version = distro.get_version(pkg_shortname)
         output = generate_output(pkg_shortname, vinca_conf, distro, version)
         if output is not None:
             outputs.append(output)
@@ -578,7 +567,7 @@ def generate_source(distro, vinca_conf):
         entry["git_url"] = url
         entry["git_rev"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-        pkg_version = get_version(distro, vinca_conf, pkg_shortname)
+        pkg_version = distro.get_version(pkg_shortname)
         print("Checking ", pkg_shortname, pkg_version)
         if not pkg_names:
             continue
@@ -618,12 +607,6 @@ def generate_source_version(distro, vinca_conf):
             continue
 
         url, version = distro.get_released_repo(pkg_shortname)
-        if (
-            vinca_conf["package_version"]
-            and vinca_conf["package_version"][pkg_shortname]
-        ):
-            url = vinca_conf["package_version"][pkg_shortname]["url"]
-            version = vinca_conf["package_version"][pkg_shortname]["version"] # TODO: What is this for?
 
         entry = {}
         entry["git_url"] = url
