@@ -61,7 +61,7 @@ class Distro(object):
         return dependencies
 
     def get_released_repo(self, pkg_name):
-        if pkg_name in self.snapshot:
+        if self.snapshot and pkg_name in self.snapshot:
             return (
                 self.snapshot[pkg_name].get("url", None),
                 self.snapshot[pkg_name].get("tag", None),
@@ -81,7 +81,7 @@ class Distro(object):
             return False
 
     def get_version(self, pkg_name):
-        if pkg_name in self.snapshot:
+        if self.snapshot and pkg_name in self.snapshot:
             return self.snapshot[pkg_name].get("version", None)
 
         pkg = self._distro.release_packages[pkg_name]
