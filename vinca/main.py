@@ -950,7 +950,7 @@ def main():
                 if "://" in fn:
                     selected_bn = vinca_conf.get("build_number", 0)
                     distro = vinca_conf["ros_distro"]
-                    for pkg_name, pkg in repodata.get("packages").items():
+                    for pkg_name, pkg in repodata.get("packages.conda").items():
                         if pkg_name.startswith(f"ros-{distro}"):
                             if pkg_name.rsplit("-", 2)[0] in additional_recipe_names:
                                 print(
