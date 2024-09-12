@@ -21,8 +21,8 @@ def main():
         "--package",
         type=str,
         dest="package",
-        default="ros_base",
-        help="ROS package to get dependencies for (default: ros_base)",
+        default=None,
+        help="ROS package to get dependencies for (default: ALL)",
         required=False,
     )
     parser.add_argument(
@@ -45,8 +45,12 @@ def main():
     args = parser.parse_args()
 
     distro = Distro(args.distro)
-    deps = distro.get_depends(args.package)
-    deps.add(args.package)
+
+    if args.package is None:
+        deps = distro.get_package_names()
+    else:
+        deps = distro.get_depends(args.package)
+        deps.add(args.package)
 
     if not args.quiet:
         max_len = max([len(dep) for dep in deps])
@@ -55,8 +59,13 @@ def main():
     output = {}
 
     for dep in deps:
-        url, tag = distro.get_released_repo(dep)
-        version = distro.get_version(dep)
+        try:
+            url, tag = distro.get_released_repo(dep)
+            version = distro.get_version(dep)
+        except AttributeError:
+            print("\033[93mPackage '{}' has no version set, skipping...\033[0m".format(dep))
+            continue
+
         output[dep] = {"url": url, "version": version, "tag": tag}
 
         if not args.quiet:

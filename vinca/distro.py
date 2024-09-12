@@ -96,3 +96,6 @@ class Distro(object):
 
     def get_python_version(self):
         return self._python_version
+
+    def get_package_names(self):
+        return self._distro.release_packages.keys()
