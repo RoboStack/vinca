@@ -240,6 +240,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 "${{ compiler('c') }}",
                 "${{ stdlib('c') }}",
                 "ninja",
+                "python",
                 "setuptools",
                 {"if": "unix", "then": ["make", "coreutils"]},
                 {"if": "osx", "then": ["tapi"]},
@@ -255,6 +256,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             ],
             "host": [
                 {"if": "build_platform == target_platform", "then": ["pkg-config"]},
+                "python",
                 "numpy",
                 "pip",
             ],
@@ -717,6 +719,7 @@ def parse_package(pkg, distro, vinca_conf, path):
                 "${{ compiler('c') }}",
                 "${{ stdlib('c') }}",
                 "ninja",
+                "python",
                 {"if": "unix", "then": ["make", "coreutils"]},
                 "cmake",
                 {"if": "build_platform != target_platform", "then": ["python"]},

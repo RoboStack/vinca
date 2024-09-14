@@ -68,6 +68,7 @@ cmake \
     -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=True \
     -DBUILD_SHARED_LIBS=ON  \
     -DBUILD_TESTING=OFF \
+    -DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local/homebrew" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
     --compile-no-warning-as-error \
     $SRC_DIR/$PKG_NAME/src/work
