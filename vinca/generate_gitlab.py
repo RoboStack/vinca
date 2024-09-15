@@ -75,7 +75,7 @@ def main():
 
     print(stages)
 
-    gitlab_template = {"image": "condaforge/linux-anvil-cos7-x86_64"}
+    gitlab_template = {"image": "ubuntu"}
 
     stage_names = []
     for i, s in enumerate(stages):
