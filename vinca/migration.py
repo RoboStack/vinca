@@ -1,6 +1,7 @@
 import argparse
 import networkx as nx
 from ruamel.yaml import YAML
+from .distro import Distro
 from .utils import get_repodata, get_pinnings
 
 
@@ -95,7 +96,7 @@ def main():
     graph = nx.DiGraph()
     for pkg in packages:
         pkg_name = packages[pkg].get("name")
-        if not pkg_name.startswith("ros-humble"):  # TODO: add parameter for prefix
+        if not pkg_name.startswith("ros-humble"):  # TODO: add parameter for distro
             continue
         graph.add_node(pkg_name)
         for dep in packages[pkg].get("depends", []):
@@ -103,13 +104,16 @@ def main():
             graph.add_edge(pkg_name, req)
 
     graph = graph.reverse()
+    distro = Distro("humble")  # TODO: add parameter for distro
 
     rebuild = set()
     for pkg in changed:
         if pkg not in graph:
             continue
         for node in nx.dfs_predecessors(graph, pkg):
-            rebuild.add(node)
+            ros_name = node.replace("ros-humble-", "").replace("-", "_")
+            repo_name = distro.get_released_repo_name(ros_name)
+            rebuild.add(repo_name)
 
     print("\n\033[1mPackages to rebuild:\033[0m")
     for pkg in rebuild:
