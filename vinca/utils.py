@@ -4,6 +4,7 @@ import os
 import time
 import json
 import requests
+import ruamel.yaml
 
 
 class folded_unicode(str):
@@ -64,3 +65,15 @@ def get_repodata(url_or_path, platform=None):
     with open(fn, "w") as fcache:
         fcache.write(content.decode("utf-8"))
     return json.loads(content)
+
+
+def get_pinnings(url_or_path):
+    yaml = ruamel.yaml.YAML()
+    yaml.allow_duplicate_keys = True
+
+    if "://" not in url_or_path:
+        with open(url_or_path) as fi:
+            return yaml.load(fi)
+
+    response = requests.get(url_or_path)
+    return yaml.load(response.content)
