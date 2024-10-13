@@ -1,4 +1,5 @@
 import argparse
+import networkx as nx
 from ruamel.yaml import YAML
 from .utils import get_repodata, get_pinnings
 
@@ -90,3 +91,26 @@ def main():
         yaml.compact_seq_seq = False
         # TODO: check output formatting
         yaml.dump(local, f)
+
+    graph = nx.DiGraph()
+    for pkg in packages:
+        pkg_name = packages[pkg].get("name")
+        if not pkg_name.startswith("ros-humble"):  # TODO: add parameter for prefix
+            continue
+        graph.add_node(pkg_name)
+        for dep in packages[pkg].get("depends", []):
+            req = dep.split()[0]
+            graph.add_edge(pkg_name, req)
+
+    graph = graph.reverse()
+
+    rebuild = set()
+    for pkg in changed:
+        if pkg not in graph:
+            continue
+        for node in nx.dfs_predecessors(graph, pkg):
+            rebuild.add(node)
+
+    print("\n\033[1mPackages to rebuild:\033[0m")
+    for pkg in rebuild:
+        print(pkg)
