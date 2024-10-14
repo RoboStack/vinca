@@ -34,6 +34,15 @@ def main():
         required=False,
     )
     parser.add_argument(
+        "-v",
+        "--vinca",
+        type=str,
+        dest="vinca",
+        default="vinca.yaml",
+        help="Path to the vinca configuration file",
+        required=False,
+    )
+    parser.add_argument(
         "--repodata",
         type=str,
         dest="repodata",
@@ -50,6 +59,11 @@ def main():
         required=False,
     )
     args = parser.parse_args()
+
+    with open(args.vinca, "r") as f:
+        vinca = YAML().load(f)
+
+    ros_distro = vinca["ros_distro"]
 
     repodata = get_repodata(args.repodata, args.platform)
     packages = repodata["packages"]
@@ -96,7 +110,7 @@ def main():
     graph = nx.DiGraph()
     for pkg in packages:
         pkg_name = packages[pkg].get("name")
-        if not pkg_name.startswith("ros-humble"):  # TODO: add parameter for distro
+        if not pkg_name.startswith("ros-" + ros_distro):
             continue
         graph.add_node(pkg_name)
         for dep in packages[pkg].get("depends", []):
@@ -104,16 +118,24 @@ def main():
             graph.add_edge(pkg_name, req)
 
     graph = graph.reverse()
-    distro = Distro("humble")  # TODO: add parameter for distro
+    distro = Distro(ros_distro)
 
     rebuild = set()
     for pkg in changed:
         if pkg not in graph:
             continue
         for node in nx.dfs_predecessors(graph, pkg):
-            ros_name = node.replace("ros-humble-", "").replace("-", "_")
+            ros_name = node.removeprefix("ros-" + ros_distro + "-").replace("-", "_")
             repo_name = distro.get_released_repo_name(ros_name)
             rebuild.add(repo_name)
+
+    vinca["build_number"] += 1
+    vinca["full_rebuild"] = False
+    vinca["packages_select_by_deps"] = list(rebuild)
+    # TODO: comment/uncomment/add packages to existing list instead of overwriting
+
+    with open(args.vinca, "w") as f:
+        yaml.dump(vinca, f)
 
     print("\n\033[1mPackages to rebuild:\033[0m")
     for pkg in rebuild:
