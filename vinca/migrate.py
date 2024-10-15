@@ -1,203 +1,142 @@
-import yaml
-import sys
-import os
 import argparse
-import re
 import networkx as nx
-import subprocess
-import shutil
-import ruamel.yaml
-from .utils import get_repodata
-from vinca import config
-from vinca.distro import Distro
-from distutils.dir_util import copy_tree
-
-distro_version = None
-ros_prefix = None
-
-# arches = ["linux-64", "linux-aarch64", "win-64", "osx-64", "osx-arm64"]
-# arch_to_fname = {
-#     "linux-64": "linux",
-#     "linux-aarch64": "linux_aarch_64",
-#     "win-64": "win",
-#     "osx-64": "osx",
-#     "osx-arm64": "osx_arm64"
-# }
-
-
-def to_ros_name(distro, pkg_name):
-    shortname = pkg_name[len(ros_prefix) + 1 :]
-    if distro.check_package(shortname):
-        return shortname
-    elif distro.check_package(shortname.replace("-", "_")):
-        return shortname.replace("-", "_")
-    else:
-        raise RuntimeError(f"Couldnt convert {pkg_name} to ROS pkg name")
-
-
-def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
-    url = "https://conda.anaconda.org/robostack/"
-
-    yaml = ruamel.yaml.YAML()
-    with open("vinca.yaml", "r") as fi:
-        vinca_conf = yaml.load(fi)
-
-    global distro_version, ros_prefix
-    distro_version = vinca_conf["ros_distro"]
-    ros_prefix = f"ros-{distro_version}"
-
-    repodata = get_repodata(url, arch)
-
-    packages = repodata["packages"]
-    to_migrate = set()
-    ros_pkgs = set()
-    for pkey in packages:
-        if not pkey.startswith(ros_prefix):
-            continue
-
-        pname = pkey.rsplit("-", 2)[0]
-        ros_pkgs.add(pname)
-
-        p = packages[pkey]
-
-        for d in p.get("depends", []):
-            if d.split()[0] in packages_to_migrate:
-                # print(f"need to migrate {pkey}")
-                to_migrate.add(pname)
-
-    latest = {}
-    for pkg in ros_pkgs:
-        current = current_version = None
-        for pkey in packages:
-            if packages[pkey]["name"] == pkg:
-                tmp = packages[pkey]["version"].split(".")
-                version = []
-                for el in tmp:
-                    if el.isdecimal():
-                        version.append(int(el))
-                    else:
-                        x = re.search(r"[^0-9]", version).start()
-                        version.append(int(el[:x]))
-
-                version = tuple(version)
-
-                if not current or version > current_version:
-                    current_version = version
-                    current = pkey
-        latest[pkg] = current
-
-    # now we can build the graph ...
-
-    G = nx.DiGraph()
-    for pkg, pkgkey in latest.items():
-        full_pkg = packages[pkgkey]
-        for dep in full_pkg.get("depends", []):
-            req = dep.split(" ")[0]
-            G.add_node(pkg)
-            if req.startswith(ros_prefix):
-                G.add_edge(pkg, req)
-
-    gsorted = nx.topological_sort(G)
-    gsorted = list(reversed([g for g in gsorted]))
-
-    to_migrate = sorted(to_migrate, key=lambda x: gsorted.index(x))
-
-    print("Sorted to migrate: ", to_migrate)
-
-    distro = Distro(distro_version)
-    # import IPython; IPython.embed()
-
-    ros_names = []
-    for pkg in to_migrate:
-        ros_names.append(to_ros_name(distro, pkg))
-    print("Final names: ", ros_names)
-
-    vinca_conf["packages_select_by_deps"] = ros_names
-    vinca_conf["skip_all_deps"] = True
-    vinca_conf["is_migration"] = True
-    vinca_conf["skip_existing"] = []
-
-    with open("vinca.yaml", "w") as fo:
-        yaml.dump(vinca_conf, fo)
-
-    if os.path.exists("recipes"):
-        shutil.rmtree("recipes")
-
-    mutex_path = os.path.join(
-        config.parsed_args.dir, "additional_recipes/ros-distro-mutex"
-    )
-    if os.path.exists(mutex_path):
-        goal_folder = os.path.join(
-            config.parsed_args.dir, "recipes", "ros-distro-mutex"
-        )
-        os.makedirs(goal_folder, exist_ok=True)
-        copy_tree(mutex_path, goal_folder)
-
-    subprocess.check_call(
-        ["vinca", "-d", config.parsed_args.dir, "--multiple", "--platform", arch]
-    )
-
-    # TODO remove hard coded build branch here!
-    recipe_dir = os.path.join(config.parsed_args.dir, "recipes")
-    subprocess.check_call(
-        [
-            "vinca-azure",
-            "--platform",
-            arch,
-            "--trigger-branch",
-            "buildbranch_linux",
-            "-d",
-            recipe_dir,
-            "--additional-recipes",
-        ]
-    )
-
-
-def parse_command_line(argv):
-    parser = argparse.ArgumentParser(
-        description="Conda recipe Azure pipeline generator for ROS packages"
-    )
-
-    default_dir = "./recipes"
-    parser.add_argument(
-        "-d",
-        "--dir",
-        dest="dir",
-        default=default_dir,
-        help="The recipes directory to process (default: {}).".format(default_dir),
-    )
-
-    parser.add_argument(
-        "-t", "--trigger-branch", dest="trigger_branch", help="Trigger branch for Azure"
-    )
-
-    parser.add_argument(
-        "-p",
-        "--platform",
-        dest="platform",
-        default="linux-64",
-        help="Platform to emit build pipeline for",
-    )
-
-    parser.add_argument(
-        "-a",
-        "--additional-recipes",
-        action="store_true",
-        help="search for additional_recipes folder?",
-    )
-
-    arguments = parser.parse_args(argv[1:])
-    config.parsed_args = arguments
-    return arguments
+from ruamel.yaml import YAML
+from .distro import Distro
+from .utils import get_repodata, get_pinnings
 
 
 def main():
-    args = parse_command_line(sys.argv)
+    parser = argparse.ArgumentParser(
+        description="Dependency migration tool for ROS packages"
+    )
+    parser.add_argument(
+        type=str,
+        dest="pinnings",
+        help="Path to the local pinnings file",
+        metavar="PINNINGS",
+    )
+    parser.add_argument(
+        "-a",
+        "--all",
+        action="store_true",
+        dest="all",
+        help="Show all dependencies",
+        required=False,
+    )
+    parser.add_argument(
+        "-p",
+        "--platform",
+        type=str,
+        dest="platform",
+        choices=["win-64", "linux-64", "linux-aarch64", "osx-64", "osx-arm64"],
+        default="linux-64",
+        help="Platform to target (default: linux-64)",
+        required=False,
+    )
+    parser.add_argument(
+        "-v",
+        "--vinca",
+        type=str,
+        dest="vinca",
+        default="vinca.yaml",
+        help="Path to the vinca configuration file",
+        required=False,
+    )
+    parser.add_argument(
+        "--repodata",
+        type=str,
+        dest="repodata",
+        default="https://conda.anaconda.org/robostack-staging/",
+        help="URL to the repodata file",
+        required=False,
+    )
+    parser.add_argument(
+        "--upstream",
+        type=str,
+        dest="upstream",
+        default="https://raw.githubusercontent.com/conda-forge/conda-forge-pinning-feedstock/refs/heads/main/recipe/conda_build_config.yaml",
+        help="URL to the upstream pinnings file",
+        required=False,
+    )
+    args = parser.parse_args()
 
-    mfile = os.path.join(args.dir + "/migration.yaml")
-    with open(mfile, "r") as fi:
-        migration = yaml.safe_load(fi)
-        print(migration)
-        create_migration_instructions(
-            args.platform, migration.get("packages", []), args.trigger_branch
-        )
+    with open(args.vinca, "r") as f:
+        vinca = YAML().load(f)
+
+    ros_distro = vinca["ros_distro"]
+
+    repodata = get_repodata(args.repodata, args.platform)
+    packages = repodata["packages"]
+
+    deps = set()
+    for pkg in packages:
+        for dep in packages[pkg].get("depends", []):
+            deps.add(dep.split()[0])
+
+    local = get_pinnings(args.pinnings)
+    upstream = get_pinnings(args.upstream)
+
+    common = sorted(deps.intersection(local.keys()))
+    max_len = max(len(name) for name in common)
+    print("\033[1m{0:{2}} {1}\033[0m".format("Package", "Versions", max_len))
+
+    changed = []
+
+    for name in common:
+        current = local[name]
+        latest = upstream[name]
+
+        if current == latest:
+            if args.all:
+                print("{0:{2}} {1}".format(name, current, max_len))
+            continue
+
+        print("{0:{3}} {1} -> {2}".format(name, current, latest, max_len))
+
+        local[name] = latest
+        changed.append(name)
+
+    if not changed:
+        print("No packages to migrate")
+        return
+
+    with open(args.pinnings, "w") as f:
+        yaml = YAML()
+        yaml.indent(mapping=2, sequence=4, offset=2)
+        yaml.compact_seq_seq = False
+        # TODO: check output formatting
+        yaml.dump(local, f)
+
+    graph = nx.DiGraph()
+    for pkg in packages:
+        pkg_name = packages[pkg].get("name")
+        if not pkg_name.startswith("ros-" + ros_distro):
+            continue
+        graph.add_node(pkg_name)
+        for dep in packages[pkg].get("depends", []):
+            req = dep.split()[0]
+            graph.add_edge(pkg_name, req)
+
+    graph = graph.reverse()
+    distro = Distro(ros_distro)
+
+    rebuild = set()
+    for pkg in changed:
+        if pkg not in graph:
+            continue
+        for node in nx.dfs_predecessors(graph, pkg):
+            ros_name = node.removeprefix("ros-" + ros_distro + "-").replace("-", "_")
+            repo_name = distro.get_released_repo_name(ros_name)
+            rebuild.add(repo_name)
+
+    vinca["build_number"] += 1
+    vinca["full_rebuild"] = False
+    vinca["packages_select_by_deps"] = list(rebuild)
+    # TODO: comment/uncomment/add packages to existing list instead of overwriting
+
+    with open(args.vinca, "w") as f:
+        yaml.dump(vinca, f)
+
+    print("\n\033[1mPackages to rebuild:\033[0m")
+    for pkg in rebuild:
+        print(pkg)
