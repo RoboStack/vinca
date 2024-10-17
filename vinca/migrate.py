@@ -43,6 +43,13 @@ def main():
         required=False,
     )
     parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Show changes without modifying files",
+        required=False,
+    )
+    parser.add_argument(
         "--repodata",
         type=str,
         dest="repodata",
@@ -100,12 +107,13 @@ def main():
         print("No packages to migrate")
         return
 
-    with open(args.pinnings, "w") as f:
-        yaml = YAML()
-        yaml.indent(mapping=2, sequence=4, offset=2)
-        yaml.compact_seq_seq = False
-        # TODO: check output formatting
-        yaml.dump(local, f)
+    if not args.dry_run:
+        with open(args.pinnings, "w") as f:
+            yaml = YAML()
+            yaml.indent(mapping=2, sequence=4, offset=2)
+            yaml.compact_seq_seq = False
+            # TODO: check output formatting
+            yaml.dump(local, f)
 
     graph = nx.DiGraph()
     for pkg in packages:
@@ -134,8 +142,9 @@ def main():
     vinca["packages_select_by_deps"] = list(rebuild)
     # TODO: comment/uncomment/add packages to existing list instead of overwriting
 
-    with open(args.vinca, "w") as f:
-        yaml.dump(vinca, f)
+    if not args.dry_run:
+        with open(args.vinca, "w") as f:
+            yaml.dump(vinca, f)
 
     print("\n\033[1mPackages to rebuild:\033[0m")
     for pkg in rebuild:
