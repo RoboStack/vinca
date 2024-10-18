@@ -50,6 +50,13 @@ def main():
         required=False,
     )
     parser.add_argument(
+        "--pinnings-only",
+        action="store_true",
+        dest="pinnings_only",
+        help="Only update the pinnings file",
+        required=False,
+    )
+    parser.add_argument(
         "--repodata",
         type=str,
         dest="repodata",
@@ -114,6 +121,9 @@ def main():
             yaml.compact_seq_seq = False
             # TODO: check output formatting
             yaml.dump(local, f)
+
+    if args.pinnings_only:
+        return
 
     graph = nx.DiGraph()
     for pkg in packages:
