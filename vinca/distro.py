@@ -74,7 +74,7 @@ class Distro(object):
 
     def check_package(self, pkg_name):
         if pkg_name in self._distro.release_packages:
-            return True
+            return self.snapshot is None or pkg_name in self.snapshot
         elif pkg_name in self.build_packages:
             return True
         else:

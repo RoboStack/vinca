@@ -547,6 +547,10 @@ def generate_outputs(distro, vinca_conf):
 def generate_outputs_version(distro, vinca_conf):
     outputs = []
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
+        if not distro.check_package(pkg_shortname):
+            print(f"Could not generate output for {pkg_shortname}")
+            continue
+
         version = distro.get_version(pkg_shortname)
         output = generate_output(pkg_shortname, vinca_conf, distro, version)
         if output is not None:
