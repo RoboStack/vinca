@@ -277,15 +277,15 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     if pkg.get_build_type() in ["cmake", "catkin"]:
         output["build"][
             "script"
-        ] = "${{ 'build_catkin.sh' if unix else 'bld_catkin.bat' }}"
+        ] = "${{ '$RECIPE_DIR/build_catkin.sh' if unix else '%RECIPE_DIR%\\bld_catkin.bat' }}"
     elif pkg.get_build_type() in ["ament_cmake"]:
         output["build"][
             "script"
-        ] = "${{ 'build_ament_cmake.sh' if unix else 'bld_ament_cmake.bat' }}"
+        ] = "${{ '$RECIPE_DIR/build_ament_cmake.sh' if unix else '%RECIPE_DIR%\\bld_ament_cmake.bat' }}"
     elif pkg.get_build_type() in ["ament_python"]:
         output["build"][
             "script"
-        ] = "${{ 'build_ament_python.sh' if unix else 'bld_ament_python.bat' }}"
+        ] = "${{ '$RECIPE_DIR/build_ament_python.sh' if unix else '%RECIPE_DIR%\\bld_ament_python.bat' }}"
         resolved_setuptools = resolve_pkgname("python-setuptools", vinca_conf, distro)
         output["requirements"]["host"].extend(resolved_setuptools)
     else:
@@ -710,7 +710,7 @@ def parse_package(pkg, distro, vinca_conf, path):
         "extra": {"recipe-maintainers": ["robostack"]},
         "build": {
             "number": 0,
-            "script": "${{ 'build_catkin.sh' if unix else 'bld_catkin.bat' }}",
+            "script": "${{ '$RECIPE_DIR/build_catkin.sh' if unix else '%RECIPE_DIR%\\bld_catkin.bat' }}",
         },
         "source": {},
         "requirements": {
@@ -801,7 +801,7 @@ def parse_package(pkg, distro, vinca_conf, path):
     if pkg.get_build_type() in ["cmake", "catkin"]:
         recipe["build"][
             "script"
-        ] = "${{ 'build_catkin.sh' if unix else 'bld_catkin.bat' }}"
+        ] = "${{ '$RECIPE_DIR/build_catkin.sh' if unix else '%RECIPE_DIR%\\bld_catkin.bat' }}"
 
     # fix up OPENGL support for Unix
     if (

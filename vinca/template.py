@@ -2,6 +2,7 @@ import datetime
 import shutil
 import os
 import re
+import stat
 
 from ruamel import yaml
 from pathlib import Path
@@ -59,6 +60,15 @@ def write_recipe_package(recipe):
     with open(recipe_path, "w") as stream:
         file.dump(recipe, stream)
 
+def copyfile_with_exec_permissions(source_file, destination_file):
+    shutil.copyfile(source_file, destination_file)
+
+    # It seems that rattler-build requires script to have executable permissions
+    if os.name == 'posix':
+        # Retrieve current permissions
+        current_permissions = os.stat(destination_file).st_mode
+        # Set executable permissions for user, group, and others
+        os.chmod(destination_file, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 def write_recipe(source, outputs, vinca_conf, single_file=True):
     build_number = vinca_conf.get("build_number", 0)
@@ -113,8 +123,10 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
                     shutil.copyfile(p, recipe_dir / p)
 
             build_scripts = re.findall(r"'(.*?)'", meta["build"]["script"])
+            baffer = meta["build"]["script"]
             for script in build_scripts:
-                shutil.copyfile(script, recipe_dir / script)
+                script_filename = script.replace("$RECIPE_DIR", "").replace("%RECIPE_DIR%", "").replace("/", "").replace("\\", "")
+                copyfile_with_exec_permissions(script_filename, recipe_dir / script_filename)
             if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
                 shutil.copyfile("activate.sh", recipe_dir / "activate.sh")
                 shutil.copyfile("activate.bat", recipe_dir / "activate.bat")
@@ -136,6 +148,13 @@ def generate_template(template_in, template_out):
     interpreter.file(open(template_in))
     interpreter.shutdown()
 
+    # It seems that rattler-build requires script to have executable permissions
+    # See https://github.com/RoboStack/ros-humble/pull/229#issuecomment-2549988298
+    if os.name == 'posix':
+        # Retrieve current permissions
+        current_permissions = os.stat(template_out.name).st_mode
+        # Set executable permissions for user, group, and others
+        os.chmod(template_out.name, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 def generate_bld_ament_cmake():
     import pkg_resources
