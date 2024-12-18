@@ -555,7 +555,7 @@ def generate_source(distro, vinca_conf):
         url, version = distro.get_released_repo(pkg_shortname)
         entry = {}
         entry["git"] = url
-        entry["rev"] = version
+        entry["tag"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
         pkg_version = get_version(distro, vinca_conf, pkg_shortname)
         print("Checking ", pkg_shortname, pkg_version)
@@ -606,7 +606,7 @@ def generate_source_version(distro, vinca_conf):
 
         entry = {}
         entry["git"] = url
-        entry["rev"] = version
+        entry["tag"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
         if vinca_conf.get("trigger_new_versions"):
             if (
@@ -646,7 +646,7 @@ def generate_fat_source(distro, vinca_conf):
         url, version = distro.get_released_repo(pkg_shortname)
         entry = {}
         entry["git"] = url
-        entry["rev"] = version
+        entry["tag"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
         if not pkg_names:
             continue
@@ -749,7 +749,7 @@ def parse_package(pkg, distro, vinca_conf, path):
     for u in pkg["urls"]:
         # if u.type == 'repository' :
         #     recipe['source']['git'] = u.url
-        #     recipe['source']['rev'] = recipe['package']['version']
+        #     recipe['source']['tag'] = recipe['package']['version']
         if u.type == "website":
             recipe["about"]["homepage"] = u.url
 
