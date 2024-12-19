@@ -431,19 +431,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         while "REQUIRE_OPENGL" in output["requirements"]["host"]:
             output["requirements"]["host"].remove("REQUIRE_OPENGL")
 
-        output["requirements"]["build"] += [
+        output["requirements"]["host"] += [
             {
                 "if": "linux",
                 "then": [
-                    "${{ cdt('mesa-libgl-devel') }}",
-                    "${{ cdt('mesa-dri-drivers') }}",
-                    "${{ cdt('libselinux') }}",
-                    "${{ cdt('libxdamage') }}",
-                    "${{ cdt('libxxf86vm') }}",
-                    "${{ cdt('libxfixes') }}",
-                    "${{ cdt('libxext') }}",
-                    "${{ cdt('libxau') }}",
-                    "${{ cdt('libxcb') }}",
+                    "libgl-devel"
                 ],
             }
         ]
@@ -466,14 +458,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         while "REQUIRE_GL" in output["requirements"]["host"]:
             output["requirements"]["host"].remove("REQUIRE_GL")
 
-        output["requirements"]["build"] += [
+        output["requirements"]["host"] += [
             {
                 "if": "linux",
                 "then": [
-                    "${{ cdt('mesa-libgl-devel') }}",
-                    "${{ cdt('mesa-dri-drivers') }}",
-                    "${{ cdt('libselinux') }}",
-                    "${{ cdt('libxxf86vm') }}",
+                    "libgl-devel"
                 ],
             }
         ]
