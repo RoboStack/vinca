@@ -126,6 +126,13 @@ def parse_command_line(argv):
         default=None,
         help="The conda platform to check existing recipes for.",
     )
+    parser.add_argument(
+        "-z",
+        "--snapshot",
+        dest="snapshot",
+        default=None,
+        help="The version snapshot file (default: None)."
+    )
     arguments = parser.parse_args(argv[1:])
     global selected_platform
     config.parsed_args = arguments
@@ -206,6 +213,15 @@ def read_vinca_yaml(filepath):
     vinca_conf["trigger_new_versions"] = vinca_conf.get("trigger_new_versions", False)
 
     return vinca_conf
+
+
+def read_snapshot(filepath):
+    if not filepath:
+        return None
+
+    yaml = ruamel.yaml.YAML()
+    snapshot = yaml.load(open(filepath, "r"))
+    return snapshot
 
 
 def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
@@ -528,21 +544,14 @@ def generate_outputs(distro, vinca_conf):
     return outputs
 
 
-def get_version(distro, vinca_conf, pkg_shortname):
-    version = distro.get_version(pkg_shortname)
-    if (
-        vinca_conf.get("package_version")
-        and vinca_conf["package_version"][pkg_shortname]
-    ):
-        version = vinca_conf["package_version"][pkg_shortname]["version"]
-
-    return version
-
-
 def generate_outputs_version(distro, vinca_conf):
     outputs = []
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
-        version = get_version(distro, vinca_conf, pkg_shortname)
+        if not distro.check_package(pkg_shortname):
+            print(f"Could not generate output for {pkg_shortname}")
+            continue
+
+        version = distro.get_version(pkg_shortname)
         output = generate_output(pkg_shortname, vinca_conf, distro, version)
         if output is not None:
             outputs.append(output)
@@ -562,7 +571,7 @@ def generate_source(distro, vinca_conf):
         entry["git_url"] = url
         entry["git_rev"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-        pkg_version = get_version(distro, vinca_conf, pkg_shortname)
+        pkg_version = distro.get_version(pkg_shortname)
         print("Checking ", pkg_shortname, pkg_version)
         if not pkg_names:
             continue
@@ -602,12 +611,6 @@ def generate_source_version(distro, vinca_conf):
             continue
 
         url, version = distro.get_released_repo(pkg_shortname)
-        if (
-            vinca_conf["package_version"]
-            and vinca_conf["package_version"][pkg_shortname]
-        ):
-            url = vinca_conf["package_version"][pkg_shortname]["url"]
-            version = vinca_conf["package_version"][pkg_shortname]["version"]
 
         entry = {}
         entry["git_url"] = url
@@ -865,6 +868,7 @@ def main():
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, "vinca.yaml")
     vinca_conf = read_vinca_yaml(vinca_yaml)
+    snapshot = read_snapshot(arguments.snapshot)
 
     from .template import generate_bld_ament_cmake
     from .template import generate_bld_ament_python
@@ -879,7 +883,7 @@ def main():
     generate_bld_colcon_merge()
     generate_bld_catkin_merge()
     generate_activate_hook()
-    
+
     if arguments.trigger_new_versions:
         vinca_conf["trigger_new_versions"] = True
     else:
@@ -892,7 +896,7 @@ def main():
         if "python_version" in vinca_conf:
             python_version = vinca_conf["python_version"]
 
-        distro = Distro(vinca_conf["ros_distro"], python_version)
+        distro = Distro(vinca_conf["ros_distro"], python_version, snapshot)
         additional_pkgs, parsed_pkgs = [], []
         for f in pkg_files:
             parsed_pkg = catkin_pkg.package.parse_package(f)
@@ -994,7 +998,7 @@ def main():
         if "python_version" in vinca_conf:
             python_version = vinca_conf["python_version"]
 
-        distro = Distro(vinca_conf["ros_distro"], python_version)
+        distro = Distro(vinca_conf["ros_distro"], python_version, snapshot)
 
         selected_pkgs = get_selected_packages(distro, vinca_conf)
 
