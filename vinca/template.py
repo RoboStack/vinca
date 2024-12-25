@@ -35,17 +35,17 @@ post_process_items = [
     {
         "files": ["*.pc"],
         "regex": '(?:-L|-I)?"?([^;\\s]+/sysroot/)',
-        "replacement": "$(CONDA_BUILD_SYSROOT_S)",
+        "replacement": "$$(CONDA_BUILD_SYSROOT_S)",
     },
     {
         "files": ["*.cmake"],
         "regex": '([^;\\s"]+/sysroot)',
-        "replacement": "$ENV{CONDA_BUILD_SYSROOT}",
+        "replacement": "$$ENV{CONDA_BUILD_SYSROOT}",
     },
     {
         "files": ["*.cmake"],
         "regex": '([^;\\s"]+/MacOSX\\d*\\.?\\d*\\.sdk)',
-        "replacement": "$ENV{CONDA_BUILD_SYSROOT}",
+        "replacement": "$$ENV{CONDA_BUILD_SYSROOT}",
     },
 ]
 
