@@ -1,15 +1,10 @@
-set "CI=azure"
-call activate base
+set "CI=true"
 
 :: 4 cores available on GHA: https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners
 :: CPU_COUNT is passed through conda build: https://github.com/conda/conda-build/pull/1149
 set CPU_COUNT=4
 
 set PYTHONUNBUFFERED=1
-
-conda config --set show_channel_urls true
-conda config --set auto_update_conda false
-conda config --set add_pip_as_python_dependency false
 
 call setup_x64
 
@@ -28,14 +23,3 @@ if defined CI (
 
 :: Make paths like C:\\hostedtoolcache\\windows\\Ruby\\2.5.7\\x64\\bin garbage
 set "PATH=%PATH:ostedtoolcache=%"
-
-mkdir "%CONDA%\\etc\\conda\\activate.d"
-
-echo set "CONDA_BLD_PATH=%CONDA_BLD_PATH%"         > "%CONDA%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
-echo set "CPU_COUNT=%CPU_COUNT%"                  >> "%CONDA%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
-echo set "PYTHONUNBUFFERED=%PYTHONUNBUFFERED%"    >> "%CONDA%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
-echo set "PATH=%PATH%"                            >> "%CONDA%\\etc\\conda\\activate.d\\conda-forge-ci-setup-activate.bat"
-
-conda info
-conda config --show-sources
-conda list --show-channel-urls
