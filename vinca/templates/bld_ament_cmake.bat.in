@@ -12,10 +12,7 @@ rd /s /q build
 mkdir build
 pushd build
 
-:: set "CMAKE_GENERATOR=Ninja"
-
-:: try to fix long paths issues by using default generator
-set "CMAKE_GENERATOR=Visual Studio %VS_MAJOR% %VS_YEAR%"
+set "CMAKE_GENERATOR=Ninja"
 
 :: PYTHON_INSTALL_DIR should be a relative path, see
 :: https://github.com/ament/ament_cmake/blob/2.3.2/ament_cmake_python/README.md
