@@ -15,7 +15,7 @@ set CXX=cl.exe
 :: This line is scary, but it basically assigns the output of the command inside (` and `)
 :: to the variable specified after DO SET
 :: The equivalent in bash is PYTHON_INSTALL_DIR=`python -c ...`
-FOR /F "tokens=* USEBACKQ" %%i IN (`python -c "import os;print(os.path.relpath(os.environ['SP_DIR'],os.environ['LIBRARY_PREFIX']).replace('\\','\\\\'))"`) DO SET PYTHON_INSTALL_DIR=%%i
+FOR /F "tokens=* USEBACKQ" %%i IN (`python -c "import os;print(os.path.relpath(os.environ['SP_DIR'],os.environ['LIBRARY_PREFIX']).replace('\\','/'))"`) DO SET PYTHON_INSTALL_DIR=%%i
 
 colcon build ^
     --event-handlers console_cohesion+ ^
