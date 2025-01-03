@@ -305,7 +305,7 @@ def build_linux_pipeline(
 def build_osx_pipeline(
     stages,
     trigger_branch,
-    vm_imagename="macos-13",
+    vm_imagename="macos-latest",
     outfile="osx.yml",
     azure_template=None,
     script=azure_osx_script,
