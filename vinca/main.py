@@ -940,7 +940,9 @@ def main():
                 if "://" in fn:
                     selected_bn = vinca_conf.get("build_number", 0)
                     distro = vinca_conf["ros_distro"]
-                    for pkg_name, pkg in repodata.get("packages.conda").items():
+                    all_pkgs = repodata.get("packages", {})
+                    all_pkgs.update(repodata.get("packages.conda", {}))
+                    for pkg_name, pkg in all_pkgs.items():
                         if pkg_name.startswith(f"ros-{distro}"):
                             if pkg_name.rsplit("-", 2)[0] in additional_recipe_names:
                                 print(
@@ -957,7 +959,7 @@ def main():
                 ]
                 all_pkgs = repodata.get("packages", {})
                 all_pkgs.update(repodata.get("packages.conda", {}))
-                for _, pkg in repodata.get("packages").items():
+                for _, pkg in all_pkgs.items():
                     is_built = False
                     if selected_bn is not None:
                         if vinca_conf.get("full_rebuild", True):
