@@ -431,9 +431,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         output["requirements"]["host"] += [
             {
                 "if": "linux",
-                "then": [
-                    "libgl-devel"
-                ],
+                "then": ["libgl-devel", "libopengl-devel"],
             }
         ]
 
