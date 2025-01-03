@@ -198,7 +198,9 @@ def add_additional_recipes(args):
         print("Checking if ", name, version, bnumber, " exists")
         skip = False
         for repo in repodatas:
-            for _, pkg in repo.get("packages", {}).items():
+            repo_pkgs = repo.get("packages", {})
+            repo_pkgs.update(repo.get("packages.conda", {}))
+            for _, pkg in repo_pkgs.items():
                 if (
                     pkg["name"] == name
                     and pkg["version"] == version
