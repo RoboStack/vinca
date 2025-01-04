@@ -406,7 +406,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         ]
     if "qt-main" in output["requirements"]["host"]:
         output["requirements"]["build"] += [
-            {"sel(build_platform != target_platform)": "qt-main"}
+            {"if": "build_platform != target_platform", "then": ["qt-main"]}
         ]
     # pyqt-builder + git + doxygen must be in build, not host for cross-compile
     pkgs_move_to_build = ["pyqt-builder", "git", "doxygen"]
