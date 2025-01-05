@@ -395,7 +395,7 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                         "name": "Setup pixi",
                         "uses": "prefix-dev/setup-pixi@v0.8.1",
                         "with": {
-                            "pixi-version": "conda-forge",
+                            "pixi-version": "v0.39.4",
                             "cache": "true",
                         },
                     },
