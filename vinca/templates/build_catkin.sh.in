@@ -31,7 +31,7 @@ fi
 
 if [[ "${CONDA_BUILD_CROSS_COMPILATION:-}" == "1" ]]; then
   export QT_HOST_PATH="$BUILD_PREFIX"
-  export AUTOMOC_EXECUTABLE="$BUILD_PREFIX/bin/moc"
+  export CMAKE_AUTOMOC_EXECUTABLE="$BUILD_PREFIX/bin/moc"
 else
   export QT_HOST_PATH="$PREFIX"
 fi
