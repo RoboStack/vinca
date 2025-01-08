@@ -73,6 +73,12 @@ fi
 
 export SKIP_TESTING=@(skip_testing)
 
+if [ "${PKG_NAME}" == "ros-noetic-euslisp" ]; then
+  GENERATOR="Unix Makefiles"
+else
+  GENERATOR="Ninja"
+fi
+
 cmake ${CMAKE_ARGS} --compile-no-warning-as-error \
          -DCMAKE_INSTALL_PREFIX=$PREFIX \
          -DCMAKE_PREFIX_PATH=$PREFIX \
@@ -92,7 +98,7 @@ cmake ${CMAKE_ARGS} --compile-no-warning-as-error \
          -DCATKIN_SKIP_TESTING=$SKIP_TESTING \
          -DCATKIN_BUILD_BINARY_PACKAGE=$CATKIN_BUILD_BINARY_PACKAGE \
          -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
-         -G "Ninja" \
+         -G "$GENERATOR" \
          $SRC_DIR/$PKG_NAME/src/work
 
 cmake --build . --config Release --target all
