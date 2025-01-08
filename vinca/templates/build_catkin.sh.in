@@ -73,7 +73,7 @@ fi
 
 export SKIP_TESTING=@(skip_testing)
 
-if [ "${PKG_NAME}" == "ros-noetic-euslisp" ]; then
+if [ "${PKG_NAME}" == "ros-noetic-euslisp" ] || [ "${PKG_NAME}" = "ros-noetic-jskeus" ] || [ "${PKG_NAME}" = "ros-noetic-roseus" ]; then
   GENERATOR="Unix Makefiles"
 else
   GENERATOR="Ninja"
