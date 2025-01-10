@@ -76,7 +76,7 @@ def resolve_pkgname(pkg_shortname, vinca_conf, distro, is_rundep=False):
             pkg_names_pinned = []
 
             for pkg_name in pkg_names:
-                if " " in pkg_name:
+                if " " in pkg_name and "${{" not in pkg_name:
                     pkg_name_raw = pkg_name.split(" ")[0]
                 else:
                     pkg_name_raw = pkg_name

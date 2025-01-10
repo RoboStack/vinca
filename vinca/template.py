@@ -1,11 +1,15 @@
 import datetime
 import shutil
 import os
+import re
+import stat
 
 from ruamel import yaml
 from pathlib import Path
 
 TEMPLATE = """\
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
 package:
   name: ros
   version: 0.0.1
@@ -16,7 +20,7 @@ build:
   number: 0
 
 about:
-  home: https://www.ros.org/
+  homepage: https://www.ros.org/
   license: BSD-3-Clause
   summary: |
     Robot Operating System
@@ -26,6 +30,24 @@ extra:
     - ros-forge
 
 """
+
+post_process_items = [
+    {
+        "files": ["*.pc"],
+        "regex": '(?:-L|-I)?"?([^;\\s]+/sysroot/)',
+        "replacement": "$$(CONDA_BUILD_SYSROOT_S)",
+    },
+    {
+        "files": ["*.cmake"],
+        "regex": '([^;\\s"]+/sysroot)',
+        "replacement": "$$ENV{CONDA_BUILD_SYSROOT}",
+    },
+    {
+        "files": ["*.cmake"],
+        "regex": '([^;\\s"]+/MacOSX\\d*\\.?\\d*\\.sdk)',
+        "replacement": "$$ENV{CONDA_BUILD_SYSROOT}",
+    },
+]
 
 
 def write_recipe_package(recipe):
@@ -38,8 +60,18 @@ def write_recipe_package(recipe):
     with open(recipe_path, "w") as stream:
         file.dump(recipe, stream)
 
+def copyfile_with_exec_permissions(source_file, destination_file):
+    shutil.copyfile(source_file, destination_file)
 
-def write_recipe(source, outputs, build_number=0, single_file=True):
+    # It seems that rattler-build requires script to have executable permissions
+    if os.name == 'posix':
+        # Retrieve current permissions
+        current_permissions = os.stat(destination_file).st_mode
+        # Set executable permissions for user, group, and others
+        os.chmod(destination_file, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+def write_recipe(source, outputs, vinca_conf, single_file=True):
+    build_number = vinca_conf.get("build_number", 0)
     # single_file = False
     if single_file:
         file = yaml.YAML()
@@ -50,7 +82,10 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
         meta["source"] = [source[k] for k in source]
         meta["outputs"] = outputs
         meta["package"]["version"] = f"{datetime.datetime.now():%Y.%m.%d}"
+        meta["recipe"] = meta["package"]
+        del meta["package"]
         meta["build"]["number"] = build_number
+        meta["build"]["post_process"] = post_process_items
         with open("recipe.yaml", "w") as stream:
             file.dump(meta, stream)
     else:
@@ -68,6 +103,13 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
             meta["package"]["version"] = o["package"]["version"]
 
             meta["build"]["number"] = build_number
+            meta["build"]["post_process"] = post_process_items
+
+            if test := vinca_conf["_tests"].get(o["package"]["name"]):
+                print("Using test: ", test)
+                text = test.read_text()
+                test_content = yaml.safe_load(text)
+                meta["tests"] = test_content["tests"]
 
             recipe_dir = (Path("recipes") / o["package"]["name"]).absolute()
             os.makedirs(recipe_dir, exist_ok=True)
@@ -80,8 +122,11 @@ def write_recipe(source, outputs, build_number=0, single_file=True):
                     os.makedirs(recipe_dir / patch_dir, exist_ok=True)
                     shutil.copyfile(p, recipe_dir / p)
 
-            for _, script in meta["build"]["script"].items():
-                shutil.copyfile(script, recipe_dir / script)
+            build_scripts = re.findall(r"'(.*?)'", meta["build"]["script"])
+            baffer = meta["build"]["script"]
+            for script in build_scripts:
+                script_filename = script.replace("$RECIPE_DIR", "").replace("%RECIPE_DIR%", "").replace("/", "").replace("\\", "")
+                copyfile_with_exec_permissions(script_filename, recipe_dir / script_filename)
             if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
                 shutil.copyfile("activate.sh", recipe_dir / "activate.sh")
                 shutil.copyfile("activate.bat", recipe_dir / "activate.bat")
@@ -103,6 +148,13 @@ def generate_template(template_in, template_out):
     interpreter.file(open(template_in))
     interpreter.shutdown()
 
+    # It seems that rattler-build requires script to have executable permissions
+    # See https://github.com/RoboStack/ros-humble/pull/229#issuecomment-2549988298
+    if os.name == 'posix':
+        # Retrieve current permissions
+        current_permissions = os.stat(template_out.name).st_mode
+        # Set executable permissions for user, group, and others
+        os.chmod(template_out.name, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 def generate_bld_ament_cmake():
     import pkg_resources
@@ -166,14 +218,18 @@ def generate_activate_hook():
 
     template_in = pkg_resources.resource_filename("vinca", "templates/activate.bat.in")
     generate_template(template_in, open("activate.bat", "w"))
-    template_in = pkg_resources.resource_filename("vinca", "templates/deactivate.bat.in")
+    template_in = pkg_resources.resource_filename(
+        "vinca", "templates/deactivate.bat.in"
+    )
     generate_template(template_in, open("deactivate.bat", "w"))
-    
+
     template_in = pkg_resources.resource_filename("vinca", "templates/activate.ps1.in")
     generate_template(template_in, open("activate.ps1", "w"))
-    template_in = pkg_resources.resource_filename("vinca", "templates/deactivate.ps1.in")
+    template_in = pkg_resources.resource_filename(
+        "vinca", "templates/deactivate.ps1.in"
+    )
     generate_template(template_in, open("deactivate.ps1", "w"))
-    
+
     template_in = pkg_resources.resource_filename("vinca", "templates/activate.sh.in")
     generate_template(template_in, open("activate.sh", "w"))
     template_in = pkg_resources.resource_filename("vinca", "templates/deactivate.sh.in")

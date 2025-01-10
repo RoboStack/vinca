@@ -67,7 +67,7 @@ def parse_command_line(argv):
         action="store_true",
         help="search for additional_recipes folder?",
     )
-    
+
     parser.add_argument(
         "-b",
         "--batch_size",
@@ -198,7 +198,9 @@ def add_additional_recipes(args):
         print("Checking if ", name, version, bnumber, " exists")
         skip = False
         for repo in repodatas:
-            for _, pkg in repo.get("packages", {}).items():
+            repo_pkgs = repo.get("packages", {})
+            repo_pkgs.update(repo.get("packages.conda", {}))
+            for _, pkg in repo_pkgs.items():
                 if (
                     pkg["name"] == name
                     and pkg["version"] == version
@@ -263,8 +265,6 @@ def build_linux_pipeline(
     if docker_image is None:
         docker_image = "condaforge/linux-anvil-cos7-x86_64"
 
-    jobs = []
-    job_names = []
     prev_batch_keys = []
 
     for i, s in enumerate(stages):
@@ -319,8 +319,6 @@ def build_osx_pipeline(
     if azure_template is None:
         azure_template = blurb
 
-    jobs = []
-    job_names = []
     prev_batch_keys = []
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
@@ -394,20 +392,12 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                 "steps": [
                     {"name": "Checkout code", "uses": "actions/checkout@v4"},
                     {
-                        "uses": "conda-incubator/setup-miniconda@v3",
+                        "name": "Setup pixi",
+                        "uses": "prefix-dev/setup-pixi@v0.8.1",
                         "with": {
-                            "channels": "conda-forge",
-                            "miniforge-variant": "Mambaforge",
-                            "miniforge-version": "latest",
-                            "use-mamba": "true",
-                            "channel-priority": "true",
-                            "python-version": "3.11",
-                            "activate-environment": "test",
+                            "pixi-version": "v0.39.4",
+                            "cache": "true",
                         },
-                    },
-                    {
-                        "run": "mamba install -c conda-forge -n base --yes --quiet conda-build pip mamba ruamel.yaml anaconda-client boa",
-                        "name": "Install conda-build, boa and activate environment",
                     },
                     {
                         "uses": "egor-tensin/cleanup-path@v4",
@@ -571,7 +561,9 @@ def main():
 
     if args.platform == "osx-64":
         build_osx_pipeline(
-            stages, args.trigger_branch, script=azure_osx_script,
+            stages,
+            args.trigger_branch,
+            script=azure_osx_script,
         )
 
     if args.platform == "osx-arm64":

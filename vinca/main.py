@@ -126,6 +126,13 @@ def parse_command_line(argv):
         default=None,
         help="The conda platform to check existing recipes for.",
     )
+    parser.add_argument(
+        "-z",
+        "--snapshot",
+        dest="snapshot",
+        default=None,
+        help="The version snapshot file (default: None)."
+    )
     arguments = parser.parse_args(argv[1:])
     global selected_platform
     config.parsed_args = arguments
@@ -191,6 +198,12 @@ def read_vinca_yaml(filepath):
 
     vinca_conf["_patches"] = patches
 
+    tests = {}
+    test_dir = Path(filepath).parent / "tests"
+    for x in test_dir.glob("*.yaml"):
+        tests[os.path.basename(x).split(".")[0]] = x
+    vinca_conf["_tests"] = tests
+
     if (patch_dir / "dependencies.yaml").exists():
         vinca_conf["depmods"] = yaml.load(open(patch_dir / "dependencies.yaml"))
     if not vinca_conf.get("depmods"):
@@ -206,6 +219,15 @@ def read_vinca_yaml(filepath):
     vinca_conf["trigger_new_versions"] = vinca_conf.get("trigger_new_versions", False)
 
     return vinca_conf
+
+
+def read_snapshot(filepath):
+    if not filepath:
+        return None
+
+    yaml = ruamel.yaml.YAML()
+    snapshot = yaml.load(open(filepath, "r"))
+    return snapshot
 
 
 def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
@@ -226,31 +248,28 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         if pkg_names[0] in vinca_conf["skip_built_packages"]:
             return None
 
-    # TODO: Remove hardcoded cmake version after building new versions of ament_cmake_export_target
-    # see: https://github.com/ament/ament_cmake/commit/796cef7d7df2ddb806f774a9889e608cc82285d3
     output = {
         "package": {"name": pkg_names[0], "version": version},
         "requirements": {
             "build": [
-                "{{ compiler('cxx') }}",
-                "{{ compiler('c') }}",
-                {"sel(linux64)": "sysroot_linux-64 2.17"},
+                "${{ compiler('cxx') }}",
+                "${{ compiler('c') }}",
+                "${{ stdlib('c') }}",
                 "ninja",
+                "python",
                 "setuptools",
-                {"sel(unix)": "make"},
-                {"sel(unix)": "coreutils"},
-                {"sel(osx)": "tapi"},
-                {"sel(build_platform != target_platform)": "pkg-config"},
+                "git",
+                {"if": "unix", "then": ["patch", "make", "coreutils"]},
+                {"if": "win", "then": ["m2-patch"]},
+                {"if": "osx", "then": ["tapi"]},
+                {"if": "build_platform != target_platform", "then": ["pkg-config"]},
                 "cmake",
                 "cython",
-                {"sel(build_platform != target_platform)": "python"},
-                {
-                    "sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"
-                },
-                {"sel(build_platform != target_platform)": "numpy"},
+                {"if": "build_platform != target_platform", "then": ["python", "cross-python_${{ target_platform }}", "numpy"]},
             ],
             "host": [
-                {"sel(build_platform == target_platform)": "pkg-config"},
+                {"if": "build_platform == target_platform", "then": ["pkg-config"]},
+                "python",
                 "numpy",
                 "pip",
             ],
@@ -269,20 +288,17 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     output["requirements"]["run"].extend(resolved_python)
     output["requirements"]["host"].extend(resolved_python)
     if pkg.get_build_type() in ["cmake", "catkin"]:
-        output["build"]["script"] = {
-            "sel(win)": "bld_catkin.bat",
-            "sel(unix)": "build_catkin.sh",
-        }
+        output["build"][
+            "script"
+        ] = "${{ '$RECIPE_DIR/build_catkin.sh' if unix else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
     elif pkg.get_build_type() in ["ament_cmake"]:
-        output["build"]["script"] = {
-            "sel(win)": "bld_ament_cmake.bat",
-            "sel(unix)": "build_ament_cmake.sh",
-        }
+        output["build"][
+            "script"
+        ] = "${{ '$RECIPE_DIR/build_ament_cmake.sh' if unix else '%RECIPE_DIR%\\\\bld_ament_cmake.bat' }}"
     elif pkg.get_build_type() in ["ament_python"]:
-        output["build"]["script"] = {
-            "sel(win)": "bld_ament_python.bat",
-            "sel(unix)": "build_ament_python.sh",
-        }
+        output["build"][
+            "script"
+        ] = "${{ '$RECIPE_DIR/build_ament_python.sh' if unix else '%RECIPE_DIR%\\\\bld_ament_python.bat' }}"
         resolved_setuptools = resolve_pkgname("python-setuptools", vinca_conf, distro)
         output["requirements"]["host"].extend(resolved_setuptools)
     else:
@@ -343,7 +359,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         ):
             output["requirements"]["build"].append(
                 {
-                    "sel(build_platform != target_platform)": f"ros-{config.ros_distro}-cyclonedds"
+                    "if": "build_platform != target_platform",
+                    "then": [f"ros-{config.ros_distro}-cyclonedds"],
                 }
             )
 
@@ -393,7 +410,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
 
     output["requirements"]["run"] += [
         {
-            "sel(osx and x86_64)": "__osx >={{ MACOSX_DEPLOYMENT_TARGET|default('10.14') }}"
+            "if": "osx and x86_64",
+            "then": ["__osx >=${{ MACOSX_DEPLOYMENT_TARGET|default('10.14') }}"],
         }
     ]
 
@@ -401,36 +419,24 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         output["requirements"]["host"] += ["pybind11"]
     if "pybind11" in output["requirements"]["host"]:
         output["requirements"]["build"] += [
-            {"sel(build_platform != target_platform)": "pybind11"}
+            {"if": "build_platform != target_platform", "then": ["pybind11"]}
         ]
-    # pkg-config + pyqt-builder + git + doxygen must be in build, not host for cross-compile
-    if "doxygen" in output["requirements"]["host"]:
+    if "qt-main" in output["requirements"]["host"]:
         output["requirements"]["build"] += [
-            {"sel(build_platform != target_platform)": "doxygen"}
+            {"if": "build_platform != target_platform", "then": ["qt-main"]}
         ]
-        while "doxygen" in output["requirements"]["host"]:
-            output["requirements"]["host"].remove("doxygen")
-        output["requirements"]["host"] += [
-            {"sel(build_platform == target_platform)": "doxygen"}
-        ]
-    if "pyqt-builder" in output["requirements"]["host"]:
-        output["requirements"]["build"] += [
-            {"sel(build_platform != target_platform)": "pyqt-builder"}
-        ]
-        while "pyqt-builder" in output["requirements"]["host"]:
-            output["requirements"]["host"].remove("pyqt-builder")
-        output["requirements"]["host"] += [
-            {"sel(build_platform == target_platform)": "pyqt-builder"}
-        ]
-    if "git" in output["requirements"]["host"]:
-        output["requirements"]["build"] += [
-            {"sel(build_platform != target_platform)": "git"}
-        ]
-        while "git" in output["requirements"]["host"]:
-            output["requirements"]["host"].remove("git")
-        output["requirements"]["host"] += [
-            {"sel(build_platform == target_platform)": "git"}
-        ]
+    # pyqt-builder + git + doxygen must be in build, not host for cross-compile
+    pkgs_move_to_build = ["pyqt-builder", "git", "doxygen"]
+    for pkg_move_to_build in pkgs_move_to_build:
+        if pkg_move_to_build in output["requirements"]["host"]:
+            output["requirements"]["build"] += [
+                {"if": "build_platform != target_platform", "then": [pkg_move_to_build]}
+            ]
+            while pkg_move_to_build in output["requirements"]["host"]:
+                output["requirements"]["host"].remove(pkg_move_to_build)
+            output["requirements"]["host"] += [
+                {"if": "build_platform == target_platform", "then": [pkg_move_to_build]}
+            ]
 
     # fix up OPENGL support for Unix
     if (
@@ -443,26 +449,18 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         while "REQUIRE_OPENGL" in output["requirements"]["host"]:
             output["requirements"]["host"].remove("REQUIRE_OPENGL")
 
-        output["requirements"]["build"] += [
-            {"sel(linux)": "{{ cdt('mesa-libgl-devel') }}"},
-            {"sel(linux)": "{{ cdt('mesa-dri-drivers') }}"},
-            {"sel(linux)": "{{ cdt('libselinux') }}"},
-            {"sel(linux)": "{{ cdt('libxdamage') }}"},
-            {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
-            {"sel(linux)": "{{ cdt('libxfixes') }}"},
-            {"sel(linux)": "{{ cdt('libxext') }}"},
-            {"sel(linux)": "{{ cdt('libxau') }}"},
-            {"sel(linux)": "{{ cdt('libxcb') }}"},
-        ]
         output["requirements"]["host"] += [
-            {"sel(unix)": "xorg-libx11"},
-            {"sel(unix)": "xorg-libxext"},
-            # 'xorg-libxfixes  [unix]',
+            {
+                "if": "linux",
+                "then": ["libgl-devel", "libopengl-devel"],
+            }
+        ]
+
+        output["requirements"]["host"] += [
+            {"if": "unix", "then": ["xorg-libx11", "xorg-libxext"]},
         ]
         output["requirements"]["run"] += [
-            {"sel(unix)": "xorg-libx11"},
-            {"sel(unix)": "xorg-libxext"},
-            # 'xorg-libxfixes  [unix]',
+            {"if": "unix", "then": ["xorg-libx11", "xorg-libxext"]},
         ]
 
     # fix up GL support for Unix
@@ -476,11 +474,13 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         while "REQUIRE_GL" in output["requirements"]["host"]:
             output["requirements"]["host"].remove("REQUIRE_GL")
 
-        output["requirements"]["build"] += [
-            {"sel(linux)": "{{ cdt('mesa-libgl-devel') }}"},
-            {"sel(linux)": "{{ cdt('mesa-dri-drivers') }}"},
-            {"sel(linux)": "{{ cdt('libselinux') }}"},
-            {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
+        output["requirements"]["host"] += [
+            {
+                "if": "linux",
+                "then": [
+                    "libgl-devel"
+                ],
+            }
         ]
 
     # remove duplicates
@@ -528,21 +528,14 @@ def generate_outputs(distro, vinca_conf):
     return outputs
 
 
-def get_version(distro, vinca_conf, pkg_shortname):
-    version = distro.get_version(pkg_shortname)
-    if (
-        vinca_conf.get("package_version")
-        and vinca_conf["package_version"][pkg_shortname]
-    ):
-        version = vinca_conf["package_version"][pkg_shortname]["version"]
-
-    return version
-
-
 def generate_outputs_version(distro, vinca_conf):
     outputs = []
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
-        version = get_version(distro, vinca_conf, pkg_shortname)
+        if not distro.check_package(pkg_shortname):
+            print(f"Could not generate output for {pkg_shortname}")
+            continue
+
+        version = distro.get_version(pkg_shortname)
         output = generate_output(pkg_shortname, vinca_conf, distro, version)
         if output is not None:
             outputs.append(output)
@@ -559,10 +552,10 @@ def generate_source(distro, vinca_conf):
 
         url, version = distro.get_released_repo(pkg_shortname)
         entry = {}
-        entry["git_url"] = url
-        entry["git_rev"] = version
+        entry["git"] = url
+        entry["tag"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-        pkg_version = get_version(distro, vinca_conf, pkg_shortname)
+        pkg_version = distro.get_version(pkg_shortname)
         print("Checking ", pkg_shortname, pkg_version)
         if not pkg_names:
             continue
@@ -573,7 +566,7 @@ def generate_source(distro, vinca_conf):
             if pkg_names[0] in vinca_conf["skip_built_packages"]:
                 continue
         pkg_name = pkg_names[0]
-        entry["folder"] = "%s/src/work" % pkg_name
+        entry["target_directory"] = "%s/src/work" % pkg_name
 
         patches = []
         pd = vinca_conf["_patches"].get(pkg_name)
@@ -602,16 +595,10 @@ def generate_source_version(distro, vinca_conf):
             continue
 
         url, version = distro.get_released_repo(pkg_shortname)
-        if (
-            vinca_conf["package_version"]
-            and vinca_conf["package_version"][pkg_shortname]
-        ):
-            url = vinca_conf["package_version"][pkg_shortname]["url"]
-            version = vinca_conf["package_version"][pkg_shortname]["version"]
 
         entry = {}
-        entry["git_url"] = url
-        entry["git_rev"] = version
+        entry["git"] = url
+        entry["tag"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
         if vinca_conf.get("trigger_new_versions"):
             if (
@@ -621,9 +608,9 @@ def generate_source_version(distro, vinca_conf):
                 continue
         else:
             if not pkg_names or pkg_names[0] in vinca_conf["skip_built_packages"]:
-                continue            
+                continue
         pkg_name = pkg_names[0]
-        entry["folder"] = "%s/src/work" % pkg_name
+        entry["target_directory"] = "%s/src/work" % pkg_name
 
         patches = []
         pd = vinca_conf["_patches"].get(pkg_name)
@@ -650,13 +637,13 @@ def generate_fat_source(distro, vinca_conf):
 
         url, version = distro.get_released_repo(pkg_shortname)
         entry = {}
-        entry["git_url"] = url
-        entry["git_rev"] = version
+        entry["git"] = url
+        entry["tag"] = version
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
         if not pkg_names:
             continue
         pkg_name = pkg_names[0]
-        entry["folder"] = "src/%s" % pkg_name
+        entry["target_directory"] = "src/%s" % pkg_name
         patch_path = os.path.join(vinca_conf["_patch_dir"], "%s.patch" % pkg_name)
         if os.path.exists(patch_path):
             entry["patches"] = [
@@ -701,13 +688,13 @@ def get_selected_packages(distro, vinca_conf):
 
 
 def parse_package(pkg, distro, vinca_conf, path):
-
     name = pkg["name"].replace("_", "-")
     final_name = f"ros-{distro.name}-{name}"
+
     recipe = {
         "package": {"name": final_name, "version": pkg["version"]},
         "about": {
-            "home": "https://www.ros.org/",
+            "homepage": "https://www.ros.org/",
             "license": [str(lic) for lic in pkg["licenses"]],
             "summary": pkg["description"],
             "maintainers": [],
@@ -715,54 +702,58 @@ def parse_package(pkg, distro, vinca_conf, path):
         "extra": {"recipe-maintainers": ["robostack"]},
         "build": {
             "number": 0,
-            "script": {"sel(unix)": "build_catkin.sh", "sel(win)": "build_catkin.bat"},
+            "script": "${{ '$RECIPE_DIR/build_catkin.sh' if unix else '%RECIPE_DIR%\\\\bld_catkin.bat' }}",
         },
         "source": {},
         "requirements": {
             "build": [
-                "{{ compiler('cxx') }}",
-                "{{ compiler('c') }}",
-                {"sel(linux64)": "sysroot_linux-64 2.17"},
+                "${{ compiler('cxx') }}",
+                "${{ compiler('c') }}",
+                "${{ stdlib('c') }}",
                 "ninja",
-                {"sel(unix)": "make"},
-                {"sel(unix)": "coreutils"},
+                "python",
+                "patch",
+                {"if": "unix", "then": ["make", "coreutils"]},
                 "cmake",
-                {"sel(build_platform != target_platform)": "python"},
+                {"if": "build_platform != target_platform", "then": ["python"]},
                 {
-                    "sel(build_platform != target_platform)": "cross-python_{{ target_platform }}"
+                    "if": "build_platform != target_platform",
+                    "then": ["cross-python_${{ target_platform }}"],
                 },
-                {"sel(build_platform != target_platform)": "cython"},
-                {"sel(build_platform != target_platform)": "numpy"},
-                {"sel(build_platform != target_platform)": "pybind11"},
+                {"if": "build_platform != target_platform", "then": ["cython"]},
+                {"if": "build_platform != target_platform", "then": ["numpy"]},
+                {"if": "build_platform != target_platform", "then": ["pybind11"]},
             ],
             "host": [],
             "run": [],
         },
     }
 
+    if test := vinca_conf.get("_tests", {}).get(final_name):
+        # parse as yaml
+        text = test.read_text()
+        test_content = ruamel.yaml.safe_load(text)
+        recipe["test"] = test_content
+
     for p in pkg["authors"]:
         name = p.name + " (" + p.email + ")" if p.email else p.name
         recipe["about"]["maintainers"].append(name)
 
-    # for p in pkg['maintainers'] :
-    #     name = p.name + " (" + p.email + ")" if p.email else p.name
-    #     recipe['about']['maintainers'].append(name)
-
     for u in pkg["urls"]:
         # if u.type == 'repository' :
-        #     recipe['source']['git_url'] = u.url
-        #     recipe['source']['git_rev'] = recipe['package']['version']
+        #     recipe['source']['git'] = u.url
+        #     recipe['source']['tag'] = recipe['package']['version']
         if u.type == "website":
-            recipe["about"]["home"] = u.url
+            recipe["about"]["homepage"] = u.url
 
         # if u.type == 'bugtracker' :
         #    recipe['about']['url_issues'] = u.url
 
-    if not recipe["source"].get("git_url", None):
+    if not recipe["source"].get("git", None):
         aux = path.split("/")
         print(aux[: len(aux) - 1])
         recipe["source"]["path"] = "/".join(aux[: len(aux) - 1])
-        recipe["source"]["folder"] = f"{final_name}/src/work"
+        recipe["source"]["target_directory"] = f"{final_name}/src/work"
 
     for d in pkg["buildtool_depends"]:
         recipe["requirements"]["host"].extend(
@@ -801,10 +792,9 @@ def parse_package(pkg, distro, vinca_conf, path):
         )
 
     if pkg.get_build_type() in ["cmake", "catkin"]:
-        recipe["build"]["script"] = {
-            "sel(win)": "bld_catkin.bat",
-            "sel(unix)": "build_catkin.sh",
-        }
+        recipe["build"][
+            "script"
+        ] = "${{ '$RECIPE_DIR/build_catkin.sh' if unix else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
 
     # fix up OPENGL support for Unix
     if (
@@ -818,22 +808,26 @@ def parse_package(pkg, distro, vinca_conf, path):
             recipe["requirements"]["host"].remove("REQUIRE_OPENGL")
 
         recipe["requirements"]["build"] += [
-            {"sel(linux)": "{{ cdt('mesa-libgl-devel') }}"},
-            {"sel(linux)": "{{ cdt('mesa-dri-drivers') }}"},
-            {"sel(linux)": "{{ cdt('libselinux') }}"},
-            {"sel(linux)": "{{ cdt('libxdamage') }}"},
-            {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
-            {"sel(linux)": "{{ cdt('libxfixes') }}"},
-            {"sel(linux)": "{{ cdt('libxext') }}"},
-            {"sel(linux)": "{{ cdt('libxau') }}"},
+            {
+                "if": "linux",
+                "then": [
+                    "${{ cdt('mesa-libgl-devel') }}",
+                    "${{ cdt('mesa-dri-drivers') }}",
+                    "${{ cdt('libselinux') }}",
+                    "${{ cdt('libxdamage') }}",
+                    "${{ cdt('libxxf86vm') }}",
+                    "${{ cdt('libxfixes') }}",
+                    "${{ cdt('libxext') }}",
+                    "${{ cdt('libxau') }}",
+                    "${{ cdt('libxcb') }}",
+                ],
+            }
         ]
         recipe["requirements"]["host"] += [
-            {"sel(unix)": "xorg-libx11"},
-            {"sel(unix)": "xorg-libxext"},
+            {"if": "unix", "then": ["xorg-libx11", "xorg-libxext"]},
         ]
         recipe["requirements"]["run"] += [
-            {"sel(unix)": "xorg-libx11"},
-            {"sel(unix)": "xorg-libxext"},
+            {"if": "unix", "then": ["xorg-libx11", "xorg-libxext"]},
         ]
 
     # fix up GL support for Unix
@@ -848,10 +842,15 @@ def parse_package(pkg, distro, vinca_conf, path):
             recipe["requirements"]["host"].remove("REQUIRE_GL")
 
         recipe["requirements"]["build"] += [
-            {"sel(linux)": "{{ cdt('mesa-libgl-devel') }}"},
-            {"sel(linux)": "{{ cdt('mesa-dri-drivers') }}"},
-            {"sel(linux)": "{{ cdt('libselinux') }}"},
-            {"sel(linux)": "{{ cdt('libxxf86vm') }}"},
+            {
+                "if": "linux",
+                "then": [
+                    "${{ cdt('mesa-libgl-devel') }}",
+                    "${{ cdt('mesa-dri-drivers') }}",
+                    "${{ cdt('libselinux') }}",
+                    "${{ cdt('libxxf86vm') }}",
+                ],
+            }
         ]
 
     return recipe
@@ -865,6 +864,7 @@ def main():
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, "vinca.yaml")
     vinca_conf = read_vinca_yaml(vinca_yaml)
+    snapshot = read_snapshot(arguments.snapshot)
 
     from .template import generate_bld_ament_cmake
     from .template import generate_bld_ament_python
@@ -879,7 +879,7 @@ def main():
     generate_bld_colcon_merge()
     generate_bld_catkin_merge()
     generate_activate_hook()
-    
+
     if arguments.trigger_new_versions:
         vinca_conf["trigger_new_versions"] = True
     else:
@@ -892,7 +892,7 @@ def main():
         if "python_version" in vinca_conf:
             python_version = vinca_conf["python_version"]
 
-        distro = Distro(vinca_conf["ros_distro"], python_version)
+        distro = Distro(vinca_conf["ros_distro"], python_version, snapshot)
         additional_pkgs, parsed_pkgs = [], []
         for f in pkg_files:
             parsed_pkg = catkin_pkg.package.parse_package(f)
@@ -916,7 +916,7 @@ def main():
             for o in outputs:
                 sources[o["package"]["name"]] = o["source"]
                 del o["source"]
-            write_recipe(sources, outputs)
+            write_recipe(sources, outputs, vinca_conf)
 
     else:
         if arguments.skip_already_built_repodata or vinca_conf.get("skip_existing"):
@@ -947,7 +947,9 @@ def main():
                 if "://" in fn:
                     selected_bn = vinca_conf.get("build_number", 0)
                     distro = vinca_conf["ros_distro"]
-                    for pkg_name, pkg in repodata.get("packages").items():
+                    all_pkgs = repodata.get("packages", {})
+                    all_pkgs.update(repodata.get("packages.conda", {}))
+                    for pkg_name, pkg in all_pkgs.items():
                         if pkg_name.startswith(f"ros-{distro}"):
                             if pkg_name.rsplit("-", 2)[0] in additional_recipe_names:
                                 print(
@@ -962,8 +964,9 @@ def main():
                     f"ros-{distro}-{pkg.replace('_', '-')}"
                     for pkg in ensure_list(vinca_conf["packages_select_by_deps"])
                 ]
-
-                for _, pkg in repodata.get("packages").items():
+                all_pkgs = repodata.get("packages", {})
+                all_pkgs.update(repodata.get("packages.conda", {}))
+                for _, pkg in all_pkgs.items():
                     is_built = False
                     if selected_bn is not None:
                         if vinca_conf.get("full_rebuild", True):
@@ -994,7 +997,7 @@ def main():
         if "python_version" in vinca_conf:
             python_version = vinca_conf["python_version"]
 
-        distro = Distro(vinca_conf["ros_distro"], python_version)
+        distro = Distro(vinca_conf["ros_distro"], python_version, snapshot)
 
         selected_pkgs = get_selected_packages(distro, vinca_conf)
 
@@ -1008,9 +1011,9 @@ def main():
             outputs = generate_outputs(distro, vinca_conf)
 
         if arguments.multiple_file:
-            write_recipe(source, outputs, vinca_conf.get("build_number", 0), False)
+            write_recipe(source, outputs, vinca_conf, False)
         else:
-            write_recipe(source, outputs, vinca_conf.get("build_number", 0))
+            write_recipe(source, outputs, vinca_conf)
 
         if unsatisfied_deps:
             print("Unsatisfied dependencies:", unsatisfied_deps)
