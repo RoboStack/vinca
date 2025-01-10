@@ -13,10 +13,21 @@ mkdir build
 pushd build
 
 :: set "CMAKE_GENERATOR=Ninja"
-
-:: try to fix long paths issues by using default generator
+:: We use the Visual Studio generator as a workaround for
+:: problems in Ninja when using long paths, see https://github.com/RoboStack/ros-humble/pull/229#issuecomment-2564856467
+:: Once those are solved, we can switch back to use Ninja
 set "CMAKE_GENERATOR=Visual Studio %VS_MAJOR% %VS_YEAR%"
-set "SP_DIR_FORWARDSLASHES=%SP_DIR:\=/%"
+
+:: PYTHON_INSTALL_DIR should be a relative path, see
+:: https://github.com/ament/ament_cmake/blob/2.3.2/ament_cmake_python/README.md
+:: So we compute the relative path of %SP_DIR% w.r.t. to LIBRARY_PREFIX,
+:: but it is not trivial to do this in Command Prompt scripting, so let's do it via
+:: python
+
+:: This line is scary, but it basically assigns the output of the command inside (` and `)
+:: to the variable specified after DO SET
+:: The equivalent in bash is PYTHON_INSTALL_DIR=`python -c ...`
+FOR /F "tokens=* USEBACKQ" %%i IN (`python -c "import os;print(os.path.relpath(os.environ['SP_DIR'],os.environ['LIBRARY_PREFIX']).replace('\\','/'))"`) DO SET PYTHON_INSTALL_DIR=%%i
 
 cmake ^
     -G "%CMAKE_GENERATOR%" ^
@@ -30,10 +41,12 @@ cmake ^
     -DBUILD_SHARED_LIBS=ON ^
     -DBUILD_TESTING=OFF ^
     -DCMAKE_OBJECT_PATH_MAX=255 ^
-    -DPYTHON_INSTALL_DIR=%SP_DIR_FORWARDSLASHES% ^
     --compile-no-warning-as-error ^
+    -DPYTHON_INSTALL_DIR=%PYTHON_INSTALL_DIR% ^
     %SRC_DIR%\%PKG_NAME%\src\work
 if errorlevel 1 exit 1
 
-cmake --build . --config Release --target install
+:: We explicitly pass %CPU_COUNT% to cmake --build as we are not using Ninja,
+:: see the comment before setting the CMAKE_GENERATOR env variable
+cmake --build . --config Release --parallel %CPU_COUNT% --target install
 if errorlevel 1 exit 1
