@@ -58,13 +58,48 @@ fi;
 export PYTHON_INSTALL_DIR=`python -c "import os;print(os.path.relpath(os.environ['SP_DIR'],os.environ['PREFIX']))"`
 echo "Using site_packages: $PYTHON_INSTALL_DIR"
 
-cmake \
+if [[ $target_platform =~ emscripten.* ]]; then
+  export CONDA_BUILD_CROSS_COMPILATION="1"
+  echo "set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)"> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_STRIP FALSE)  # used by default in pybind11 on .so modules">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)  # fixes an error where numpy header files are not found correctly">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+
+  if [ "${PKG_NAME}" == "ros-humble-examples-rclcpp-minimal-publisher" ] || [ "${PKG_NAME}" == "ros-humble-examples-rclcpp-minimal-subscriber" ] || [ "${PKG_NAME}" == "ros-humble-rclcpp-components" ]; then
+    echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=0 -s DEMANGLE_SUPPORT=1 -s ALLOW_MEMORY_GROWTH=1 -sASYNCIFY -O3 -s ASYNCIFY_STACK_SIZE=24576 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+    echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=0 -s DEMANGLE_SUPPORT=1 -s ALLOW_MEMORY_GROWTH=1 -sASYNCIFY -O3 -s ASYNCIFY_STACK_SIZE=24576 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+    echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sWASM_BIGINT -s USE_PTHREADS=0 -s DEMANGLE_SUPPORT=1 -sALLOW_MEMORY_GROWTH=1 -sASYNCIFY -O3 -s ASYNCIFY_STACK_SIZE=24576 -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  else
+    echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=0 -s DEMANGLE_SUPPORT=1 -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+    echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=0 -s DEMANGLE_SUPPORT=1 -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+    echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sWASM_BIGINT -s USE_PTHREADS=0 -s DEMANGLE_SUPPORT=1 -sALLOW_MEMORY_GROWTH=1 -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  fi
+
+  # export USE_WASM=ON
+  # -DTHREADS_PREFER_PTHREAD_FLAG=TRUE\
+  export BUILD_TYPE="Debug"
+  export EXTRA_CMAKE_ARGS=" \
+      -DRMW_IMPLEMENTATION=rmw_wasm_cpp \
+      -DCMAKE_FIND_ROOT_PATH=$PREFIX    \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE \
+      -DCMAKE_PROJECT_INCLUDE=$SRC_DIR/__vinca_shared_lib_patch.cmake \
+  "
+
+    unset -f cmake
+    export CMAKE_GEN="emcmake cmake"
+    export CMAKE_BLD="cmake"
+else
+    export BUILD_TYPE="RELEASE"
+    export CMAKE_GEN="cmake"
+    export CMAKE_BLD="cmake"
+fi;
+
+$CMAKE_GEN \
     -G "Ninja" \
+    -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
     -DCMAKE_INSTALL_PREFIX=$PREFIX \
     -DCMAKE_PREFIX_PATH=$PREFIX \
     -DAMENT_PREFIX_PATH=$PREFIX \
     -DCMAKE_INSTALL_LIBDIR=lib \
-    -DCMAKE_BUILD_TYPE=Release \
     -DPYTHON_EXECUTABLE=$PYTHON_EXECUTABLE \
     -DPython_EXECUTABLE=$PYTHON_EXECUTABLE \
     -DPython3_EXECUTABLE=$PYTHON_EXECUTABLE \
@@ -79,6 +114,7 @@ cmake \
     -DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local/homebrew" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
     --compile-no-warning-as-error \
+    $EXTRA_CMAKE_ARGS \
     $SRC_DIR/$PKG_NAME/src/work
 
-cmake --build . --config Release --target install
+$CMAKE_BLD --build . --config $BUILD_TYPE --target install

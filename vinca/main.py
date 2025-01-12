@@ -184,9 +184,9 @@ def read_vinca_yaml(filepath):
     for x in glob.glob(os.path.join(vinca_conf["_patch_dir"], "*.patch")):
         splitted = os.path.basename(x).split(".")
         if splitted[0] not in patches:
-            patches[splitted[0]] = {"any": [], "osx": [], "linux": [], "win": []}
+            patches[splitted[0]] = {"any": [], "osx": [], "linux": [], "win": [], "emscripten": []}
         if len(splitted) == 3:
-            if splitted[1] in ("osx", "linux", "win"):
+            if splitted[1] in ("osx", "linux", "win" , "emscripten"):
                 patches[splitted[0]][splitted[1]].append(x)
                 continue
             if splitted[1] == "unix":
@@ -248,6 +248,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         if pkg_names[0] in vinca_conf["skip_built_packages"]:
             return None
 
+    # TODO: MIGHT NEED TO ADD WORKAROUND FOR EMSCRIPTEN AND/OR DISABLE STDLIB("C")
     output = {
         "package": {"name": pkg_names[0], "version": version},
         "requirements": {
@@ -290,15 +291,15 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     if pkg.get_build_type() in ["cmake", "catkin"]:
         output["build"][
             "script"
-        ] = "${{ '$RECIPE_DIR/build_catkin.sh' if unix else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
+        ] = "${{ '$RECIPE_DIR/build_catkin.sh' if unix or emscripten-wasm32 else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
     elif pkg.get_build_type() in ["ament_cmake"]:
         output["build"][
             "script"
-        ] = "${{ '$RECIPE_DIR/build_ament_cmake.sh' if unix else '%RECIPE_DIR%\\\\bld_ament_cmake.bat' }}"
+        ] = "${{ '$RECIPE_DIR/build_ament_cmake.sh' if unix or emscripten-wasm32 else '%RECIPE_DIR%\\\\bld_ament_cmake.bat' }}"
     elif pkg.get_build_type() in ["ament_python"]:
         output["build"][
             "script"
-        ] = "${{ '$RECIPE_DIR/build_ament_python.sh' if unix else '%RECIPE_DIR%\\\\bld_ament_python.bat' }}"
+        ] = "${{ '$RECIPE_DIR/build_ament_python.sh' if unix or emscripten-wasm32 else '%RECIPE_DIR%\\\\bld_ament_python.bat' }}"
         resolved_setuptools = resolve_pkgname("python-setuptools", vinca_conf, distro)
         output["requirements"]["host"].extend(resolved_setuptools)
     else:
@@ -405,6 +406,28 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             return list(k.values())[0]
         return k
 
+    # For Emscripten, only install cmake as a build dependency.
+    # This should be ok as cmake is only really needed during builds, not when running packages.
+    if "cmake" in output["requirements"]["run"]:
+        output["requirements"]["run"].remove("cmake")
+        output["requirements"]["run"].append({"if": "target_platform != 'emscripten-wasm32'", "then": ["cmake"]})
+
+    if "cmake" in output["requirements"]["host"]:
+        output["requirements"]["host"].remove("cmake")
+        if "cmake" not in output["requirements"]["build"]:
+            output["requirements"]["build"].append("cmake")
+
+    if f"ros-{config.ros_distro}-mimick-vendor" in output["requirements"]["build"]:
+        output["requirements"]["build"].remove(f"ros-{config.ros_distro}-mimick-vendor")
+        output["requirements"]["build"].append({"if": "target_platform != 'emscripten-wasm32'", "then": [f"ros-{config.ros_distro}-mimick-vendor"]})
+
+    if f"ros-{config.ros_distro}-mimick-vendor" in output["requirements"]["host"]:
+        output["requirements"]["host"].remove(f"ros-{config.ros_distro}-mimick-vendor")
+        output["requirements"]["build"].append({"if": "target_platform != 'emscripten-wasm32'", "then": [f"ros-{config.ros_distro}-mimick-vendor"]})
+
+    if f"ros-{config.ros_distro}-rosidl-default-generators" in output["requirements"]["host"]:
+        output["requirements"]["build"].append({"if": "target_platform == 'emscripten-wasm32'", "then": [f"ros-{config.ros_distro}-rosidl-default-generators"]})
+
     output["requirements"]["run"] = sorted(output["requirements"]["run"], key=sortkey)
     output["requirements"]["host"] = sorted(output["requirements"]["host"], key=sortkey)
 
@@ -477,9 +500,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         output["requirements"]["host"] += [
             {
                 "if": "linux",
-                "then": [
-                    "libgl-devel"
-                ],
+                "then": ["libgl-devel"],
             }
         ]
 
@@ -702,7 +723,7 @@ def parse_package(pkg, distro, vinca_conf, path):
         "extra": {"recipe-maintainers": ["robostack"]},
         "build": {
             "number": 0,
-            "script": "${{ '$RECIPE_DIR/build_catkin.sh' if unix else '%RECIPE_DIR%\\\\bld_catkin.bat' }}",
+            "script": "${{ '$RECIPE_DIR/build_catkin.sh' if unix or emscripten-wasm32 else '%RECIPE_DIR%\\\\bld_catkin.bat' }}",
         },
         "source": {},
         "requirements": {
@@ -794,7 +815,7 @@ def parse_package(pkg, distro, vinca_conf, path):
     if pkg.get_build_type() in ["cmake", "catkin"]:
         recipe["build"][
             "script"
-        ] = "${{ '$RECIPE_DIR/build_catkin.sh' if unix else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
+        ] = "${{ '$RECIPE_DIR/build_catkin.sh' if unix or emscripten-wasm32 else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
 
     # fix up OPENGL support for Unix
     if (
@@ -807,20 +828,10 @@ def parse_package(pkg, distro, vinca_conf, path):
         while "REQUIRE_OPENGL" in recipe["requirements"]["host"]:
             recipe["requirements"]["host"].remove("REQUIRE_OPENGL")
 
-        recipe["requirements"]["build"] += [
+        recipe["requirements"]["host"] += [
             {
                 "if": "linux",
-                "then": [
-                    "${{ cdt('mesa-libgl-devel') }}",
-                    "${{ cdt('mesa-dri-drivers') }}",
-                    "${{ cdt('libselinux') }}",
-                    "${{ cdt('libxdamage') }}",
-                    "${{ cdt('libxxf86vm') }}",
-                    "${{ cdt('libxfixes') }}",
-                    "${{ cdt('libxext') }}",
-                    "${{ cdt('libxau') }}",
-                    "${{ cdt('libxcb') }}",
-                ],
+                "then": ["libgl-devel", "libopengl-devel"],
             }
         ]
         recipe["requirements"]["host"] += [
@@ -841,15 +852,10 @@ def parse_package(pkg, distro, vinca_conf, path):
         while "REQUIRE_GL" in recipe["requirements"]["host"]:
             recipe["requirements"]["host"].remove("REQUIRE_GL")
 
-        recipe["requirements"]["build"] += [
+        recipe["requirements"]["host"] += [
             {
                 "if": "linux",
-                "then": [
-                    "${{ cdt('mesa-libgl-devel') }}",
-                    "${{ cdt('mesa-dri-drivers') }}",
-                    "${{ cdt('libselinux') }}",
-                    "${{ cdt('libxxf86vm') }}",
-                ],
+                "then": ["libgl-devel"],
             }
         ]
 

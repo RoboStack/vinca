@@ -29,6 +29,7 @@ def read_azure_script(fn):
 
 
 azure_linux_script = lu(read_azure_script("linux.sh"))
+azure_emscripten_wasm32_script = lu(read_azure_script("emscripten_wasm32.sh"))
 azure_osx_script = lu(read_azure_script("osx_64.sh"))
 azure_osx_arm64_script = lu(read_azure_script("osx_arm64.sh"))
 azure_win_preconfig_script = lu(read_azure_script("win_preconfig.bat"))
@@ -251,9 +252,10 @@ def build_linux_pipeline(
     docker_image=None,
     runs_on=None,
     outfile="linux.yml",
+    pipeline_name="build_linux"
 ):
 
-    blurb = {"jobs": {}, "name": "build_linux"}
+    blurb = {"jobs": {}, "name": pipeline_name}
 
     if runs_on is None:
         runs_on = "ubuntu-latest"
@@ -588,3 +590,12 @@ def main():
     # windows
     if args.platform == "win-64":
         build_win_pipeline(stages, args.trigger_branch, outfile="win.yml")
+
+    if args.platform == "emscripten-wasm32":
+        build_linux_pipeline(
+            stages,
+            args.trigger_branch,
+            outfile="emscripten_wasm32.yml",
+            script=azure_emscripten_wasm32_script,
+            pipeline_name="emscripten_wasm32"
+        )
