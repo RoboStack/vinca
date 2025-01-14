@@ -952,7 +952,7 @@ def main():
                 # only URLs
                 if "://" in fn:
                     selected_bn = vinca_conf.get("build_number", 0)
-                    if not vinca_conf.get("use_explicit_build_number", False):
+                    if not vinca_conf.get("use_explicit_build_number", True):
                         distro = vinca_conf["ros_distro"]
                         all_pkgs = repodata.get("packages", {})
                         all_pkgs.update(repodata.get("packages.conda", {}))
