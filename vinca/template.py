@@ -7,6 +7,8 @@ import stat
 from ruamel import yaml
 from pathlib import Path
 
+from vinca.utils import get_pkg_build_number
+
 TEMPLATE = """\
 # yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
 
@@ -71,7 +73,6 @@ def copyfile_with_exec_permissions(source_file, destination_file):
         os.chmod(destination_file, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 def write_recipe(source, outputs, vinca_conf, single_file=True):
-    build_number = vinca_conf.get("build_number", 0)
     # single_file = False
     if single_file:
         file = yaml.YAML()
@@ -84,7 +85,7 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
         meta["package"]["version"] = f"{datetime.datetime.now():%Y.%m.%d}"
         meta["recipe"] = meta["package"]
         del meta["package"]
-        meta["build"]["number"] = build_number
+        meta["build"]["number"] = vinca_conf.get("build_number", 0)
         meta["build"]["post_process"] = post_process_items
         with open("recipe.yaml", "w") as stream:
             file.dump(meta, stream)
@@ -102,7 +103,7 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
             meta["package"]["name"] = o["package"]["name"]
             meta["package"]["version"] = o["package"]["version"]
 
-            meta["build"]["number"] = build_number
+            meta["build"]["number"] = get_pkg_build_number(vinca_conf.get("build_number", 0), o["package"]["name"], vinca_conf)
             meta["build"]["post_process"] = post_process_items
 
             if test := vinca_conf["_tests"].get(o["package"]["name"]):

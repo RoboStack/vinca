@@ -16,7 +16,7 @@ from .template import write_recipe, write_recipe_package
 from .distro import Distro
 
 from vinca import config
-from vinca.utils import get_repodata
+from vinca.utils import get_repodata, get_pkg_build_number
 
 unsatisfied_deps = set()
 distro = None
@@ -217,6 +217,11 @@ def read_vinca_yaml(filepath):
     )
 
     vinca_conf["trigger_new_versions"] = vinca_conf.get("trigger_new_versions", False)
+
+    if (Path(filepath).parent / "pkg_additional_info.yaml").exists():
+        vinca_conf["_pkg_additional_info"] = yaml.load(open(Path(filepath).parent / "pkg_additional_info.yaml"))
+    else:
+        vinca_conf["_pkg_additional_info"] = {}
 
     return vinca_conf
 
@@ -864,6 +869,7 @@ def main():
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, "vinca.yaml")
     vinca_conf = read_vinca_yaml(vinca_yaml)
+
     snapshot = read_snapshot(arguments.snapshot)
 
     from .template import generate_bld_ament_cmake
@@ -946,19 +952,19 @@ def main():
                 # only URLs
                 if "://" in fn:
                     selected_bn = vinca_conf.get("build_number", 0)
-                    distro = vinca_conf["ros_distro"]
-                    all_pkgs = repodata.get("packages", {})
-                    all_pkgs.update(repodata.get("packages.conda", {}))
-                    for pkg_name, pkg in all_pkgs.items():
-                        if pkg_name.startswith(f"ros-{distro}"):
-                            if pkg_name.rsplit("-", 2)[0] in additional_recipe_names:
-                                print(
-                                    f"Skipping additional recipe for build number computation {pkg_name}"
-                                )
-                                continue
-                            selected_bn = max(selected_bn, pkg["build_number"])
+                    if not vinca_conf.get("use_explicit_build_number", False):
+                        distro = vinca_conf["ros_distro"]
+                        all_pkgs = repodata.get("packages", {})
+                        all_pkgs.update(repodata.get("packages.conda", {}))
+                        for pkg_name, pkg in all_pkgs.items():
+                            if pkg_name.startswith(f"ros-{distro}"):
+                                if pkg_name.rsplit("-", 2)[0] in additional_recipe_names:
+                                    print(
+                                        f"Skipping additional recipe for build number computation {pkg_name}"
+                                    )
+                                    continue
+                                selected_bn = max(selected_bn, pkg["build_number"])
 
-                print(f"Selected build number: {selected_bn}")
 
                 explicitly_selected_pkgs = [
                     f"ros-{distro}-{pkg.replace('_', '-')}"
@@ -969,14 +975,15 @@ def main():
                 for _, pkg in all_pkgs.items():
                     is_built = False
                     if selected_bn is not None:
+                        pkg_build_number = get_pkg_build_number(selected_bn, pkg["name"], vinca_conf)
                         if vinca_conf.get("full_rebuild", True):
-                            if pkg["build_number"] == selected_bn:
+                            if pkg["build_number"] == pkg_build_number:
                                 is_built = True
                         else:
                             # remove all packages except explicitly selected ones
                             if (
                                 pkg["name"] not in explicitly_selected_pkgs
-                                or pkg["build_number"] == selected_bn
+                                or pkg["build_number"] == pkg_build_number
                             ):
                                 is_built = True
                     else:
