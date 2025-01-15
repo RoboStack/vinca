@@ -676,17 +676,16 @@ def get_selected_packages(distro, vinca_conf):
         for i in vinca_conf["packages_select_by_deps"]:
             i = i.replace("-", "_")
             selected_packages = selected_packages.union([i])
-            if "skip_all_deps" not in vinca_conf or not vinca_conf["skip_all_deps"]:
-                if i in skipped_packages:
-                    continue
-                try:
-                    pkgs = distro.get_depends(i, ignore_pkgs=skipped_packages)
-                except KeyError:
-                    # handle (rare) package names that use "-" as separator
-                    pkgs = distro.get_depends(i.replace("_", "-"))
-                    selected_packages.remove(i)
-                    selected_packages.add(i.replace("_", "-"))
-                selected_packages = selected_packages.union(pkgs)
+            if i in skipped_packages:
+                continue
+            try:
+                pkgs = distro.get_depends(i, ignore_pkgs=skipped_packages)
+            except KeyError:
+                # handle (rare) package names that use "-" as separator
+                pkgs = distro.get_depends(i.replace("_", "-"))
+                selected_packages.remove(i)
+                selected_packages.add(i.replace("_", "-"))
+            selected_packages = selected_packages.union(pkgs)
 
     result = sorted(list(selected_packages))
     return result
@@ -976,16 +975,8 @@ def main():
                     is_built = False
                     if selected_bn is not None:
                         pkg_build_number = get_pkg_build_number(selected_bn, pkg["name"], vinca_conf)
-                        if vinca_conf.get("full_rebuild", True):
-                            if pkg["build_number"] == pkg_build_number:
-                                is_built = True
-                        else:
-                            # remove all packages except explicitly selected ones
-                            if (
-                                pkg["name"] not in explicitly_selected_pkgs
-                                or pkg["build_number"] == pkg_build_number
-                            ):
-                                is_built = True
+                        if pkg["build_number"] == pkg_build_number:
+                            is_built = True
                     else:
                         is_built = True
 

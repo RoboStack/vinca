@@ -113,7 +113,6 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     print("Final names: ", ros_names)
 
     vinca_conf["packages_select_by_deps"] = ros_names
-    vinca_conf["skip_all_deps"] = True
     vinca_conf["is_migration"] = True
     vinca_conf["skip_existing"] = []
 
