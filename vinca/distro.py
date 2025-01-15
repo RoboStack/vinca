@@ -72,6 +72,9 @@ class Distro(object):
         release_tag = get_release_tag(repo, pkg_name)
         return repo.url, release_tag
 
+    def get_released_repo_name(self, package_name):
+        return self._distro.release_packages[package_name].repository_name
+
     def check_package(self, pkg_name):
         if pkg_name in self._distro.release_packages:
             return self.snapshot is None or pkg_name in self.snapshot
