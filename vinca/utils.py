@@ -65,3 +65,20 @@ def get_repodata(url_or_path, platform=None):
     with open(fn, "w") as fcache:
         fcache.write(content.decode("utf-8"))
     return json.loads(content)
+
+def ensure_name_is_without_distro_prefix_and_with_underscores(name, vinca_conf):
+    """
+    Ensure that the name is without distro prefix and with underscores
+    e.g. "ros-humble-pkg-name" -> "pkg_name"
+    """
+    newname = name.replace("-", "_")
+    distro_prefix = "ros_" + vinca_conf.get("ros_distro") + "_"
+    if (newname.startswith(distro_prefix) ):
+        newname = newname.replace(distro_prefix, "")
+
+    return newname
+
+def get_pkg_build_number(default_build_number, pkg_name, vinca_conf):
+    normalized_name = ensure_name_is_without_distro_prefix_and_with_underscores(pkg_name, vinca_conf)
+    pkg_additional_info = vinca_conf["_pkg_additional_info"].get(normalized_name, {})
+    return pkg_additional_info.get("build_number", default_build_number)
