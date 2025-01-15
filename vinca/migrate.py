@@ -147,14 +147,12 @@ def main():
             repo_name = distro.get_released_repo_name(ros_name)
             rebuild.add(repo_name)
 
-    vinca["build_number"] += 1
-    vinca["full_rebuild"] = False
-    vinca["packages_select_by_deps"] = list(rebuild)
-    # TODO: comment/uncomment/add packages to existing list instead of overwriting
+    new_build_number = vinca["build_number"] + 1
+    yaml_data = {package: {"build_number": new_build_number} for package in list(rebuild)}
 
     if not args.dry_run:
-        with open(args.vinca, "w") as f:
-            yaml.dump(vinca, f)
+        with open("pkg_additional_info.yaml", "w") as f:
+            yaml.dump(yaml_data, f)
 
     print("\n\033[1mPackages to rebuild:\033[0m")
     for pkg in rebuild:
