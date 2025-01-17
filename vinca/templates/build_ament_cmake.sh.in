@@ -60,6 +60,7 @@ echo "Using site_packages: $PYTHON_INSTALL_DIR"
 
 if [[ $target_platform =~ emscripten.* ]]; then
   export CONDA_BUILD_CROSS_COMPILATION="1"
+  export PYTHON_EXECUTABLE=python$PY_VER
   echo "set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)"> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_STRIP FALSE)  # used by default in pybind11 on .so modules">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)  # fixes an error where numpy header files are not found correctly">> $SRC_DIR/__vinca_shared_lib_patch.cmake

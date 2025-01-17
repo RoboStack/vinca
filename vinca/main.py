@@ -248,14 +248,13 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         if pkg_names[0] in vinca_conf["skip_built_packages"]:
             return None
 
-    # TODO: MIGHT NEED TO ADD WORKAROUND FOR EMSCRIPTEN AND/OR DISABLE STDLIB("C")
     output = {
         "package": {"name": pkg_names[0], "version": version},
         "requirements": {
             "build": [
                 "${{ compiler('cxx') }}",
                 "${{ compiler('c') }}",
-                "${{ stdlib('c') }}",
+                {"if": "target_platform!='emscripten-wasm32'", "then": ["${{ stdlib('c') }}"]},
                 "ninja",
                 "python",
                 "setuptools",
@@ -730,7 +729,7 @@ def parse_package(pkg, distro, vinca_conf, path):
             "build": [
                 "${{ compiler('cxx') }}",
                 "${{ compiler('c') }}",
-                "${{ stdlib('c') }}",
+                {"if": "target_platform!='emscripten-wasm32'", "then": ["${{ stdlib('c') }}"]},
                 "ninja",
                 "python",
                 "patch",
