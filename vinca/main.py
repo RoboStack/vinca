@@ -126,13 +126,6 @@ def parse_command_line(argv):
         default=None,
         help="The conda platform to check existing recipes for.",
     )
-    parser.add_argument(
-        "-z",
-        "--snapshot",
-        dest="snapshot",
-        default=None,
-        help="The version snapshot file (default: None)."
-    )
     arguments = parser.parse_args(argv[1:])
     global selected_platform
     config.parsed_args = arguments
@@ -226,12 +219,12 @@ def read_vinca_yaml(filepath):
     return vinca_conf
 
 
-def read_snapshot(filepath):
-    if not filepath:
+def read_snapshot(vinca_conf):
+    if not "rosdistro_snapshot" in vinca_conf:
         return None
 
     yaml = ruamel.yaml.YAML()
-    snapshot = yaml.load(open(filepath, "r"))
+    snapshot = yaml.load(open(vinca_conf["rosdistro_snapshot"], "r"))
     return snapshot
 
 
@@ -868,8 +861,7 @@ def main():
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, "vinca.yaml")
     vinca_conf = read_vinca_yaml(vinca_yaml)
-
-    snapshot = read_snapshot(arguments.snapshot)
+    snapshot = read_snapshot(vinca_conf)
 
     from .template import generate_bld_ament_cmake
     from .template import generate_bld_ament_python
