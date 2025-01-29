@@ -28,6 +28,8 @@ def read_azure_script(fn):
         return fi.read()
 
 
+azure_unix_script = lu(read_azure_script("unix.sh"))
+
 azure_linux_script = lu(read_azure_script("linux.sh"))
 azure_emscripten_wasm32_script = lu(read_azure_script("emscripten_wasm32.sh"))
 azure_osx_script = lu(read_azure_script("osx_64.sh"))
@@ -244,28 +246,20 @@ def get_stage_name(batch):
     return " ".join(stage_name)
 
 
-def build_linux_pipeline(
+def build_unix_pipeline(
     stages,
     trigger_branch,
-    script=azure_linux_script,
+    script=azure_unix_script,
     azure_template=None,
-    docker_image=None,
-    runs_on=None,
+    runs_on="ubuntu-latest",
     outfile="linux.yml",
-    pipeline_name="build_linux"
+    pipeline_name="build_linux",
+    target="",
 ):
-
     blurb = {"jobs": {}, "name": pipeline_name}
 
-    if runs_on is None:
-        runs_on = "ubuntu-latest"
-
-    # Build Linux pipeline
     if azure_template is None:
         azure_template = blurb
-
-    if docker_image is None:
-        docker_image = "condaforge/linux-anvil-cos7-x86_64"
 
     prev_batch_keys = []
 
@@ -289,7 +283,7 @@ def build_linux_pipeline(
                         "env": {
                             "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
                             "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                            "DOCKER_IMAGE": docker_image,
+                            "BUILD_TARGET": target,  # use for cross-compilation
                         },
                         "run": script,
                     },
@@ -304,6 +298,27 @@ def build_linux_pipeline(
     azure_template["on"] = {"push": {"branches": [trigger_branch]}}
 
     dump_for_gha(azure_template, outfile)
+
+
+def build_linux_pipeline(
+    stages,
+    trigger_branch,
+    script=azure_unix_script,
+    azure_template=None,
+    runs_on="ubuntu-latest",
+    outfile="linux.yml",
+    pipeline_name="build_linux",
+):
+    build_unix_pipeline(
+        stages,
+        trigger_branch,
+        script=script,
+        azure_template=azure_template,
+        runs_on=runs_on,
+        outfile=outfile,
+        pipeline_name=pipeline_name,
+        target="linux-64",
+    )
 
 
 def build_osx_pipeline(
@@ -312,54 +327,20 @@ def build_osx_pipeline(
     vm_imagename="macos-13",
     outfile="osx.yml",
     azure_template=None,
-    script=azure_osx_script,
+    script=azure_unix_script,
 ):
-    # Build OSX pipeline
-    blurb = {"jobs": {}, "name": "build_osx"}
-
-    # Build Linux pipeline
-    if azure_template is None:
-        azure_template = blurb
-
-    prev_batch_keys = []
-    for i, s in enumerate(stages):
-        stage_name = f"stage_{i}"
-        batch_keys = []
-        for batch in s:
-            batch_key = f"{stage_name}_job_{len(azure_template['jobs'])}"
-            batch_keys.append(batch_key)
-
-            pretty_stage_name = get_stage_name(batch)
-            azure_template["jobs"][batch_key] = {
-                "name": pretty_stage_name,
-                "runs-on": vm_imagename,
-                "strategy": {"fail-fast": False},
-                "needs": prev_batch_keys,
-                "steps": [
-                    {"name": "Checkout code", "uses": "actions/checkout@v4"},
-                    {
-                        "name": f"Build {' '.join([pkg for pkg in batch])}",
-                        "env": {
-                            "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
-                            "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                        },
-                        "run": script,
-                    },
-                ],
-            }
-
-        prev_batch_keys = batch_keys
-
-    if len(azure_template.get("jobs", [])) == 0:
-        return
-
-    azure_template["on"] = {"push": {"branches": [trigger_branch]}}
-
-    dump_for_gha(azure_template, outfile)
+    build_unix_pipeline(
+        stages,
+        trigger_branch,
+        script=script,
+        azure_template=azure_template,
+        runs_on=vm_imagename,
+        outfile=outfile,
+        target="osx-64",
+    )
 
 
 def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template=None):
-
     vm_imagename = "windows-2019"
     # Build Win pipeline
     blurb = {"jobs": {}, "name": "build_win"}
@@ -456,7 +437,6 @@ def get_full_tree():
 
 
 def main():
-
     args = parse_command_line(sys.argv)
 
     full_tree = get_full_tree()
@@ -559,13 +539,12 @@ def main():
         fo.write("\n".join(order))
 
     if args.platform == "linux-64":
-        build_linux_pipeline(stages, args.trigger_branch, outfile="linux.yml")
+        build_unix_pipeline(stages, args.trigger_branch, outfile="linux.yml")
 
     if args.platform == "osx-64":
         build_osx_pipeline(
             stages,
             args.trigger_branch,
-            script=azure_osx_script,
         )
 
     if args.platform == "osx-arm64":
@@ -574,28 +553,28 @@ def main():
             args.trigger_branch,
             vm_imagename="macos-14",
             outfile="osx_arm64.yml",
-            script=azure_osx_arm64_script,
+            script=azure_unix_script,
         )
 
-    if args.platform == "linux-aarch64":
-        # Build aarch64 pipeline
-        build_linux_pipeline(
-            stages,
-            args.trigger_branch,
-            runs_on="cirun-linux-aarch64--${{ github.run_id }}",
-            docker_image="condaforge/linux-anvil-aarch64",
-            outfile="linux_aarch64.yml",
-        )
+    # if args.platform == "linux-aarch64":
+    #     # Build aarch64 pipeline
+    #     build_linux_pipeline(
+    #         stages,
+    #         args.trigger_branch,
+    #         runs_on="cirun-linux-aarch64--${{ github.run_id }}",
+    #         docker_image="condaforge/linux-anvil-aarch64",
+    #         outfile="linux_aarch64.yml",
+    #     )
 
     # windows
     if args.platform == "win-64":
         build_win_pipeline(stages, args.trigger_branch, outfile="win.yml")
 
     if args.platform == "emscripten-wasm32":
-        build_linux_pipeline(
+        build_unix_pipeline(
             stages,
             args.trigger_branch,
             outfile="emscripten_wasm32.yml",
-            script=azure_emscripten_wasm32_script,
-            pipeline_name="emscripten_wasm32"
+            pipeline_name="emscripten_wasm32",
+            target="emscripten-wasm32",
         )
