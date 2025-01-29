@@ -277,7 +277,10 @@ def build_unix_pipeline(
                 "strategy": {"fail-fast": False},
                 "needs": prev_batch_keys,
                 "steps": [
-                    {"name": "Checkout code", "uses": "actions/checkout@v4"},
+                    {
+                        "name": "Checkout code",
+                        "uses": "actions/checkout@v4",
+                    },
                     {
                         "name": f"Build {' '.join([pkg for pkg in batch])}",
                         "env": {
