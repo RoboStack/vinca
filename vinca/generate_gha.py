@@ -494,10 +494,11 @@ def main():
         # sort out requirements that are not built in this run
         for pkg_name, reqs in requirements.items():
             if platform == "emscripten-wasm32":
-                requirements[pkg_name] = sum(
+                parsed = sum(
                     (parse_if_wasm32(r) if isinstance(r, dict) else [r] for r in reqs),
                     [],
                 )
+                requirements[pkg_name] = [r.split()[0] for r in parsed]
             else:
                 requirements[pkg_name] = [
                     r.split()[0] for r in reqs if (isinstance(r, str) and r in reqs)
