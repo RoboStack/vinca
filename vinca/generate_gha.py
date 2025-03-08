@@ -29,11 +29,6 @@ def read_azure_script(fn):
 
 
 azure_unix_script = lu(read_azure_script("unix.sh"))
-
-azure_linux_script = lu(read_azure_script("linux.sh"))
-azure_emscripten_wasm32_script = lu(read_azure_script("emscripten_wasm32.sh"))
-azure_osx_script = lu(read_azure_script("osx_64.sh"))
-azure_osx_arm64_script = lu(read_azure_script("osx_arm64.sh"))
 azure_win_preconfig_script = lu(read_azure_script("win_preconfig.bat"))
 azure_win_script = lu(read_azure_script("win_build.bat"))
 
@@ -381,7 +376,7 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                         "name": "Setup pixi",
                         "uses": "prefix-dev/setup-pixi@v0.8.1",
                         "with": {
-                            "pixi-version": "v0.39.4",
+                            "pixi-version": "v0.40.3",
                             "cache": "true",
                         },
                     },
@@ -591,15 +586,15 @@ def main():
             script=azure_unix_script,
         )
 
-    # if args.platform == "linux-aarch64":
-    #     # Build aarch64 pipeline
-    #     build_linux_pipeline(
-    #         stages,
-    #         args.trigger_branch,
-    #         runs_on="cirun-linux-aarch64--${{ github.run_id }}",
-    #         docker_image="condaforge/linux-anvil-aarch64",
-    #         outfile="linux_aarch64.yml",
-    #     )
+    if args.platform == "linux-aarch64":
+        # Build aarch64 pipeline
+        build_linux_pipeline(
+            stages,
+            args.trigger_branch,
+            runs_on="ubuntu-24.04-arm",
+            docker_image="condaforge/linux-anvil-aarch64",
+            outfile="linux_aarch64.yml",
+        )
 
     # windows
     if args.platform == "win-64":
