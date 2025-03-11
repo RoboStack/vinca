@@ -414,25 +414,6 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
     dump_for_gha(azure_template, outfile)
 
 
-def parse_if_wasm32(condition_dict):
-    context = {
-        "target_platform": "emscripten-wasm32",
-        "build_platform": "linux-64",
-        "osx": False,
-        "x86_64": False,
-        "unix": False,
-        "linux": False,
-    }
-    try:
-        if eval(condition_dict["if"], {}, context):
-            return condition_dict["then"]
-        else:
-            return condition_dict.get("else", [])
-    except Exception as e:
-        print(f"Error evaluating {condition_dict}")
-        return []
-
-
 def get_full_tree():
     recipes_dir = config.parsed_args.dir
 
@@ -488,16 +469,13 @@ def main():
 
         # sort out requirements that are not built in this run
         for pkg_name, reqs in requirements.items():
+            requirements[pkg_name] = [
+                r.split()[0] for r in reqs if (isinstance(r, str) and r in reqs)
+            ]
             if platform == "emscripten-wasm32":
-                parsed = sum(
-                    (parse_if_wasm32(r) if isinstance(r, dict) else [r] for r in reqs),
-                    [],
-                )
-                requirements[pkg_name] = [r.split()[0] for r in parsed]
-            else:
-                requirements[pkg_name] = [
-                    r.split()[0] for r in reqs if (isinstance(r, str) and r in reqs)
-                ]
+                # Hot fix to add the only ros package inside a if else statement
+                if "ros-humble-rmw-wasm-cpp" in reqs:
+                    requirements[pkg_name].append("ros-humble-rmw-wasm-cpp")
 
         G = nx.DiGraph()
         for pkg, reqs in requirements.items():
