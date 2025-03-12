@@ -868,7 +868,7 @@ def main():
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, "vinca.yaml")
     vinca_conf = read_vinca_yaml(vinca_yaml)
-    snapshot = read_snapshot(arguments.snapshot)
+    snapshot = read_snapshot(vinca_conf)
 
     from .template import generate_bld_ament_cmake
     from .template import generate_bld_ament_python
