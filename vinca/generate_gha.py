@@ -481,11 +481,7 @@ def main():
         for pkg, reqs in requirements.items():
             G.add_node(pkg)
             for r in reqs:
-                if (
-                    r.startswith("ros-")
-                    or r.startswith("ros2-")
-                    or r.startswith("dynmsg")
-                ):
+                if r in requirements:
                     G.add_edge(pkg, r)
 
         # print(requirements)
