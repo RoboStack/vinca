@@ -219,12 +219,12 @@ def read_vinca_yaml(filepath):
     return vinca_conf
 
 
-def read_snapshot(vinca_conf):
-    if not "rosdistro_snapshot" in vinca_conf:
+def read_snapshot(filepath):
+    if not filepath:
         return None
 
     yaml = ruamel.yaml.YAML()
-    snapshot = yaml.load(open(vinca_conf["rosdistro_snapshot"], "r"))
+    snapshot = yaml.load(open(filepath, "r"))
     return snapshot
 
 
@@ -868,7 +868,7 @@ def main():
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, "vinca.yaml")
     vinca_conf = read_vinca_yaml(vinca_yaml)
-    snapshot = read_snapshot(vinca_conf)
+    snapshot = read_snapshot(arguments.snapshot)
 
     from .template import generate_bld_ament_cmake
     from .template import generate_bld_ament_python
