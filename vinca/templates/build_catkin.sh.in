@@ -71,6 +71,18 @@ if [[ $target_platform =~ linux.* ]]; then
     ln -s $GXX $BUILD_PREFIX/bin/g++
 fi
 
+if [[ $target_platform =~ emscripten.* ]]; then
+  export CONDA_BUILD_CROSS_COMPILATION="1"
+  echo "set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)"> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_STRIP FALSE)  # used by default in pybind11 on .so modules">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)  # fixes an error where numpy header files are not found correctly">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  export EXTRA_CMAKE_ARGS=" \
+      -DCMAKE_FIND_ROOT_PATH=$PREFIX    \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE \
+      -DCMAKE_PROJECT_INCLUDE=$SRC_DIR/__vinca_shared_lib_patch.cmake \
+  "
+fi
+
 export SKIP_TESTING=@(skip_testing)
 
 if [ "${PKG_NAME}" == "ros-noetic-euslisp" ] || [ "${PKG_NAME}" = "ros-noetic-jskeus" ] || [ "${PKG_NAME}" = "ros-noetic-roseus" ]; then
@@ -98,6 +110,7 @@ cmake ${CMAKE_ARGS} --compile-no-warning-as-error \
          -DCATKIN_SKIP_TESTING=$SKIP_TESTING \
          -DCATKIN_BUILD_BINARY_PACKAGE=$CATKIN_BUILD_BINARY_PACKAGE \
          -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
+         $EXTRA_CMAKE_ARGS \
          -G "$GENERATOR" \
          $SRC_DIR/$PKG_NAME/src/work
 

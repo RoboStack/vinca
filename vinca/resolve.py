@@ -8,6 +8,7 @@ map_platform_python_to_conda = {
     "osx-64": "osx",
     "osx-arm64": "osx",
     "win-64": "win64",
+    "emscripten-wasm32": "emscripten",
 }
 
 
