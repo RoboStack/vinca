@@ -562,12 +562,12 @@ def main():
 
     if args.platform == "linux-aarch64":
         # Build aarch64 pipeline
-        build_linux_pipeline(
+        build_unix_pipeline(
             stages,
             args.trigger_branch,
             runs_on="ubuntu-24.04-arm",
-            docker_image="condaforge/linux-anvil-aarch64",
             outfile="linux_aarch64.yml",
+            target=platform
         )
 
     # windows
