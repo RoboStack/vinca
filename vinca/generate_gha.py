@@ -326,6 +326,7 @@ def build_osx_pipeline(
     outfile="osx.yml",
     azure_template=None,
     script=azure_unix_script,
+    target="osx-64"
 ):
     build_unix_pipeline(
         stages,
@@ -334,7 +335,7 @@ def build_osx_pipeline(
         azure_template=azure_template,
         runs_on=vm_imagename,
         outfile=outfile,
-        target="osx-64",
+        target=target,
     )
 
 
@@ -558,6 +559,7 @@ def main():
             vm_imagename="macos-14",
             outfile="osx_arm64.yml",
             script=azure_unix_script,
+            target=platform,
         )
 
     if args.platform == "linux-aarch64":
