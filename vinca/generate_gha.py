@@ -248,7 +248,7 @@ def build_unix_pipeline(
     azure_template=None,
     runs_on="ubuntu-latest",
     outfile="linux.yml",
-    pipeline_name="build_linux",
+    pipeline_name="build_unix",
     target="",
 ):
     blurb = {"jobs": {}, "name": pipeline_name}
@@ -326,6 +326,8 @@ def build_osx_pipeline(
     outfile="osx.yml",
     azure_template=None,
     script=azure_unix_script,
+    target="osx-64",
+    pipeline_name="build_osx_64"
 ):
     build_unix_pipeline(
         stages,
@@ -334,7 +336,8 @@ def build_osx_pipeline(
         azure_template=azure_template,
         runs_on=vm_imagename,
         outfile=outfile,
-        target="osx-64",
+        target=target,
+        pipeline_name=pipeline_name
     )
 
 
@@ -558,6 +561,8 @@ def main():
             vm_imagename="macos-14",
             outfile="osx_arm64.yml",
             script=azure_unix_script,
+            target=platform,
+            pipeline_name="build_osx_arm64"
         )
 
     if args.platform == "linux-aarch64":
@@ -567,7 +572,8 @@ def main():
             args.trigger_branch,
             runs_on="ubuntu-24.04-arm",
             outfile="linux_aarch64.yml",
-            target=platform
+            target=platform,
+            pipeline_name="build_linux_aarch64"
         )
 
     # windows
@@ -579,6 +585,6 @@ def main():
             stages,
             args.trigger_branch,
             outfile="emscripten_wasm32.yml",
-            pipeline_name="emscripten_wasm32",
+            pipeline_name="build_emscripten_wasm32",
             target="emscripten-wasm32",
         )
