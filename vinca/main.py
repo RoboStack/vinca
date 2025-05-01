@@ -936,7 +936,11 @@ def main():
             ):
                 with open(add_rec) as fi:
                     add_rec_y = yaml.load(fi)
-                additional_recipe_names.add(add_rec_y["package"]["name"])
+                if config.parsed_args.platform == 'emscripten-wasm32':
+                    additional_recipe_names.add(add_rec_y["package"]["name"])
+                else:
+                    if add_rec_y["package"]["name"] not in ["ros-humble-rmw-wasm-cpp", "ros-humble-wasm-cpp", "ros-humble-dynmsg", "ros-humble-test-wasm"]:
+                        additional_recipe_names.add(add_rec_y["package"]["name"])
 
             print("Found additional recipes: ", additional_recipe_names)
 
