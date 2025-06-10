@@ -342,7 +342,7 @@ def build_osx_pipeline(
 
 
 def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template=None):
-    vm_imagename = "windows-2019"
+    vm_imagename = "windows-2022"
     # Build Win pipeline
     blurb = {"jobs": {}, "name": "build_win"}
 
