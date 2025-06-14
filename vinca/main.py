@@ -14,6 +14,7 @@ from .resolve import get_conda_index
 from .resolve import resolve_pkgname
 from .template import write_recipe, write_recipe_package
 from .distro import Distro
+from .v1_selectors import evaluate_selectors
 
 from vinca import config
 from vinca.utils import get_repodata, get_pkg_build_number
@@ -159,7 +160,7 @@ def get_depmods(vinca_conf, pkg_name):
 
 def read_vinca_yaml(filepath):
     yaml = ruamel.yaml.YAML()
-    vinca_conf = yaml.load(open(filepath, "r"))
+    vinca_conf = evaluate_selectors(yaml.load(open(filepath, "r")), target_platform=get_conda_subdir())
 
     # normalize paths to absolute paths
     conda_index = []
@@ -198,7 +199,7 @@ def read_vinca_yaml(filepath):
     vinca_conf["_tests"] = tests
 
     if (patch_dir / "dependencies.yaml").exists():
-        vinca_conf["depmods"] = yaml.load(open(patch_dir / "dependencies.yaml"))
+        vinca_conf["depmods"] = evaluate_selectors(yaml.load(open(patch_dir / "dependencies.yaml")), target_platform=get_conda_subdir())
     if not vinca_conf.get("depmods"):
         vinca_conf["depmods"] = {}
 
@@ -212,7 +213,7 @@ def read_vinca_yaml(filepath):
     vinca_conf["trigger_new_versions"] = vinca_conf.get("trigger_new_versions", False)
 
     if (Path(filepath).parent / "pkg_additional_info.yaml").exists():
-        vinca_conf["_pkg_additional_info"] = yaml.load(open(Path(filepath).parent / "pkg_additional_info.yaml"))
+        vinca_conf["_pkg_additional_info"] = evaluate_selectors(yaml.load(open(Path(filepath).parent / "pkg_additional_info.yaml")), target_platform=get_conda_subdir())
     else:
         vinca_conf["_pkg_additional_info"] = {}
 
