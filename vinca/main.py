@@ -225,8 +225,17 @@ def read_snapshot(vinca_conf):
         return None
 
     yaml = ruamel.yaml.YAML()
-    snapshot = yaml.load(open(vinca_conf["rosdistro_snapshot"], "r"))
-    return snapshot
+    # load primary snapshot
+    snapshot = yaml.load(open(vinca_conf["rosdistro_snapshot"], "r")) or {}
+    # if additional snapshot file specified, load and merge
+    additional_key = "rosdistro_additional_recipes"
+    additional = None
+    if additional_key in vinca_conf and vinca_conf[additional_key]:
+        additional = yaml.load(open(vinca_conf[additional_key], "r")) or {}
+        # merge additional entries, overriding or adding
+        snapshot.update(additional)
+
+    return snapshot, additional
 
 
 def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
@@ -696,7 +705,7 @@ def get_selected_packages(distro, vinca_conf):
                 continue
             try:
                 pkgs = distro.get_depends(i, ignore_pkgs=skipped_packages)
-            except KeyError:
+            except KeyError as err:
                 # handle (rare) package names that use "-" as separator
                 pkgs = distro.get_depends(i.replace("_", "-"))
                 selected_packages.remove(i)
@@ -869,7 +878,11 @@ def main():
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, "vinca.yaml")
     vinca_conf = read_vinca_yaml(vinca_yaml)
-    snapshot = read_snapshot(vinca_conf)
+
+    # snapshot contains both rosdistro_snapshot.yaml and
+    # rosdistro_additional_recipes.yaml
+
+    snapshot, additional_packages_snapshot = read_snapshot(vinca_conf)
 
     from .template import generate_bld_ament_cmake
     from .template import generate_bld_ament_python
@@ -897,7 +910,7 @@ def main():
         if "python_version" in vinca_conf:
             python_version = vinca_conf["python_version"]
 
-        distro = Distro(vinca_conf["ros_distro"], python_version, snapshot)
+        distro = Distro(vinca_conf["ros_distro"], python_version, snapshot, additional_packages_snapshot)
         additional_pkgs, parsed_pkgs = [], []
         for f in pkg_files:
             parsed_pkg = catkin_pkg.package.parse_package(f)
@@ -999,7 +1012,7 @@ def main():
         if "python_version" in vinca_conf:
             python_version = vinca_conf["python_version"]
 
-        distro = Distro(vinca_conf["ros_distro"], python_version, snapshot)
+        distro = Distro(vinca_conf["ros_distro"], python_version, snapshot, additional_packages_snapshot)
 
         selected_pkgs = get_selected_packages(distro, vinca_conf)
 
