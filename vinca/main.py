@@ -17,7 +17,7 @@ from .distro import Distro
 from .v1_selectors import evaluate_selectors
 
 from vinca import config
-from vinca.utils import get_repodata, get_pkg_build_number
+from vinca.utils import get_repodata, get_pkg_build_number, get_pkg_additional_info, is_dummy_metapackage
 
 unsatisfied_deps = set()
 distro = None
@@ -255,36 +255,69 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     else:
         if pkg_names[0] in vinca_conf["skip_built_packages"]:
             return None
-
-    output = {
-        "package": {"name": pkg_names[0], "version": version},
-        "requirements": {
-            "build": [
-                "${{ compiler('cxx') }}",
-                "${{ compiler('c') }}",
-                {"if": "target_platform!='emscripten-wasm32'", "then": ["${{ stdlib('c') }}"]},
-                "ninja",
-                "python",
-                "setuptools",
-                "git",
-                {"if": "unix", "then": ["patch", "make", "coreutils"]},
-                {"if": "win", "then": ["m2-patch"]},
-                {"if": "osx", "then": ["tapi"]},
-                {"if": "build_platform != target_platform", "then": ["pkg-config"]},
-                "cmake",
-                "cython",
-                {"if": "build_platform != target_platform", "then": ["python", "cross-python_${{ target_platform }}", "numpy"]},
-            ],
-            "host": [
-                {"if": "build_platform == target_platform", "then": ["pkg-config"]},
-                "python",
-                "numpy",
-                "pip",
-            ],
-            "run": [],
-        },
-        "build": {"script": ""},
-    }
+    # handle dummy recipe generation for vendored packages
+    output = {}
+    if is_dummy_metapackage(pkg_shortname, vinca_conf):
+        pkg_additional_info = get_pkg_additional_info(pkg_shortname, vinca_conf)
+        gen = pkg_additional_info["generate_dummy_package_with_run_deps"]
+        dep_name = gen.get("dep_name")
+        # dep_name is required to specify which dependency to pin in the dummy recipe
+        if not dep_name:
+            runerr = f"Missing 'dep_name' for dummy recipe of {pkg_shortname}"
+            raise RuntimeError(runerr)
+        # max_pin is required for dummy recipe pinning
+        max_pin = gen.get("max_pin")
+        if not max_pin:
+            runerr = f"Missing 'max_pin' for dummy recipe of {pkg_shortname}"
+            raise RuntimeError(runerr)
+        # Compute rattler-build-compatible version constraint based on max_pin:
+        # - lower bound: allow the exact package version
+        # - upper bound: increment the segment of version defined by max_pin length,
+        #   then append 'a0' to ensure the constraint captures pre-releases correctly
+        lower = version
+        parts = [int(p) for p in lower.split('.')]
+        seg = len(max_pin.split('.'))
+        upper_parts = parts[:seg]
+        upper_parts[-1] += 1
+        upper_parts += [0] * (len(parts) - seg)
+        upper = ".".join(str(p) for p in upper_parts) + "a0"
+        constraint = f"{dep_name} >={lower}, <{upper}"
+        output = {
+            "package": {"name": pkg_names[0], "version": version},
+            "build": {"number": get_pkg_build_number(vinca_conf.get("build_number", 0), pkg_names[0], vinca_conf), "script": ""},
+            "requirements": {"build": [], "host": [], "run": [constraint]},
+        }
+    else:
+        # If the package is not a dummy recipe, we generate a full recipe
+        output = {
+            "package": {"name": pkg_names[0], "version": version},
+            "requirements": {
+                "build": [
+                    "${{ compiler('cxx') }}",
+                    "${{ compiler('c') }}",
+                    {"if": "target_platform!='emscripten-wasm32'", "then": ["${{ stdlib('c') }}"]},
+                    "ninja",
+                    "python",
+                    "setuptools",
+                    "git",
+                    {"if": "unix", "then": ["patch", "make", "coreutils"]},
+                    {"if": "win", "then": ["m2-patch"]},
+                    {"if": "osx", "then": ["tapi"]},
+                    {"if": "build_platform != target_platform", "then": ["pkg-config"]},
+                    "cmake",
+                    "cython",
+                    {"if": "build_platform != target_platform", "then": ["python", "cross-python_${{ target_platform }}", "numpy"]},
+                ],
+                "host": [
+                    {"if": "build_platform == target_platform", "then": ["pkg-config"]},
+                    "python",
+                    "numpy",
+                    "pip",
+                ],
+                "run": [],
+            },
+            "build": {"script": ""},
+        }
 
     pkg = catkin_pkg.package.parse_package_string(
         distro.get_release_package_xml(pkg_shortname)
@@ -295,7 +328,11 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     resolved_python = resolve_pkgname("python", vinca_conf, distro)
     output["requirements"]["run"].extend(resolved_python)
     output["requirements"]["host"].extend(resolved_python)
-    if pkg.get_build_type() in ["cmake", "catkin"]:
+
+    if is_dummy_metapackage(pkg_shortname, vinca_conf):
+        # Dummy recipes do not actually build anything, so we set the script to empty
+        output["build"]["script"] = ""
+    elif pkg.get_build_type() in ["cmake", "catkin"]:
         output["build"][
             "script"
         ] = "${{ '$RECIPE_DIR/build_catkin.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
@@ -579,7 +616,9 @@ def generate_source(distro, vinca_conf):
         if not distro.check_package(pkg_shortname):
             print(f"Could not generate source for {pkg_shortname}")
             continue
-
+        # skip cloning source for dummy recipes
+        if is_dummy_metapackage(pkg_shortname, vinca_conf):
+            continue
         url, version = distro.get_released_repo(pkg_shortname)
         entry = {}
         entry["git"] = url
@@ -696,6 +735,7 @@ def get_selected_packages(distro, vinca_conf):
             and vinca_conf["packages_skip_by_deps"] is not None
         ):
             for i in vinca_conf["packages_skip_by_deps"]:
+                print(f"Calling replace on {i}.")
                 skipped_packages = skipped_packages.union([i, i.replace("-", "_")])
         print("Skipped pkgs: ", skipped_packages)
         for i in vinca_conf["packages_select_by_deps"]:
@@ -706,6 +746,7 @@ def get_selected_packages(distro, vinca_conf):
             try:
                 pkgs = distro.get_depends(i, ignore_pkgs=skipped_packages)
             except KeyError as err:
+                print(f"KeyError: {err} for package {i}. Skipping.")
                 # handle (rare) package names that use "-" as separator
                 pkgs = distro.get_depends(i.replace("_", "-"))
                 selected_packages.remove(i)
