@@ -96,7 +96,13 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
             file.indent(mapping=2, sequence=4, offset=2)
             meta = file.load(TEMPLATE)
 
-            meta["source"] = source[o["package"]["name"]]
+            # safe lookup of source entry; dummy recipes may not have a source
+            # only include source section if entry is present, else remove it (dummy recipes)
+            src_entry = source.get(o["package"]["name"], {})
+            if src_entry:
+                meta["source"] = src_entry
+            else:
+                meta.pop("source", None)
             for k, v in o.items():
                 meta[k] = v
 
@@ -117,7 +123,7 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
             with open(recipe_dir / "recipe.yaml", "w") as stream:
                 file.dump(meta, stream)
 
-            if meta["source"].get("patches"):
+            if meta.get("source") and meta["source"].get("patches"):
                 for p in meta["source"]["patches"]:
                     patch_dir, _ = os.path.split(p)
                     os.makedirs(recipe_dir / patch_dir, exist_ok=True)

@@ -78,7 +78,20 @@ def ensure_name_is_without_distro_prefix_and_with_underscores(name, vinca_conf):
 
     return newname
 
-def get_pkg_build_number(default_build_number, pkg_name, vinca_conf):
+def get_pkg_additional_info(pkg_name, vinca_conf):
     normalized_name = ensure_name_is_without_distro_prefix_and_with_underscores(pkg_name, vinca_conf)
     pkg_additional_info = vinca_conf["_pkg_additional_info"].get(normalized_name, {})
+    return pkg_additional_info
+
+def get_pkg_build_number(default_build_number, pkg_name, vinca_conf):
+    pkg_additional_info = get_pkg_additional_info(pkg_name, vinca_conf)
     return pkg_additional_info.get("build_number", default_build_number)
+
+# Return true if the package is actually provided in conda-forge, and so we generate
+# only a recipe with a run dependency on the conda forge package
+def is_dummy_metapackage(pkg_name, vinca_conf):
+    pkg_additional_info = get_pkg_additional_info(pkg_name, vinca_conf)
+    if pkg_additional_info.get("generate_dummy_package_with_run_deps"):
+        return True
+    else:
+        return False
