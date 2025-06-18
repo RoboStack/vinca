@@ -300,6 +300,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                     "python",
                     "setuptools",
                     "git",
+                    "git-lfs",
                     {"if": "unix", "then": ["patch", "make", "coreutils"]},
                     {"if": "win", "then": ["m2-patch"]},
                     {"if": "osx", "then": ["tapi"]},
@@ -493,7 +494,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             {"if": "build_platform != target_platform", "then": ["qt-main"]}
         ]
     # pyqt-builder + git + doxygen must be in build, not host for cross-compile
-    pkgs_move_to_build = ["pyqt-builder", "git", "doxygen"]
+    pkgs_move_to_build = ["pyqt-builder", "git", "doxygen", "git-lfs"]
     for pkg_move_to_build in pkgs_move_to_build:
         if pkg_move_to_build in output["requirements"]["host"]:
             output["requirements"]["build"] += [
