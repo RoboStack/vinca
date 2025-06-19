@@ -377,7 +377,7 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                     {"name": "Checkout code", "uses": "actions/checkout@v4"},
                     {
                         "name": "Setup pixi",
-                        "uses": "prefix-dev/setup-pixi@v0.8.1",
+                        "uses": "prefix-dev/setup-pixi@v0.8.10",
                         "with": {
                             "pixi-version": "v0.40.3",
                             "cache": "true",
