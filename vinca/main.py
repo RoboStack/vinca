@@ -754,6 +754,18 @@ def get_selected_packages(distro, vinca_conf):
                 selected_packages.add(i.replace("_", "-"))
             selected_packages = selected_packages.union(pkgs)
 
+    # Automatically include ros_workspace and ros_environment for ROS2 distributions
+    # if any ROS2 packages are selected (these are added as dependencies automatically)
+    if not distro.check_ros1() and selected_packages:
+        # Check if we have any ROS packages selected (excluding the workspace/environment packages themselves)
+        has_ros_packages = any(pkg not in ["ros_workspace", "ros_environment", "ament_cmake_core", "ament_package"] 
+                             for pkg in selected_packages)
+        if has_ros_packages:
+            if distro.check_package("ros_workspace"):
+                selected_packages.add("ros_workspace")
+            if distro.check_package("ros_environment"):
+                selected_packages.add("ros_environment")
+
     result = sorted(list(selected_packages))
     return result
 
@@ -990,6 +1002,7 @@ def main():
             for add_rec in glob.glob(
                 os.path.join(base_dir, "additional_recipes", "**", "recipe.yaml")
             ):
+                print(f"====> Reading additional recipe {add_rec}")
                 with open(add_rec) as fi:
                     add_rec_y = yaml.load(fi)
                 if config.parsed_args.platform == 'emscripten-wasm32':
