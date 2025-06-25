@@ -222,7 +222,7 @@ def read_vinca_yaml(filepath):
 
 def read_snapshot(vinca_conf):
     if not "rosdistro_snapshot" in vinca_conf:
-        return None
+        return None , None
 
     yaml = ruamel.yaml.YAML()
     # load primary snapshot
