@@ -265,18 +265,20 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         if not dep_name:
             runerr = f"Missing 'dep_name' for dummy recipe of {pkg_shortname}"
             raise RuntimeError(runerr)
-        # max_pin is required for dummy recipe pinning
-        max_pin = gen.get("max_pin")
-        if not max_pin:
-            runerr = f"Missing 'max_pin' for dummy recipe of {pkg_shortname}"
-            raise RuntimeError(runerr)
-        # Compute rattler-build-compatible version constraint based on max_pin:
+        # upper_bound is required for dummy recipe pinning
+        upper_bound = gen.get("upper_bound")
+        if not upper_bound:
+            upper_bound = gen.get("max_pin")
+            if not upper_bound:
+                runerr = f"Missing 'upper_bound' or 'max_pin' for dummy recipe of {pkg_shortname}"
+                raise RuntimeError(runerr)
+        # Compute rattler-build-compatible version constraint based on upper_bound:
         # - lower bound: allow the exact package version
-        # - upper bound: increment the segment of version defined by max_pin length,
+        # - upper bound: increment the segment of version defined by upper_bound length,
         #   then append 'a0' to ensure the constraint captures pre-releases correctly
         lower = version
         parts = [int(p) for p in lower.split('.')]
-        seg = len(max_pin.split('.'))
+        seg = len(upper_bound.split('.'))
         upper_parts = parts[:seg]
         upper_parts[-1] += 1
         upper_parts += [0] * (len(parts) - seg)
@@ -352,8 +354,10 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         return None
 
     if vinca_conf.get("mutex_package"):
-        output["requirements"]["host"].append(vinca_conf["mutex_package"])
-        output["requirements"]["run"].append(vinca_conf["mutex_package"])
+        mutex_dep = get_mutex_package_dependency(vinca_conf, distro)
+        if mutex_dep:
+            output["requirements"]["host"].append(mutex_dep)
+            output["requirements"]["run"].append(mutex_dep)
 
     if not distro.check_ros1() and pkg_shortname not in [
         "ament_cmake_core",
@@ -754,8 +758,127 @@ def get_selected_packages(distro, vinca_conf):
                 selected_packages.add(i.replace("_", "-"))
             selected_packages = selected_packages.union(pkgs)
 
+    # Automatically include ros_workspace and ros_environment for ROS2 distributions
+    # if any ROS2 packages are selected (these are added as dependencies automatically)
+    if not distro.check_ros1() and selected_packages:
+        # Check if we have any ROS packages selected (excluding the workspace/environment packages themselves)
+        has_ros_packages = any(pkg not in ["ros_workspace", "ros_environment", "ament_cmake_core", "ament_package"] 
+                             for pkg in selected_packages)
+        if has_ros_packages:
+            if distro.check_package("ros_workspace"):
+                selected_packages.add("ros_workspace")
+            if distro.check_package("ros_environment"):
+                selected_packages.add("ros_environment")
+
     result = sorted(list(selected_packages))
     return result
+
+
+def parse_mutex_package_config(vinca_conf):
+    """Parse and validate mutex package configuration.
+
+    Returns:
+        dict: Parsed mutex configuration with all required fields, or None if mutex_package is a string
+
+    Raises:
+        ValueError: If mutex_package is a dict but missing required fields
+    """
+    mutex_pkg = vinca_conf.get("mutex_package")
+    if not mutex_pkg:
+        return None
+
+    if isinstance(mutex_pkg, str):
+        # Backward compatibility: return None to indicate string format
+        return None
+
+    if isinstance(mutex_pkg, dict):
+        # Validate required fields
+        required_fields = ["name", "version", "upper_bound", "run_constraints"]
+        missing_fields = [field for field in required_fields if field not in mutex_pkg]
+
+        if missing_fields:
+            raise ValueError(f"mutex_package configuration is missing required fields: {missing_fields}")
+
+        # Return validated config with build_number from vinca_conf if not specified
+        config = dict(mutex_pkg)
+        if "build_number" not in config:
+            config["build_number"] = vinca_conf.get("build_number", 1)
+
+        return config
+
+    raise ValueError(f"mutex_package must be either a string or a dictionary, got {type(mutex_pkg)}")
+
+
+def get_mutex_package_dependency(vinca_conf, distro):
+    """Get the mutex package dependency string, handling both string and dict formats."""
+    mutex_pkg = vinca_conf.get("mutex_package")
+    if not mutex_pkg:
+        return None
+
+    if isinstance(mutex_pkg, str):
+        # Backward compatibility: return the string as-is
+        return mutex_pkg
+
+    # Try to parse as dict configuration
+    try:
+        config = parse_mutex_package_config(vinca_conf)
+        if config is None:
+            # This shouldn't happen since we already checked isinstance(mutex_pkg, str) above
+            return None
+
+        # New format: construct the dependency string
+        # Compute the pin from version and upper_bound
+        version_parts = config['version'].split('.')
+        upper_bound_parts = config['upper_bound'].split('.')
+
+        # Take as many version parts as specified by upper_bound
+        pin_parts = version_parts[:len(upper_bound_parts)]
+        pin = '.'.join(pin_parts) + '.*'
+
+        return f"{config['name']} {pin} {distro.name}_*"
+    except ValueError as e:
+        raise ValueError(f"Error parsing mutex_package configuration: {e}")
+
+    return None
+
+
+def generate_mutex_package_recipe(vinca_conf, distro):
+    """Generate a mutex package recipe if mutex_package is defined as a dict."""
+    try:
+        config = parse_mutex_package_config(vinca_conf)
+        if config is None:
+            # mutex_package is a string or not configured, don't generate recipe
+            return None
+    except ValueError as e:
+        raise ValueError(f"Cannot generate mutex package recipe: {e}")
+
+    # Create build string using distro name
+    build_string = f"{distro.name}_{config['build_number']}"
+
+    recipe = {
+        "package": {
+            "name": config["name"],
+            "version": config["version"]
+        },
+        "build": {
+            "number": config["build_number"],
+            "string": build_string,
+            "script": ""
+        },
+        "requirements": {
+            "run_constraints": config["run_constraints"],
+            "run_exports": {
+                "weak": [f"${{{{ pin_subpackage('{config['name']}', upper_bound='{config['upper_bound']}') }}}}"]
+            }
+        },
+        "about": {
+            "homepage": f"https://github.com/robostack/ros-{distro.name}",
+            "license": "BSD-3-Clause",
+            "summary": f"The ROS2 distro mutex. To switch between ROS2 versions, you need to change the mutex.\nE.g. mamba install {config['name']}=*={distro.name} to switch to {distro.name}."
+        },
+    }
+
+    return recipe
 
 
 def parse_package(pkg, distro, vinca_conf, path):
@@ -990,6 +1113,7 @@ def main():
             for add_rec in glob.glob(
                 os.path.join(base_dir, "additional_recipes", "**", "recipe.yaml")
             ):
+                print(f"====> Reading additional recipe {add_rec}")
                 with open(add_rec) as fi:
                     add_rec_y = yaml.load(fi)
                 if config.parsed_args.platform == 'emscripten-wasm32':
@@ -1066,6 +1190,14 @@ def main():
         else:
             source = generate_source(distro, vinca_conf)
             outputs = generate_outputs(distro, vinca_conf)
+
+        # Generate mutex package if configured as dictionary
+        mutex_recipe = generate_mutex_package_recipe(vinca_conf, distro)
+        if mutex_recipe:
+            print(f"Generating mutex package: {mutex_recipe['package']['name']}")
+            outputs.append(mutex_recipe)
+            # Add empty source for mutex package since it's a meta-package
+            source[mutex_recipe['package']['name']] = {}
 
         if arguments.multiple_file:
             write_recipe(source, outputs, vinca_conf, False)
