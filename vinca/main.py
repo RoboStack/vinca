@@ -273,10 +273,13 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
                 runerr = f"Missing 'upper_bound' or 'max_pin' for dummy recipe of {pkg_shortname}"
                 raise RuntimeError(runerr)
         # Compute rattler-build-compatible version constraint based on upper_bound:
-        # - lower bound: allow the exact package version
+        # - lower bound: allow the exact package version (or override_version if specified)
         # - upper bound: increment the segment of version defined by upper_bound length,
         #   then append 'a0' to ensure the constraint captures pre-releases correctly
-        lower = version
+
+        # Use override_version if specified, otherwise use the ROS package version
+        dummy_package_version = gen.get("override_version", version)
+        lower = dummy_package_version
         parts = [int(p) for p in lower.split('.')]
         seg = len(upper_bound.split('.'))
         upper_parts = parts[:seg]
@@ -285,7 +288,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         upper = ".".join(str(p) for p in upper_parts) + "a0"
         constraint = f"{dep_name} >={lower}, <{upper}"
         output = {
-            "package": {"name": pkg_names[0], "version": version},
+            "package": {"name": pkg_names[0], "version": dummy_package_version},
             "build": {"number": get_pkg_build_number(vinca_conf.get("build_number", 0), pkg_names[0], vinca_conf), "script": ""},
             "requirements": {"build": [], "host": [], "run": [constraint]},
         }
