@@ -600,6 +600,13 @@ def generate_outputs(distro, vinca_conf):
             print("Skip " + pkg_shortname + " due to invalid version / XML.")
         if output is not None:
             outputs.append(output)
+
+    # Generate mutex package if configured as dictionary
+    mutex_recipe = generate_mutex_package_recipe(vinca_conf, distro)
+    if mutex_recipe:
+        print(f"Generating mutex package: {mutex_recipe['package']['name']}")
+        outputs.append(mutex_recipe)
+
     return outputs
 
 
@@ -660,6 +667,11 @@ def generate_source(distro, vinca_conf):
                 entry["patches"] = [os.path.relpath(p, common_prefix) for p in patches]
 
         source[pkg_name] = entry
+
+    # Generate empty source for mutex package (if generated) since it's a meta-package
+    mutex_recipe = generate_mutex_package_recipe(vinca_conf, distro)
+    if mutex_recipe:
+        source[mutex_recipe['package']['name']] = {}
 
     return source
 
@@ -1193,14 +1205,6 @@ def main():
         else:
             source = generate_source(distro, vinca_conf)
             outputs = generate_outputs(distro, vinca_conf)
-
-        # Generate mutex package if configured as dictionary
-        mutex_recipe = generate_mutex_package_recipe(vinca_conf, distro)
-        if mutex_recipe:
-            print(f"Generating mutex package: {mutex_recipe['package']['name']}")
-            outputs.append(mutex_recipe)
-            # Add empty source for mutex package since it's a meta-package
-            source[mutex_recipe['package']['name']] = {}
 
         if arguments.multiple_file:
             write_recipe(source, outputs, vinca_conf, False)
