@@ -1128,7 +1128,6 @@ def main():
             for add_rec in glob.glob(
                 os.path.join(base_dir, "additional_recipes", "**", "recipe.yaml")
             ):
-                print(f"====> Reading additional recipe {add_rec}")
                 with open(add_rec) as fi:
                     add_rec_y = yaml.load(fi)
                 if config.parsed_args.platform == 'emscripten-wasm32':
