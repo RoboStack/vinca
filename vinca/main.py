@@ -1084,20 +1084,6 @@ def main():
 
     snapshot, additional_packages_snapshot = read_snapshot(vinca_conf)
 
-    from .template import generate_bld_ament_cmake
-    from .template import generate_bld_ament_python
-    from .template import generate_bld_catkin
-    from .template import generate_activate_hook
-    from .template import generate_bld_colcon_merge
-    from .template import generate_bld_catkin_merge
-
-    generate_bld_ament_cmake()
-    generate_bld_ament_python()
-    generate_bld_catkin()
-    generate_bld_colcon_merge()
-    generate_bld_catkin_merge()
-    generate_activate_hook()
-
     if arguments.trigger_new_versions:
         vinca_conf["trigger_new_versions"] = True
     else:

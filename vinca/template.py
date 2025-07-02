@@ -130,18 +130,13 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
                     shutil.copyfile(p, recipe_dir / p)
 
             build_scripts = re.findall(r"'(.*?)'", meta["build"]["script"])
-            baffer = meta["build"]["script"]
             for script in build_scripts:
                 script_filename = script.replace("$RECIPE_DIR", "").replace("%RECIPE_DIR%", "").replace("/", "").replace("\\", "")
-                copyfile_with_exec_permissions(script_filename, recipe_dir / script_filename)
+                # Generate the build script directly in the recipe directory
+                generate_build_script_for_recipe(script_filename, recipe_dir / script_filename)
             if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
-                shutil.copyfile("activate.sh", recipe_dir / "activate.sh")
-                shutil.copyfile("activate.bat", recipe_dir / "activate.bat")
-                shutil.copyfile("activate.ps1", recipe_dir / "activate.ps1")
-                shutil.copyfile("deactivate.sh", recipe_dir / "deactivate.sh")
-                shutil.copyfile("deactivate.bat", recipe_dir / "deactivate.bat")
-                shutil.copyfile("deactivate.ps1", recipe_dir / "deactivate.ps1")
-
+                # Generate activation scripts directly in the recipe directory
+                generate_activation_scripts_for_recipe(recipe_dir)
 
 def generate_template(template_in, template_out):
     import em
@@ -163,81 +158,54 @@ def generate_template(template_in, template_out):
         # Set executable permissions for user, group, and others
         os.chmod(template_out.name, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-def generate_bld_ament_cmake():
+def generate_build_script_for_recipe(script_name, output_path):
+    """Generate a specific build script directly in the recipe directory."""
     import pkg_resources
 
-    template_in = pkg_resources.resource_filename(
-        "vinca", "templates/bld_ament_cmake.bat.in"
-    )
-    generate_template(template_in, open("bld_ament_cmake.bat", "w"))
-    template_in = pkg_resources.resource_filename(
-        "vinca", "templates/build_ament_cmake.sh.in"
-    )
-    generate_template(template_in, open("build_ament_cmake.sh", "w"))
+    # Map script names to their template files
+    script_templates = {
+        "build_ament_cmake.sh": "templates/build_ament_cmake.sh.in",
+        "bld_ament_cmake.bat": "templates/bld_ament_cmake.bat.in",
+        "build_ament_python.sh": "templates/build_ament_python.sh.in",
+        "bld_ament_python.bat": "templates/bld_ament_python.bat.in",
+        "build_catkin.sh": "templates/build_catkin.sh.in",
+        "bld_catkin.bat": "templates/bld_catkin.bat.in",
+        "bld_colcon_merge.bat": "templates/bld_colcon_merge.bat.in",
+        "bld_catkin_merge.bat": "templates/bld_catkin_merge.bat.in"
+    }
 
+    if script_name in script_templates:
+        template_in = pkg_resources.resource_filename("vinca", script_templates[script_name])
+        with open(output_path, "w") as output_file:
+            generate_template(template_in, output_file)
 
-def generate_bld_ament_python():
+        # Set executable permissions on Unix systems
+        if os.name == 'posix' and script_name.endswith('.sh'):
+            current_permissions = os.stat(output_path).st_mode
+            os.chmod(output_path, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    else:
+        print(f"Warning: Unknown build script template for {script_name}")
+
+def generate_activation_scripts_for_recipe(recipe_dir):
+    """Generate activation scripts directly in the recipe directory."""
     import pkg_resources
 
-    template_in = pkg_resources.resource_filename(
-        "vinca", "templates/bld_ament_python.bat.in"
-    )
-    generate_template(template_in, open("bld_ament_python.bat", "w"))
-    template_in = pkg_resources.resource_filename(
-        "vinca", "templates/build_ament_python.sh.in"
-    )
-    generate_template(template_in, open("build_ament_python.sh", "w"))
+    activation_templates = {
+        "activate.sh": "templates/activate.sh.in",
+        "activate.bat": "templates/activate.bat.in",
+        "activate.ps1": "templates/activate.ps1.in",
+        "deactivate.sh": "templates/deactivate.sh.in",
+        "deactivate.bat": "templates/deactivate.bat.in",
+        "deactivate.ps1": "templates/deactivate.ps1.in"
+    }
 
+    for script_name, template_path in activation_templates.items():
+        template_in = pkg_resources.resource_filename("vinca", template_path)
+        output_path = recipe_dir / script_name
+        with open(output_path, "w") as output_file:
+            generate_template(template_in, output_file)
 
-def generate_bld_catkin():
-    import pkg_resources
-
-    template_in = pkg_resources.resource_filename(
-        "vinca", "templates/bld_catkin.bat.in"
-    )
-    generate_template(template_in, open("bld_catkin.bat", "w"))
-    template_in = pkg_resources.resource_filename(
-        "vinca", "templates/build_catkin.sh.in"
-    )
-    generate_template(template_in, open("build_catkin.sh", "w"))
-
-
-def generate_bld_colcon_merge():
-    import pkg_resources
-
-    template_in = pkg_resources.resource_filename(
-        "vinca", "templates/bld_colcon_merge.bat.in"
-    )
-    generate_template(template_in, open("bld_colcon_merge.bat", "w"))
-
-
-def generate_bld_catkin_merge():
-    import pkg_resources
-
-    template_in = pkg_resources.resource_filename(
-        "vinca", "templates/bld_catkin_merge.bat.in"
-    )
-    generate_template(template_in, open("bld_catkin_merge.bat", "w"))
-
-
-def generate_activate_hook():
-    import pkg_resources
-
-    template_in = pkg_resources.resource_filename("vinca", "templates/activate.bat.in")
-    generate_template(template_in, open("activate.bat", "w"))
-    template_in = pkg_resources.resource_filename(
-        "vinca", "templates/deactivate.bat.in"
-    )
-    generate_template(template_in, open("deactivate.bat", "w"))
-
-    template_in = pkg_resources.resource_filename("vinca", "templates/activate.ps1.in")
-    generate_template(template_in, open("activate.ps1", "w"))
-    template_in = pkg_resources.resource_filename(
-        "vinca", "templates/deactivate.ps1.in"
-    )
-    generate_template(template_in, open("deactivate.ps1", "w"))
-
-    template_in = pkg_resources.resource_filename("vinca", "templates/activate.sh.in")
-    generate_template(template_in, open("activate.sh", "w"))
-    template_in = pkg_resources.resource_filename("vinca", "templates/deactivate.sh.in")
-    generate_template(template_in, open("deactivate.sh", "w"))
+        # Set executable permissions on Unix systems for shell scripts
+        if os.name == 'posix' and script_name.endswith('.sh'):
+            current_permissions = os.stat(output_path).st_mode
+            os.chmod(output_path, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
