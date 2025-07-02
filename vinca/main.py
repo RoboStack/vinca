@@ -604,8 +604,15 @@ def generate_outputs(distro, vinca_conf):
     # Generate mutex package if configured as dictionary
     mutex_recipe = generate_mutex_package_recipe(vinca_conf, distro)
     if mutex_recipe:
-        print(f"Generating mutex package: {mutex_recipe['package']['name']}")
-        outputs.append(mutex_recipe)
+        # Check if mutex package should be skipped
+        mutex_name = mutex_recipe['package']['name']
+        mutex_version = mutex_recipe['package']['version']
+
+        if should_skip_mutex_package(vinca_conf, mutex_name, mutex_version):
+            print(f"Skipping mutex package {mutex_name} (already built)")
+        else:
+            print(f"Generating mutex package: {mutex_name}")
+            outputs.append(mutex_recipe)
 
     return outputs
 
@@ -671,7 +678,12 @@ def generate_source(distro, vinca_conf):
     # Generate empty source for mutex package (if generated) since it's a meta-package
     mutex_recipe = generate_mutex_package_recipe(vinca_conf, distro)
     if mutex_recipe:
-        source[mutex_recipe['package']['name']] = {}
+        # Check if mutex package should be skipped
+        mutex_name = mutex_recipe['package']['name']
+        mutex_version = mutex_recipe['package']['version']
+
+        if not should_skip_mutex_package(vinca_conf, mutex_name, mutex_version):
+            source[mutex_name] = {}
 
     return source
 
@@ -777,7 +789,7 @@ def get_selected_packages(distro, vinca_conf):
     # if any ROS2 packages are selected (these are added as dependencies automatically)
     if not distro.check_ros1() and selected_packages:
         # Check if we have any ROS packages selected (excluding the workspace/environment packages themselves)
-        has_ros_packages = any(pkg not in ["ros_workspace", "ros_environment", "ament_cmake_core", "ament_package"] 
+        has_ros_packages = any(pkg not in ["ros_workspace", "ros_environment", "ament_cmake_core", "ament_package"]
                              for pkg in selected_packages)
         if has_ros_packages:
             if distro.check_package("ros_workspace"):
@@ -855,6 +867,14 @@ def get_mutex_package_dependency(vinca_conf, distro):
         raise ValueError(f"Error parsing mutex_package configuration: {e}")
 
     return None
+
+
+def should_skip_mutex_package(vinca_conf, mutex_name, mutex_version):
+    """Check if the mutex package should be skipped based on skip_built_packages logic."""
+    if vinca_conf.get("trigger_new_versions"):
+        return (mutex_name, mutex_version) in vinca_conf["skip_built_packages"]
+    else:
+        return mutex_name in vinca_conf["skip_built_packages"]
 
 
 def generate_mutex_package_recipe(vinca_conf, distro):
@@ -1128,7 +1148,6 @@ def main():
             for add_rec in glob.glob(
                 os.path.join(base_dir, "additional_recipes", "**", "recipe.yaml")
             ):
-                print(f"====> Reading additional recipe {add_rec}")
                 with open(add_rec) as fi:
                     add_rec_y = yaml.load(fi)
                 if config.parsed_args.platform == 'emscripten-wasm32':
