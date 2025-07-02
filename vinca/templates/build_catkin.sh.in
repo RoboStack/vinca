@@ -113,7 +113,7 @@ cmake ${CMAKE_ARGS} --compile-no-warning-as-error \
          $EXTRA_CMAKE_ARGS \
          @(additional_cmake_args) \
          -G "$GENERATOR" \
-         $SRC_DIR/$PKG_NAME/src/work
+         $SRC_DIR/$PKG_NAME/src/work/@(additional_folder)
 
 cmake --build . --config Release --target all
 

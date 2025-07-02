@@ -3,7 +3,7 @@
 
 set -eo pipefail
 
-pushd $SRC_DIR/$PKG_NAME/src/work
+pushd $SRC_DIR/$PKG_NAME/src/work/@(additional_folder)
 
 # If there is a setup.cfg that contains install-scripts then we should not set it here
 if [ -f setup.cfg ] && grep -q "install[-_]scripts" setup.cfg; then

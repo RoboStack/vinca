@@ -140,11 +140,17 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
                 pkg_shortname = ensure_name_is_without_distro_prefix_and_with_underscores(pkg_name, vinca_conf)
 
                 additional_cmake_args = ""
+                additional_folder = ""
                 if pkg_shortname:
                     pkg_additional_info = get_pkg_additional_info(pkg_shortname, vinca_conf)
                     additional_cmake_args = pkg_additional_info.get("additional_cmake_args", "")
 
-                generate_build_script_for_recipe(script_filename, recipe_dir / script_filename, additional_cmake_args)
+                    # Check if this package has folder info from additional_packages_snapshot
+                    if (vinca_conf.get("_additional_packages_snapshot") and
+                        pkg_shortname in vinca_conf["_additional_packages_snapshot"]):
+                        additional_folder = vinca_conf["_additional_packages_snapshot"][pkg_shortname].get("additional_folder", "")
+
+                generate_build_script_for_recipe(script_filename, recipe_dir / script_filename, additional_cmake_args, additional_folder)
             if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
                 # Generate activation scripts directly in the recipe directory
                 generate_activation_scripts_for_recipe(recipe_dir)
@@ -177,7 +183,7 @@ def generate_template(template_in, template_out, extra_globals=None):
         # Set executable permissions for user, group, and others
         os.chmod(template_out.name, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-def generate_build_script_for_recipe(script_name, output_path, additional_cmake_args=""):
+def generate_build_script_for_recipe(script_name, output_path, additional_cmake_args="", additional_folder=""):
     """Generate a specific build script directly in the recipe directory."""
     import pkg_resources
 
@@ -196,7 +202,15 @@ def generate_build_script_for_recipe(script_name, output_path, additional_cmake_
     if script_name in script_templates:
         template_in = pkg_resources.resource_filename("vinca", script_templates[script_name])
         with open(output_path, "w") as output_file:
-            extra_globals = {"additional_cmake_args": additional_cmake_args} if additional_cmake_args else None
+            extra_globals = {}
+            if additional_cmake_args:
+                extra_globals["additional_cmake_args"] = additional_cmake_args
+            else:
+                extra_globals["additional_cmake_args"] = ""
+            if additional_folder:
+                extra_globals["additional_folder"] = additional_folder
+            else:
+                extra_globals["additional_folder"] = ""
             generate_template(template_in, output_file, extra_globals)
 
         # Set executable permissions on Unix systems

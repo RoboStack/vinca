@@ -1084,6 +1084,9 @@ def main():
 
     snapshot, additional_packages_snapshot = read_snapshot(vinca_conf)
 
+    # Store additional_packages_snapshot in vinca_conf for template access
+    vinca_conf["_additional_packages_snapshot"] = additional_packages_snapshot or {}
+
     if arguments.trigger_new_versions:
         vinca_conf["trigger_new_versions"] = True
     else:
