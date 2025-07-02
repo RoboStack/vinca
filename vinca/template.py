@@ -133,16 +133,35 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
             for script in build_scripts:
                 script_filename = script.replace("$RECIPE_DIR", "").replace("%RECIPE_DIR%", "").replace("/", "").replace("\\", "")
                 # Generate the build script directly in the recipe directory
-                generate_build_script_for_recipe(script_filename, recipe_dir / script_filename)
+                # Get additional CMake arguments from pkg_additional_info
+                from vinca.utils import get_pkg_additional_info, ensure_name_is_without_distro_prefix_and_with_underscores
+                pkg_name = o["package"]["name"]
+                # Use the proper utility function to normalize the package name
+                pkg_shortname = ensure_name_is_without_distro_prefix_and_with_underscores(pkg_name, vinca_conf)
+
+                additional_cmake_args = ""
+                if pkg_shortname:
+                    pkg_additional_info = get_pkg_additional_info(pkg_shortname, vinca_conf)
+                    additional_cmake_args = pkg_additional_info.get("additional_cmake_args", "")
+
+                generate_build_script_for_recipe(script_filename, recipe_dir / script_filename, additional_cmake_args)
             if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
                 # Generate activation scripts directly in the recipe directory
                 generate_activation_scripts_for_recipe(recipe_dir)
 
-def generate_template(template_in, template_out):
+def generate_template(template_in, template_out, extra_globals=None):
     import em
     from vinca.config import skip_testing, ros_distro
 
-    g = {"ros_distro": ros_distro, "skip_testing": "ON" if skip_testing else "OFF"}
+    g = {
+        "ros_distro": ros_distro,
+        "skip_testing": "ON" if skip_testing else "OFF"
+    }
+
+    # Merge additional global variables if provided
+    if extra_globals:
+        g.update(extra_globals)
+
     interpreter = em.Interpreter(
         output=template_out, options={em.RAW_OPT: True, em.BUFFERED_OPT: True}
     )
@@ -158,7 +177,7 @@ def generate_template(template_in, template_out):
         # Set executable permissions for user, group, and others
         os.chmod(template_out.name, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-def generate_build_script_for_recipe(script_name, output_path):
+def generate_build_script_for_recipe(script_name, output_path, additional_cmake_args=""):
     """Generate a specific build script directly in the recipe directory."""
     import pkg_resources
 
@@ -177,7 +196,8 @@ def generate_build_script_for_recipe(script_name, output_path):
     if script_name in script_templates:
         template_in = pkg_resources.resource_filename("vinca", script_templates[script_name])
         with open(output_path, "w") as output_file:
-            generate_template(template_in, output_file)
+            extra_globals = {"additional_cmake_args": additional_cmake_args} if additional_cmake_args else None
+            generate_template(template_in, output_file, extra_globals)
 
         # Set executable permissions on Unix systems
         if os.name == 'posix' and script_name.endswith('.sh'):
@@ -203,7 +223,7 @@ def generate_activation_scripts_for_recipe(recipe_dir):
         template_in = pkg_resources.resource_filename("vinca", template_path)
         output_path = recipe_dir / script_name
         with open(output_path, "w") as output_file:
-            generate_template(template_in, output_file)
+            generate_template(template_in, output_file)  # No extra globals needed for activation scripts
 
         # Set executable permissions on Unix systems for shell scripts
         if os.name == 'posix' and script_name.endswith('.sh'):
