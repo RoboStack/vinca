@@ -103,7 +103,7 @@ elif [ "${PKG_NAME}" == "ros-humble-wasm-cpp" ]; then
 elif [ "${PKG_NAME}" == "dynmsg" ]; then
   WORK_DIR=$SRC_DIR/$PKG_NAME/src/work/dynmsg
 else
-  WORK_DIR=$SRC_DIR/$PKG_NAME/src/work
+  WORK_DIR=$SRC_DIR/$PKG_NAME/src/work/@(additional_folder)
 fi;
 
 $CMAKE_GEN \
@@ -128,6 +128,7 @@ $CMAKE_GEN \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
     --compile-no-warning-as-error \
     $EXTRA_CMAKE_ARGS \
+    @(additional_cmake_args) \
     $WORK_DIR
 
 $CMAKE_BLD --build . --config $BUILD_TYPE --target install
