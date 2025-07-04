@@ -80,7 +80,11 @@ def ensure_name_is_without_distro_prefix_and_with_underscores(name, vinca_conf):
 
 def get_pkg_additional_info(pkg_name, vinca_conf):
     normalized_name = ensure_name_is_without_distro_prefix_and_with_underscores(pkg_name, vinca_conf)
-    pkg_additional_info = vinca_conf["_pkg_additional_info"].get(normalized_name, {})
+    pkg_additional_info_all = vinca_conf["_pkg_additional_info"]
+    if pkg_additional_info_all is None:
+        pkg_additional_info = {}
+    else:
+        pkg_additional_info = vinca_conf.get("_pkg_additional_info", {}).get(normalized_name, {})
     return pkg_additional_info
 
 def get_pkg_build_number(default_build_number, pkg_name, vinca_conf):
