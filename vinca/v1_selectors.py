@@ -55,6 +55,10 @@ def _platform_flags(platform: str | None) -> dict[str, bool | str]:
         "linux": os_part == "linux",
         "osx": os_part == "osx",
         "win": os_part == "win",
+        "emscripten": os_part == "emscripten",
+        "wasi": os_part == "wasi",
+        "freebsd": os_part == "freebsd",
+        "zos": os_part == "zos",
         "unix": os_part in {"linux", "osx", "emscripten", "wasi", "freebsd", "zos"},
         # x86
         "x86": arch in {"32", "64"},
