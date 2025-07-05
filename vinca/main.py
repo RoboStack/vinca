@@ -641,10 +641,10 @@ def generate_source(distro, vinca_conf):
         # skip cloning source for dummy recipes
         if is_dummy_metapackage(pkg_shortname, vinca_conf):
             continue
-        url, version = distro.get_released_repo(pkg_shortname)
+        url, ref, ref_type = distro.get_released_repo(pkg_shortname)
         entry = {}
         entry["git"] = url
-        entry["tag"] = version
+        entry[ref_type] = ref
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
         pkg_version = distro.get_version(pkg_shortname)
         print("Checking ", pkg_shortname, pkg_version)
@@ -695,11 +695,11 @@ def generate_source_version(distro, vinca_conf):
             print(f"Could not generate source for {pkg_shortname}")
             continue
 
-        url, version = distro.get_released_repo(pkg_shortname)
+        url, ref, ref_type = distro.get_released_repo(pkg_shortname)
 
         entry = {}
         entry["git"] = url
-        entry["tag"] = version
+        entry[ref_type] = ref
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
         if vinca_conf.get("trigger_new_versions"):
             if (
@@ -736,10 +736,10 @@ def generate_fat_source(distro, vinca_conf):
             print(f"Could not generate source for {pkg_shortname}")
             continue
 
-        url, version = distro.get_released_repo(pkg_shortname)
+        url, ref, ref_type = distro.get_released_repo(pkg_shortname)
         entry = {}
         entry["git"] = url
-        entry["tag"] = version
+        entry[ref_type] = ref
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
         if not pkg_names:
             continue
