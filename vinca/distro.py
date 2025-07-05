@@ -94,15 +94,24 @@ class Distro(object):
 
     def get_released_repo(self, pkg_name):
         if self.snapshot and pkg_name in self.snapshot:
-            return (
-                self.snapshot[pkg_name].get("url", None),
-                self.snapshot[pkg_name].get("tag", None),
-            )
+
+            # In the case of snapshot, for rosdistro_additional_recipes
+            # we also support a 'rev' field, so depending on what is available
+            # we return either the tag or the rev, and the third argument is either 'rev' or 'tag'
+            url = self.snapshot[pkg_name].get("url", None)
+            if "tag" in self.snapshot[pkg_name].keys():
+                tag_or_rev = self.snapshot[pkg_name].get("tag", None)
+                ref_type = "tag"
+            else:
+                tag_or_rev = self.snapshot[pkg_name].get("rev", None)
+                ref_type = "rev"
+
+            return url, tag_or_rev, ref_type
 
         pkg = self._distro.release_packages[pkg_name]
         repo = self._distro.repositories[pkg.repository_name].release_repository
         release_tag = get_release_tag(repo, pkg_name)
-        return repo.url, release_tag
+        return repo.url, release_tag, 'tag'
 
     def check_package(self, pkg_name):
         # If the package is in the additional_packages_snapshot, it is always considered valid
@@ -151,12 +160,13 @@ class Distro(object):
             raise RuntimeError(f"Cannot handle non-GitHub URL: {raw_url_base}")
         # Extract owner/repo
         owner_repo = raw_url_base.split("github.com/")[-1]
-        tag = pkg_info.get("tag")
+        # Use rev if available, otherwise fallback to tag
+        ref = pkg_info.get("rev") or pkg_info.get("tag")
         xml_name = pkg_info.get("package_xml_name", "package.xml")
         additional_folder = pkg_info.get("additional_folder", "")
         if additional_folder != "":
             additional_folder = additional_folder + "/"
-        raw_url = f"https://raw.githubusercontent.com/{owner_repo}/{tag}/{additional_folder}{xml_name}"
+        raw_url = f"https://raw.githubusercontent.com/{owner_repo}/{ref}/{additional_folder}{xml_name}"
         try:
             with urllib.request.urlopen(raw_url) as resp:
                 return resp.read().decode('utf-8')
