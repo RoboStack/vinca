@@ -771,7 +771,6 @@ def get_selected_packages(distro, vinca_conf):
         # Add packages from rosdistro_additional_recipes.yaml when build_all is True
         if "_additional_packages_snapshot" in vinca_conf and vinca_conf["_additional_packages_snapshot"]:
             additional_packages = set(vinca_conf["_additional_packages_snapshot"].keys())
-            print(f"Adding additional packages from snapshot: {additional_packages}")
             selected_packages = selected_packages.union(additional_packages)
     elif vinca_conf["packages_select_by_deps"]:
 
