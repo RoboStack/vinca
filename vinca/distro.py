@@ -11,7 +11,7 @@ class Distro(object):
         index = get_index(get_index_url())
         self._distro = get_cached_distribution(index, distro_name)
         self.distro_name = distro_name
-        self.snapshot = snapshot
+        self.snapshot = snapshotf
         self.additional_packages_snapshot = additional_packages_snapshot
 
         # set up ROS environments
@@ -119,8 +119,10 @@ class Distro(object):
         # package specified in rosdistro_additional_recipes.yaml
         if self.additional_packages_snapshot and pkg_name in self.additional_packages_snapshot:
             return True
-        if pkg_name in self._distro.release_packages:
-            return self.snapshot is None or pkg_name in self.snapshot
+        # the .replace('_', '-') is needed for packages like 'hpp-fcl' that have hypen and not underscore
+        # in the rosdistro metadata
+        if pkg_name in self._distro.release_packages or pkg_name.replace('_', '-') in self._distro.release_packages:
+            return self.snapshot is None or (pkg_name in self.snapshot or pkg_name.replace('_', '-') in self.snapshot)
         elif pkg_name in self.build_packages:
             return True
         else:
