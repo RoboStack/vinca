@@ -11,7 +11,7 @@ class Distro(object):
         index = get_index(get_index_url())
         self._distro = get_cached_distribution(index, distro_name)
         self.distro_name = distro_name
-        self.snapshot = snapshotf
+        self.snapshot = snapshot
         self.additional_packages_snapshot = additional_packages_snapshot
 
         # set up ROS environments
