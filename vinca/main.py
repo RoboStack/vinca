@@ -217,6 +217,14 @@ def read_vinca_yaml(filepath):
     else:
         vinca_conf["_pkg_additional_info"] = {}
 
+    # snapshot contains both rosdistro_snapshot.yaml and
+    # rosdistro_additional_recipes.yaml
+    snapshot, additional_packages_snapshot = read_snapshot(vinca_conf)
+
+    # Store additional_packages_snapshot in vinca_conf for template access
+    vinca_conf["_snapshot"] = snapshot or {}
+    vinca_conf["_additional_packages_snapshot"] = additional_packages_snapshot or {}
+
     return vinca_conf
 
 
@@ -760,6 +768,10 @@ def get_selected_packages(distro, vinca_conf):
 
     if vinca_conf.get("build_all", False):
         selected_packages = set(distro._distro.release_packages.keys())
+        # Add packages from rosdistro_additional_recipes.yaml when build_all is True
+        if "_additional_packages_snapshot" in vinca_conf and vinca_conf["_additional_packages_snapshot"]:
+            additional_packages = set(vinca_conf["_additional_packages_snapshot"].keys())
+            selected_packages = selected_packages.union(additional_packages)
     elif vinca_conf["packages_select_by_deps"]:
 
         if (
@@ -1078,14 +1090,8 @@ def main():
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, "vinca.yaml")
     vinca_conf = read_vinca_yaml(vinca_yaml)
-
-    # snapshot contains both rosdistro_snapshot.yaml and
-    # rosdistro_additional_recipes.yaml
-
-    snapshot, additional_packages_snapshot = read_snapshot(vinca_conf)
-
-    # Store additional_packages_snapshot in vinca_conf for template access
-    vinca_conf["_additional_packages_snapshot"] = additional_packages_snapshot or {}
+    snapshot = vinca_conf.get("snapshot", None)
+    additional_packages_snapshot = vinca_conf.get("_additional_packages_snapshot", None)
 
     if arguments.trigger_new_versions:
         vinca_conf["trigger_new_versions"] = True
@@ -1099,7 +1105,7 @@ def main():
         if "python_version" in vinca_conf:
             python_version = vinca_conf["python_version"]
 
-        distro = Distro(vinca_conf["ros_distro"], python_version, snapshot, additional_packages_snapshot)
+        distro = Distro(vinca_conf["ros_distro"], python_version, vinca_conf["_snapshot"], vinca_conf["_additional_packages_snapshot"])
         additional_pkgs, parsed_pkgs = [], []
         for f in pkg_files:
             parsed_pkg = catkin_pkg.package.parse_package(f)
@@ -1201,7 +1207,7 @@ def main():
         if "python_version" in vinca_conf:
             python_version = vinca_conf["python_version"]
 
-        distro = Distro(vinca_conf["ros_distro"], python_version, snapshot, additional_packages_snapshot)
+        distro = Distro(vinca_conf["ros_distro"], python_version, vinca_conf["_snapshot"], vinca_conf["_additional_packages_snapshot"])
 
         selected_pkgs = get_selected_packages(distro, vinca_conf)
 

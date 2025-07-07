@@ -48,6 +48,8 @@ def main():
     # Get the current UTC time
     utc_time = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    # Note: we intentionally do not pass any kind of additional packages snapshot
+    # here, as it would pollute the snapshot with additional packages
     distro = Distro(args.distro)
 
     if args.package is None:
