@@ -120,6 +120,25 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
 
             recipe_dir = (Path("recipes") / o["package"]["name"]).absolute()
             os.makedirs(recipe_dir, exist_ok=True)
+
+            # Copy test folder contents if corresponding test folder exists
+            test_dir = vinca_conf.get("_test_dir")
+            if test_dir is not None:
+                test_folder_name = o["package"]["name"]
+                test_folder_path = test_dir / test_folder_name
+
+                if test_folder_path.exists() and test_folder_path.is_dir():
+                    # Copy all contents of the test folder to the recipe directory
+                    for item in test_folder_path.iterdir():
+                        if item.is_file():
+                            shutil.copy2(item, recipe_dir / item.name)
+                        elif item.is_dir():
+                            # Use copytree for directories, but handle existing directories
+                            dest_dir = recipe_dir / item.name
+                            if dest_dir.exists():
+                                shutil.rmtree(dest_dir)
+                            shutil.copytree(item, dest_dir)
+
             with open(recipe_dir / "recipe.yaml", "w") as stream:
                 file.dump(meta, stream)
 
