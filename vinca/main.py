@@ -194,6 +194,8 @@ def read_vinca_yaml(filepath):
 
     tests = {}
     test_dir = Path(filepath).parent / "tests"
+    # Store the test directory directly for use in template.py
+    vinca_conf["_test_dir"] = test_dir
     for x in test_dir.glob("*.yaml"):
         tests[os.path.basename(x).split(".")[0]] = x
     vinca_conf["_tests"] = tests
