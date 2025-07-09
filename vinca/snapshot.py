@@ -66,7 +66,7 @@ def main():
 
     for dep in deps:
         try:
-            url, tag = distro.get_released_repo(dep)
+            url, tag, _ = distro.get_released_repo(dep)
             version = distro.get_version(dep)
         except AttributeError:
             print("\033[93mPackage '{}' has no version set, skipping...\033[0m".format(dep))
