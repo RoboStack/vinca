@@ -1165,19 +1165,6 @@ def main():
                 # only URLs
                 if "://" in fn:
                     selected_bn = vinca_conf.get("build_number", 0)
-                    if not vinca_conf.get("use_explicit_build_number", True):
-                        distro = vinca_conf["ros_distro"]
-                        all_pkgs = repodata.get("packages", {})
-                        all_pkgs.update(repodata.get("packages.conda", {}))
-                        for pkg_name, pkg in all_pkgs.items():
-                            if pkg_name.startswith(f"ros-{distro}"):
-                                if pkg_name.rsplit("-", 2)[0] in additional_recipe_names:
-                                    print(
-                                        f"Skipping additional recipe for build number computation {pkg_name}"
-                                    )
-                                    continue
-                                selected_bn = max(selected_bn, pkg["build_number"])
-
 
                 explicitly_selected_pkgs = [
                     f"ros-{distro}-{pkg.replace('_', '-')}"
