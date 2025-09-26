@@ -334,10 +334,17 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             },
             "build": {"script": ""},
         }
+    
+    xml = distro.get_release_package_xml(pkg_shortname)
 
-    pkg = catkin_pkg.package.parse_package_string(
-        distro.get_release_package_xml(pkg_shortname)
-    )
+    # If the snapshot is not aligned with the latest rosdistro (for example if a package is removed,
+    # see https://github.com/RoboStack/ros-jazzy/pull/107#issuecomment-3338962041), get_release_package_xml can return none,
+    # in that case we can just skip the package, remove if https://github.com/RoboStack/vinca/issues/93 is fixed 
+    if not xml:
+        print("Skip " + pkg_shortname + " as it is present in our snapshot, but not in the latest rosdistro cache.")
+        return None
+
+    pkg = catkin_pkg.package.parse_package_string(xml)
 
     pkg.evaluate_conditions(os.environ)
 
