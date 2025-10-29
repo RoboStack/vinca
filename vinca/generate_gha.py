@@ -327,7 +327,7 @@ def build_osx_pipeline(
     azure_template=None,
     script=azure_unix_script,
     target="osx-64",
-    pipeline_name="build_osx_64"
+    pipeline_name="build_osx_64",
 ):
     build_unix_pipeline(
         stages,
@@ -337,7 +337,7 @@ def build_osx_pipeline(
         runs_on=vm_imagename,
         outfile=outfile,
         target=target,
-        pipeline_name=pipeline_name
+        pipeline_name=pipeline_name,
     )
 
 
@@ -428,7 +428,12 @@ def get_full_tree():
     config.selected_platform = get_conda_subdir()
 
     python_version = temp_vinca_conf.get("python_version", None)
-    distro = Distro(temp_vinca_conf["ros_distro"], python_version, temp_vinca_conf["_snapshot"], temp_vinca_conf["_additional_packages_snapshot"])
+    distro = Distro(
+        temp_vinca_conf["ros_distro"],
+        python_version,
+        temp_vinca_conf["_snapshot"],
+        temp_vinca_conf["_additional_packages_snapshot"],
+    )
 
     all_packages = get_selected_packages(distro, temp_vinca_conf)
     temp_vinca_conf["_selected_pkgs"] = all_packages
@@ -562,7 +567,7 @@ def main():
             outfile="osx_arm64.yml",
             script=azure_unix_script,
             target=platform,
-            pipeline_name="build_osx_arm64"
+            pipeline_name="build_osx_arm64",
         )
 
     if args.platform == "linux-aarch64":
@@ -573,7 +578,7 @@ def main():
             runs_on="ubuntu-24.04-arm",
             outfile="linux_aarch64.yml",
             target=platform,
-            pipeline_name="build_linux_aarch64"
+            pipeline_name="build_linux_aarch64",
         )
 
     # windows

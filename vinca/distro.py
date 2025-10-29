@@ -7,7 +7,13 @@ from rosdistro.manifest_provider import get_release_tag
 
 
 class Distro(object):
-    def __init__(self, distro_name, python_version=None, snapshot=None, additional_packages_snapshot=None):
+    def __init__(
+        self,
+        distro_name,
+        python_version=None,
+        snapshot=None,
+        additional_packages_snapshot=None,
+    ):
         index = get_index(get_index_url())
         self._distro = get_cached_distribution(index, distro_name)
         self.distro_name = distro_name
@@ -49,20 +55,30 @@ class Distro(object):
             return dependencies
 
         # if pkg comes from additional_packages_snapshot, extract from its package.xml
-        if self.additional_packages_snapshot and pkg in self.additional_packages_snapshot:
+        if (
+            self.additional_packages_snapshot
+            and pkg in self.additional_packages_snapshot
+        ):
             pkg_info = self.additional_packages_snapshot[pkg]
             xml_str = self.get_package_xml_for_additional_package(pkg_info)
             # parse XML
             import xml.etree.ElementTree as ET
+
             root = ET.fromstring(xml_str)
             # collect direct dependencies tags from package.xml
             dep_tags = [
-                'depend', 'build_depend', 'buildtool_depend', 'buildtool_export_depend',
-                'exec_depend', 'run_depend', 'test_depend', 'build_export_depend'
+                "depend",
+                "build_depend",
+                "buildtool_depend",
+                "buildtool_export_depend",
+                "exec_depend",
+                "run_depend",
+                "test_depend",
+                "build_export_depend",
             ]
             direct = set()
             for tag in dep_tags:
-                for elem in root.findall(f'.//{tag}'):
+                for elem in root.findall(f".//{tag}"):
                     if elem.text:
                         name = elem.text.strip()
                         direct.add(name)
@@ -111,18 +127,26 @@ class Distro(object):
         pkg = self._distro.release_packages[pkg_name]
         repo = self._distro.repositories[pkg.repository_name].release_repository
         release_tag = get_release_tag(repo, pkg_name)
-        return repo.url, release_tag, 'tag'
+        return repo.url, release_tag, "tag"
 
     def check_package(self, pkg_name):
         # If the package is in the additional_packages_snapshot, it is always considered valid
         # even if it is not in the released packages, as it is an additional
         # package specified in rosdistro_additional_recipes.yaml
-        if self.additional_packages_snapshot and pkg_name in self.additional_packages_snapshot:
+        if (
+            self.additional_packages_snapshot
+            and pkg_name in self.additional_packages_snapshot
+        ):
             return True
         # the .replace('_', '-') is needed for packages like 'hpp-fcl' that have hypen and not underscore
         # in the rosdistro metadata
-        if pkg_name in self._distro.release_packages or pkg_name.replace('_', '-') in self._distro.release_packages:
-            return self.snapshot is None or (pkg_name in self.snapshot or pkg_name.replace('_', '-') in self.snapshot)
+        if (
+            pkg_name in self._distro.release_packages
+            or pkg_name.replace("_", "-") in self._distro.release_packages
+        ):
+            return self.snapshot is None or (
+                pkg_name in self.snapshot or pkg_name.replace("_", "-") in self.snapshot
+            )
         elif pkg_name in self.build_packages:
             return True
         else:
@@ -137,7 +161,10 @@ class Distro(object):
         return repo.version.split("-")[0]
 
     def get_release_package_xml(self, pkg_name):
-        if self.additional_packages_snapshot and pkg_name in self.additional_packages_snapshot:
+        if (
+            self.additional_packages_snapshot
+            and pkg_name in self.additional_packages_snapshot
+        ):
             pkg_info = self.additional_packages_snapshot[pkg_name]
             return self.get_package_xml_for_additional_package(pkg_info)
         return self._distro.get_release_package_xml(pkg_name)
@@ -171,6 +198,6 @@ class Distro(object):
         raw_url = f"https://raw.githubusercontent.com/{owner_repo}/{ref}/{additional_folder}{xml_name}"
         try:
             with urllib.request.urlopen(raw_url) as resp:
-                return resp.read().decode('utf-8')
+                return resp.read().decode("utf-8")
         except Exception as e:
             raise RuntimeError(f"Failed to fetch package.xml from {raw_url}: {e}")

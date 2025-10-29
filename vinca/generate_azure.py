@@ -413,7 +413,12 @@ def get_full_tree():
     config.selected_platform = get_conda_subdir()
 
     python_version = temp_vinca_conf.get("python_version", None)
-    distro = Distro(temp_vinca_conf["ros_distro"], python_version, temp_vinca_conf["_snapshot"], temp_vinca_conf["_additional_packages_snapshot"])
+    distro = Distro(
+        temp_vinca_conf["ros_distro"],
+        python_version,
+        temp_vinca_conf["_snapshot"],
+        temp_vinca_conf["_additional_packages_snapshot"],
+    )
 
     all_packages = get_selected_packages(distro, temp_vinca_conf)
     temp_vinca_conf["_selected_pkgs"] = all_packages

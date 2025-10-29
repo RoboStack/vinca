@@ -140,3 +140,6 @@ dmypy.json
 
 # Generated examples
 # examples/
+# pixi environments
+.pixi/*
+!.pixi/config.toml

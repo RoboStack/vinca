@@ -62,15 +62,20 @@ def write_recipe_package(recipe):
     with open(recipe_path, "w") as stream:
         file.dump(recipe, stream)
 
+
 def copyfile_with_exec_permissions(source_file, destination_file):
     shutil.copyfile(source_file, destination_file)
 
     # It seems that rattler-build requires script to have executable permissions
-    if os.name == 'posix':
+    if os.name == "posix":
         # Retrieve current permissions
         current_permissions = os.stat(destination_file).st_mode
         # Set executable permissions for user, group, and others
-        os.chmod(destination_file, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        os.chmod(
+            destination_file,
+            current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
+        )
+
 
 def write_recipe(source, outputs, vinca_conf, single_file=True):
     # single_file = False
@@ -109,7 +114,9 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
             meta["package"]["name"] = o["package"]["name"]
             meta["package"]["version"] = o["package"]["version"]
 
-            meta["build"]["number"] = get_pkg_build_number(vinca_conf.get("build_number", 0), o["package"]["name"], vinca_conf)
+            meta["build"]["number"] = get_pkg_build_number(
+                vinca_conf.get("build_number", 0), o["package"]["name"], vinca_conf
+            )
             meta["build"]["post_process"] = post_process_items
 
             if test := vinca_conf["_tests"].get(o["package"]["name"]):
@@ -150,38 +157,62 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
 
             build_scripts = re.findall(r"'(.*?)'", meta["build"]["script"])
             for script in build_scripts:
-                script_filename = script.replace("$RECIPE_DIR", "").replace("%RECIPE_DIR%", "").replace("/", "").replace("\\", "")
+                script_filename = (
+                    script.replace("$RECIPE_DIR", "")
+                    .replace("%RECIPE_DIR%", "")
+                    .replace("/", "")
+                    .replace("\\", "")
+                )
                 # Generate the build script directly in the recipe directory
                 # Get additional CMake arguments from pkg_additional_info
-                from vinca.utils import get_pkg_additional_info, ensure_name_is_without_distro_prefix_and_with_underscores
+                from vinca.utils import (
+                    get_pkg_additional_info,
+                    ensure_name_is_without_distro_prefix_and_with_underscores,
+                )
+
                 pkg_name = o["package"]["name"]
                 # Use the proper utility function to normalize the package name
-                pkg_shortname = ensure_name_is_without_distro_prefix_and_with_underscores(pkg_name, vinca_conf)
+                pkg_shortname = (
+                    ensure_name_is_without_distro_prefix_and_with_underscores(
+                        pkg_name, vinca_conf
+                    )
+                )
 
                 additional_cmake_args = ""
                 additional_folder = ""
                 if pkg_shortname:
-                    pkg_additional_info = get_pkg_additional_info(pkg_shortname, vinca_conf)
-                    additional_cmake_args = pkg_additional_info.get("additional_cmake_args", "")
+                    pkg_additional_info = get_pkg_additional_info(
+                        pkg_shortname, vinca_conf
+                    )
+                    additional_cmake_args = pkg_additional_info.get(
+                        "additional_cmake_args", ""
+                    )
 
                     # Check if this package has folder info from additional_packages_snapshot
-                    if (vinca_conf.get("_additional_packages_snapshot") and
-                        pkg_shortname in vinca_conf["_additional_packages_snapshot"]):
-                        additional_folder = vinca_conf["_additional_packages_snapshot"][pkg_shortname].get("additional_folder", "")
+                    if (
+                        vinca_conf.get("_additional_packages_snapshot")
+                        and pkg_shortname in vinca_conf["_additional_packages_snapshot"]
+                    ):
+                        additional_folder = vinca_conf["_additional_packages_snapshot"][
+                            pkg_shortname
+                        ].get("additional_folder", "")
 
-                generate_build_script_for_recipe(script_filename, recipe_dir / script_filename, additional_cmake_args, additional_folder)
+                generate_build_script_for_recipe(
+                    script_filename,
+                    recipe_dir / script_filename,
+                    additional_cmake_args,
+                    additional_folder,
+                )
             if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
                 # Generate activation scripts directly in the recipe directory
                 generate_activation_scripts_for_recipe(recipe_dir)
+
 
 def generate_template(template_in, template_out, extra_globals=None):
     import em
     from vinca.config import skip_testing, ros_distro
 
-    g = {
-        "ros_distro": ros_distro,
-        "skip_testing": "ON" if skip_testing else "OFF"
-    }
+    g = {"ros_distro": ros_distro, "skip_testing": "ON" if skip_testing else "OFF"}
 
     # Merge additional global variables if provided
     if extra_globals:
@@ -196,13 +227,19 @@ def generate_template(template_in, template_out, extra_globals=None):
 
     # It seems that rattler-build requires script to have executable permissions
     # See https://github.com/RoboStack/ros-humble/pull/229#issuecomment-2549988298
-    if os.name == 'posix':
+    if os.name == "posix":
         # Retrieve current permissions
         current_permissions = os.stat(template_out.name).st_mode
         # Set executable permissions for user, group, and others
-        os.chmod(template_out.name, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        os.chmod(
+            template_out.name,
+            current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
+        )
 
-def generate_build_script_for_recipe(script_name, output_path, additional_cmake_args="", additional_folder=""):
+
+def generate_build_script_for_recipe(
+    script_name, output_path, additional_cmake_args="", additional_folder=""
+):
     """Generate a specific build script directly in the recipe directory."""
     import pkg_resources
 
@@ -215,11 +252,13 @@ def generate_build_script_for_recipe(script_name, output_path, additional_cmake_
         "build_catkin.sh": "templates/build_catkin.sh.in",
         "bld_catkin.bat": "templates/bld_catkin.bat.in",
         "bld_colcon_merge.bat": "templates/bld_colcon_merge.bat.in",
-        "bld_catkin_merge.bat": "templates/bld_catkin_merge.bat.in"
+        "bld_catkin_merge.bat": "templates/bld_catkin_merge.bat.in",
     }
 
     if script_name in script_templates:
-        template_in = pkg_resources.resource_filename("vinca", script_templates[script_name])
+        template_in = pkg_resources.resource_filename(
+            "vinca", script_templates[script_name]
+        )
         with open(output_path, "w") as output_file:
             extra_globals = {}
             if additional_cmake_args:
@@ -233,11 +272,15 @@ def generate_build_script_for_recipe(script_name, output_path, additional_cmake_
             generate_template(template_in, output_file, extra_globals)
 
         # Set executable permissions on Unix systems
-        if os.name == 'posix' and script_name.endswith('.sh'):
+        if os.name == "posix" and script_name.endswith(".sh"):
             current_permissions = os.stat(output_path).st_mode
-            os.chmod(output_path, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            os.chmod(
+                output_path,
+                current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
+            )
     else:
         print(f"Warning: Unknown build script template for {script_name}")
+
 
 def generate_activation_scripts_for_recipe(recipe_dir):
     """Generate activation scripts directly in the recipe directory."""
@@ -249,16 +292,21 @@ def generate_activation_scripts_for_recipe(recipe_dir):
         "activate.ps1": "templates/activate.ps1.in",
         "deactivate.sh": "templates/deactivate.sh.in",
         "deactivate.bat": "templates/deactivate.bat.in",
-        "deactivate.ps1": "templates/deactivate.ps1.in"
+        "deactivate.ps1": "templates/deactivate.ps1.in",
     }
 
     for script_name, template_path in activation_templates.items():
         template_in = pkg_resources.resource_filename("vinca", template_path)
         output_path = recipe_dir / script_name
         with open(output_path, "w") as output_file:
-            generate_template(template_in, output_file)  # No extra globals needed for activation scripts
+            generate_template(
+                template_in, output_file
+            )  # No extra globals needed for activation scripts
 
         # Set executable permissions on Unix systems for shell scripts
-        if os.name == 'posix' and script_name.endswith('.sh'):
+        if os.name == "posix" and script_name.endswith(".sh"):
             current_permissions = os.stat(output_path).st_mode
-            os.chmod(output_path, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            os.chmod(
+                output_path,
+                current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
+            )
