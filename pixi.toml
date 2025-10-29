@@ -9,8 +9,10 @@ version = "0.1.0"
 test = "pytest vinca/"
 
 # Code quality
-format = "black --safe --quiet ."
-lint = "flake8 vinca/"
+fmt = "ruff format ."
+fmt-check = "ruff format --check ."
+lint = "ruff check --fix ."
+lint-check = "ruff check ."
 
 [dependencies]
 python = ">=3.14.0,<3.15"
@@ -28,8 +30,7 @@ license-expression = ">=30.0.0"
 
 # Development dependencies
 pytest = "*"
-black = "*"
-flake8 = "*"
+ruff = "*"
 
 [pypi-dependencies]
 vinca = { path = ".", editable = true}

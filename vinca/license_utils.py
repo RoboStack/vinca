@@ -149,9 +149,7 @@ def convert_to_spdx_license(
             # Split by comma and process each part
             # Filter out empty strings from malformed input
             # (trailing/double commas)
-            parts = [
-                part.strip() for part in lic_str.split(",") if part.strip()
-            ]
+            parts = [part.strip() for part in lic_str.split(",") if part.strip()]
             sub_licenses = []
             seen_sub = set()
             for part in parts:

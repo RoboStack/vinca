@@ -251,7 +251,7 @@ def read_vinca_yaml(filepath):
 
 
 def read_snapshot(vinca_conf):
-    if not "rosdistro_snapshot" in vinca_conf:
+    if "rosdistro_snapshot" not in vinca_conf:
         return None, None
 
     yaml = ruamel.yaml.YAML()
@@ -395,17 +395,17 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         # Dummy recipes do not actually build anything, so we set the script to empty
         output["build"]["script"] = ""
     elif pkg.get_build_type() in ["cmake", "catkin"]:
-        output["build"][
-            "script"
-        ] = "${{ '$RECIPE_DIR/build_catkin.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
+        output["build"]["script"] = (
+            "${{ '$RECIPE_DIR/build_catkin.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
+        )
     elif pkg.get_build_type() in ["ament_cmake"]:
-        output["build"][
-            "script"
-        ] = "${{ '$RECIPE_DIR/build_ament_cmake.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_ament_cmake.bat' }}"
+        output["build"]["script"] = (
+            "${{ '$RECIPE_DIR/build_ament_cmake.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_ament_cmake.bat' }}"
+        )
     elif pkg.get_build_type() in ["ament_python"]:
-        output["build"][
-            "script"
-        ] = "${{ '$RECIPE_DIR/build_ament_python.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_ament_python.bat' }}"
+        output["build"]["script"] = (
+            "${{ '$RECIPE_DIR/build_ament_python.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_ament_python.bat' }}"
+        )
         resolved_setuptools = resolve_pkgname("python-setuptools", vinca_conf, distro)
         output["requirements"]["host"].extend(resolved_setuptools)
     else:
@@ -797,6 +797,7 @@ def generate_source_version(distro, vinca_conf):
         entry["git"] = url
         entry[ref_type] = ref
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
+        version = distro.get_version(pkg_shortname)
         if vinca_conf.get("trigger_new_versions"):
             if (
                 not pkg_names
@@ -866,7 +867,6 @@ def get_selected_packages(distro, vinca_conf):
             )
             selected_packages = selected_packages.union(additional_packages)
     elif vinca_conf["packages_select_by_deps"]:
-
         if (
             "packages_skip_by_deps" in vinca_conf
             and vinca_conf["packages_skip_by_deps"] is not None
@@ -1140,9 +1140,9 @@ def parse_package(pkg, distro, vinca_conf, path):
         )
 
     if pkg.get_build_type() in ["cmake", "catkin"]:
-        recipe["build"][
-            "script"
-        ] = "${{ '$RECIPE_DIR/build_catkin.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
+        recipe["build"]["script"] = (
+            "${{ '$RECIPE_DIR/build_catkin.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
+        )
 
     # fix up OPENGL support for Unix
     if (
@@ -1197,8 +1197,6 @@ def main():
     base_dir = os.path.abspath(arguments.dir)
     vinca_yaml = os.path.join(base_dir, "vinca.yaml")
     vinca_conf = read_vinca_yaml(vinca_yaml)
-    snapshot = vinca_conf.get("snapshot", None)
-    additional_packages_snapshot = vinca_conf.get("_additional_packages_snapshot", None)
 
     if arguments.trigger_new_versions:
         vinca_conf["trigger_new_versions"] = True
@@ -1283,10 +1281,6 @@ def main():
                 if "://" in fn:
                     selected_bn = vinca_conf.get("build_number", 0)
 
-                explicitly_selected_pkgs = [
-                    f"ros-{distro}-{pkg.replace('_', '-')}"
-                    for pkg in ensure_list(vinca_conf["packages_select_by_deps"])
-                ]
                 all_pkgs = repodata.get("packages", {})
                 all_pkgs.update(repodata.get("packages.conda", {}))
                 for _, pkg in all_pkgs.items():

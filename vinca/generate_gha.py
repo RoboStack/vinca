@@ -356,8 +356,6 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
         with open(".scripts/build_win.bat", "r") as fi:
             script = lu(fi.read())
 
-    jobs = []
-    job_names = []
     prev_batch_keys = []
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
