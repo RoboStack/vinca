@@ -140,9 +140,6 @@ def test_bsd2_normalized():
     assert convert_to_spdx_license(["BSD-2"]) == "BSD-2-Clause"
 
 
-# Tests for high-priority bug fixes
-
-
 def test_empty_strings_from_trailing_comma():
     """Test trailing commas don't create empty LicenseRef."""
     assert convert_to_spdx_license(["MIT,"]) == "MIT"
@@ -196,9 +193,6 @@ def test_comma_separated_with_duplicates():
     """Test comma-separated licenses with duplicates are deduplicated."""
     result = convert_to_spdx_license(["MIT, MIT"])
     assert result == "MIT"
-
-
-# Tests for medium-priority improvements
 
 
 def test_case_insensitive_lookup():
