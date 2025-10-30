@@ -110,7 +110,6 @@ class Distro(object):
 
     def get_released_repo(self, pkg_name):
         if self.snapshot and pkg_name in self.snapshot:
-
             # In the case of snapshot, for rosdistro_additional_recipes
             # we also support a 'rev' field, so depending on what is available
             # we return either the tag or the rev, and the third argument is either 'rev' or 'tag'

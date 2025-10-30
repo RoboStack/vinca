@@ -428,7 +428,6 @@ def get_full_tree():
 
 
 def main():
-
     args = parse_command_line(sys.argv)
 
     full_tree = get_full_tree()

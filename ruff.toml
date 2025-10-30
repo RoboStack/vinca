@@ -1,0 +1,12 @@
+line-length = 88
+target-version = "py37"
+
+[lint]
+# Ignore rules that were excluded in .flake8:
+# D104: Missing docstring in public package
+# E501: Line too long (handled by line-length setting)
+ignore = ["D104", "D100", "E501"]
+
+[lint.extend-per-file-ignores]
+# Exclude tests/data/* from all checks
+"tests/data/*" = ["ALL"]
