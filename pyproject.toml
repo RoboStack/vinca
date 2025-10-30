@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vinca"
+version = { attr = "vinca.__version__" }
+description = "Conda recipe generator for ROS packages."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+  { name = "Sean Yen", email = "seanyen@microsoft.com" },
+  { name = "Silvio Traversaro", email = "silvio@traversaro.it" },
+  { name = "Tobias Fischer", email = "info@tobiasfischer.info" },
+]
+maintainers = [
+  { name = "Silvio Traversaro" },
+  { name = "Tobias Fischer" },
+]
+requires-python = ">=3.9"
+keywords = ["ros"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Operating System :: OS Independent",
+  "Topic :: Software Development :: Build Tools",
+]
+
+dependencies = [
+  "catkin_pkg >=0.4.16",
+  "ruamel.yaml >=0.16.6,<0.18.0",
+  "rosdistro >=0.8.0",
+  "empy >=3.3.4,<4.0.0",
+  "requests >=2.24.0",
+  "networkx >=2.5",
+  "rich >=10",
+  "jinja2 >=3.0.0",
+  "license-expression >=30.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/RoboStack/vinca"
+Changelog = "https://github.com/RoboStack/vinca/milestones?direction=desc&sort=due_date&state=closed"
+GitHub = "https://github.com/RoboStack/vinca"
+
+[project.scripts]
+vinca = "vinca.main:main"
+vinca-glab = "vinca.generate_gitlab:main"
+vinca-gha = "vinca.generate_gha:main"
+vinca-azure = "vinca.generate_azure:main"
+vinca-migrate = "vinca.migrate:main"
+vinca-snapshot = "vinca.snapshot:main"
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["vinca*"]
+
+[tool.setuptools.package-data]
+vinca = ["templates/*", "azure_templates/*"]
+
+[tool.flake8]
+import-order-style = "google"
