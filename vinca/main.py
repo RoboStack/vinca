@@ -474,10 +474,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             )
 
     for dep in build_deps:
-        if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
-            output["requirements"]["host"].append(dep)
-            continue
-
         resolved_dep = resolve_pkgname(dep, vinca_conf, distro)
         if not resolved_dep:
             unsatisfied_deps.add(dep)
@@ -492,10 +488,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     run_deps += gdeps
 
     for dep in run_deps:
-        if dep in ["REQUIRE_OPENGL", "REQUIRE_GL"]:
-            output["requirements"]["host"].append(dep)
-            continue
-
         resolved_dep = resolve_pkgname(dep, vinca_conf, distro, is_rundep=True)
         if not resolved_dep:
             unsatisfied_deps.add(dep)
@@ -588,49 +580,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             output["requirements"]["host"] += [
                 {"if": "build_platform == target_platform", "then": [pkg_move_to_build]}
             ]
-
-    # fix up OPENGL support for Unix
-    if (
-        "REQUIRE_OPENGL" in output["requirements"]["run"]
-        or "REQUIRE_OPENGL" in output["requirements"]["host"]
-    ):
-        # add requirements for opengl
-        while "REQUIRE_OPENGL" in output["requirements"]["run"]:
-            output["requirements"]["run"].remove("REQUIRE_OPENGL")
-        while "REQUIRE_OPENGL" in output["requirements"]["host"]:
-            output["requirements"]["host"].remove("REQUIRE_OPENGL")
-
-        output["requirements"]["host"] += [
-            {
-                "if": "linux",
-                "then": ["libgl-devel", "libopengl-devel"],
-            }
-        ]
-
-        output["requirements"]["host"] += [
-            {"if": "unix", "then": ["xorg-libx11", "xorg-libxext"]},
-        ]
-        output["requirements"]["run"] += [
-            {"if": "unix", "then": ["xorg-libx11", "xorg-libxext"]},
-        ]
-
-    # fix up GL support for Unix
-    if (
-        "REQUIRE_GL" in output["requirements"]["run"]
-        or "REQUIRE_GL" in output["requirements"]["host"]
-    ):
-        # add requirements for gl
-        while "REQUIRE_GL" in output["requirements"]["run"]:
-            output["requirements"]["run"].remove("REQUIRE_GL")
-        while "REQUIRE_GL" in output["requirements"]["host"]:
-            output["requirements"]["host"].remove("REQUIRE_GL")
-
-        output["requirements"]["host"] += [
-            {
-                "if": "linux",
-                "then": ["libgl-devel"],
-            }
-        ]
 
     # remove duplicates
     for dep_type in ["build", "host", "run"]:
@@ -1143,48 +1092,6 @@ def parse_package(pkg, distro, vinca_conf, path):
         recipe["build"]["script"] = (
             "${{ '$RECIPE_DIR/build_catkin.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
         )
-
-    # fix up OPENGL support for Unix
-    if (
-        "REQUIRE_OPENGL" in recipe["requirements"]["run"]
-        or "REQUIRE_OPENGL" in recipe["requirements"]["host"]
-    ):
-        # add requirements for opengl
-        while "REQUIRE_OPENGL" in recipe["requirements"]["run"]:
-            recipe["requirements"]["run"].remove("REQUIRE_OPENGL")
-        while "REQUIRE_OPENGL" in recipe["requirements"]["host"]:
-            recipe["requirements"]["host"].remove("REQUIRE_OPENGL")
-
-        recipe["requirements"]["host"] += [
-            {
-                "if": "linux",
-                "then": ["libgl-devel", "libopengl-devel"],
-            }
-        ]
-        recipe["requirements"]["host"] += [
-            {"if": "unix", "then": ["xorg-libx11", "xorg-libxext"]},
-        ]
-        recipe["requirements"]["run"] += [
-            {"if": "unix", "then": ["xorg-libx11", "xorg-libxext"]},
-        ]
-
-    # fix up GL support for Unix
-    if (
-        "REQUIRE_GL" in recipe["requirements"]["run"]
-        or "REQUIRE_GL" in recipe["requirements"]["host"]
-    ):
-        # add requirements for gl
-        while "REQUIRE_GL" in recipe["requirements"]["run"]:
-            recipe["requirements"]["run"].remove("REQUIRE_GL")
-        while "REQUIRE_GL" in recipe["requirements"]["host"]:
-            recipe["requirements"]["host"].remove("REQUIRE_GL")
-
-        recipe["requirements"]["host"] += [
-            {
-                "if": "linux",
-                "then": ["libgl-devel"],
-            }
-        ]
 
     return recipe
 
