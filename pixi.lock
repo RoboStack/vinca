@@ -1849,19 +1849,19 @@ packages:
   timestamp: 1760418593847
 - pypi: ./
   name: vinca
-  version: 0.1.0
-  sha256: d2bc6544875054cbc0fee273120911dd4d686c31c52c8978364aa8f26c592fbb
+  version: 0.2.0
+  sha256: 6e7d2912d0be29dd4abc699e9d02ae8ec90dd3469876e296c90bc4a976103712
   requires_dist:
   - catkin-pkg>=0.4.16
-  - ruamel-yaml>=0.16.6,<0.18.0
-  - rosdistro>=0.8.0
   - empy>=3.3.4,<4.0.0
-  - requests>=2.24.0
-  - networkx>=2.5
-  - rich>=10
   - jinja2>=3.0.0
   - license-expression>=30.0.0
-  requires_python: '>=3.6'
+  - networkx>=2.5
+  - requests>=2.24.0
+  - rich>=10
+  - rosdistro>=0.8.0
+  - ruamel-yaml>=0.16.6,<0.18.0
+  requires_python: '>=3.9'
   editable: true
 - conda: https://prefix.dev/conda-forge/noarch/win_inet_pton-1.1.0-pyh7428d3b_8.conda
   sha256: 93807369ab91f230cf9e6e2a237eaa812492fe00face5b38068735858fba954f

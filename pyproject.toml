@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
 
 [project]
 name = "vinca"
-version = { attr = "vinca.__version__" }
+dynamic = ["version"]
 description = "Conda recipe generator for ROS packages."
 readme = "README.md"
 license = { text = "MIT" }
@@ -42,7 +42,6 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/RoboStack/vinca"
-Changelog = "https://github.com/RoboStack/vinca/milestones?direction=desc&sort=due_date&state=closed"
 GitHub = "https://github.com/RoboStack/vinca"
 
 [project.scripts]
@@ -53,15 +52,42 @@ vinca-azure = "vinca.generate_azure:main"
 vinca-migrate = "vinca.migrate:main"
 vinca-snapshot = "vinca.snapshot:main"
 
-[tool.setuptools]
-zip-safe = false
-include-package-data = true
+[tool.hatch.version]
+path = "vinca/__init__.py"
 
-[tool.setuptools.packages.find]
-include = ["vinca*"]
+[tool.hatch.build]
+include = [
+  "vinca/templates/**",
+  "vinca/azure_templates/**",
+]
 
-[tool.setuptools.package-data]
-vinca = ["templates/*", "azure_templates/*"]
+[tool.hatch.build.targets.wheel]
+packages = ["vinca"]
 
-[tool.flake8]
-import-order-style = "google"
+[tool.pixi.workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["win-64", "linux-64", "osx-arm64", "osx-64"]
+
+[tool.pixi.tasks]
+test = "pytest vinca/"
+fmt = "ruff format ."
+fmt-check = "ruff format --check ."
+lint = "ruff check --fix ."
+lint-check = "ruff check ."
+
+[tool.pixi.dependencies]
+python = ">=3.14.0,<3.15"
+catkin_pkg = ">=0.4.16"
+"ruamel.yaml" = ">=0.16.6,<0.18.0"
+rosdistro = ">=0.8.0"
+empy = ">=3.3.4,<4.0.0"
+requests = ">=2.24.0"
+networkx = ">=2.5"
+rich = ">=10"
+jinja2 = ">=3.0.0"
+license-expression = ">=30.0.0"
+pytest = "*"
+ruff = "*"
+
+[tool.pixi.pypi-dependencies]
+vinca = { path = ".", editable = true }

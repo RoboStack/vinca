@@ -1,5 +1,5 @@
 line-length = 88
-target-version = "py37"
+target-version = "py39"
 
 [lint]
 # Ignore rules that were excluded in .flake8:
