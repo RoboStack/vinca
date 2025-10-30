@@ -66,6 +66,7 @@ def get_repodata(url_or_path, platform=None):
         fcache.write(content.decode("utf-8"))
     return json.loads(content)
 
+
 def ensure_name_is_without_distro_prefix_and_with_underscores(name, vinca_conf):
     """
     Ensure that the name is without distro prefix and with underscores
@@ -73,23 +74,30 @@ def ensure_name_is_without_distro_prefix_and_with_underscores(name, vinca_conf):
     """
     newname = name.replace("-", "_")
     distro_prefix = "ros_" + vinca_conf.get("ros_distro") + "_"
-    if (newname.startswith(distro_prefix) ):
+    if newname.startswith(distro_prefix):
         newname = newname.replace(distro_prefix, "")
 
     return newname
 
+
 def get_pkg_additional_info(pkg_name, vinca_conf):
-    normalized_name = ensure_name_is_without_distro_prefix_and_with_underscores(pkg_name, vinca_conf)
+    normalized_name = ensure_name_is_without_distro_prefix_and_with_underscores(
+        pkg_name, vinca_conf
+    )
     pkg_additional_info_all = vinca_conf["_pkg_additional_info"]
     if pkg_additional_info_all is None:
         pkg_additional_info = {}
     else:
-        pkg_additional_info = vinca_conf.get("_pkg_additional_info", {}).get(normalized_name, {})
+        pkg_additional_info = vinca_conf.get("_pkg_additional_info", {}).get(
+            normalized_name, {}
+        )
     return pkg_additional_info
+
 
 def get_pkg_build_number(default_build_number, pkg_name, vinca_conf):
     pkg_additional_info = get_pkg_additional_info(pkg_name, vinca_conf)
     return pkg_additional_info.get("build_number", default_build_number)
+
 
 # Return true if the package is actually provided in conda-forge, and so we generate
 # only a recipe with a run dependency on the conda forge package

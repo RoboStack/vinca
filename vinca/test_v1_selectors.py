@@ -5,6 +5,7 @@ from vinca import v1_selectors
 
 yaml = ruamel.yaml.YAML()
 
+
 # -----------------------------------------------------------------------------#
 # Fixtures                                                                      #
 # -----------------------------------------------------------------------------#
@@ -43,7 +44,9 @@ def test_then_else_branch():
         k: 2
     """
     data = yaml.load(src)
-    assert v1_selectors.evaluate_selectors(data, target_platform="linux-64") == [{"k": 1}]
+    assert v1_selectors.evaluate_selectors(data, target_platform="linux-64") == [
+        {"k": 1}
+    ]
     assert v1_selectors.evaluate_selectors(data, target_platform="win-64") == [{"k": 2}]
 
 
@@ -61,4 +64,3 @@ def test_spliced_list():
     assert out["host"] == ["linux-tool-1", "linux-tool-2", "always-tool"]
     out2 = v1_selectors.evaluate_selectors(data, target_platform="win-64")
     assert out2["host"] == ["always-tool"]
-

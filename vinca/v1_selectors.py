@@ -10,6 +10,7 @@ Usage
 >>> data = yaml.load(open("recipe.yaml"))
 >>> clean = evaluate_selectors(data, target_platform="linux-64")
 """
+
 from __future__ import annotations
 
 import copy
@@ -85,6 +86,7 @@ def _platform_flags(platform: str | None) -> dict[str, bool | str]:
 # -----------------------------------------------------------------------------#
 _ENV = jinja2.Environment()
 
+
 def _eval_condition(expr: str, ctx: Mapping[str, Any]) -> bool:
     """Safe-ish evaluation of the selector expression using jinja2."""
     try:
@@ -109,9 +111,9 @@ def _process_node(node: Any, ctx: Mapping[str, Any]) -> Any | None:
     if isinstance(node, Mapping) and "if" in node and "then" in node:
         cond = str(node["if"])
         branch = "then" if _eval_condition(cond, ctx) else "else"
-        if branch in node:                          # recurse into chosen branch
+        if branch in node:  # recurse into chosen branch
             return _process_node(node[branch], ctx)
-        return None                                 # nothing chosen – drop
+        return None  # nothing chosen – drop
 
     # Recursion – dict ---------------------------------------------------------
     if isinstance(node, MutableMapping):

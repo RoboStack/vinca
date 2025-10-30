@@ -1,0 +1,35 @@
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+name = "vinca"
+platforms = ["win-64", "linux-64", "osx-arm64", "osx-64"]
+version = "0.1.0"
+
+[tasks]
+# Testing
+test = "pytest vinca/"
+
+# Code quality
+format = "black --safe --quiet ."
+lint = "flake8 vinca/"
+
+[dependencies]
+python = ">=3.14.0,<3.15"
+
+# Core dependencies
+catkin_pkg = ">=0.4.16"
+"ruamel.yaml" = ">=0.16.6,<0.18.0"
+rosdistro = ">=0.8.0"
+empy = ">=3.3.4,<4.0.0"
+requests = ">=2.24.0"
+networkx = ">=2.5"
+rich = ">=10"
+jinja2 = ">=3.0.0"
+license-expression = ">=30.0.0"
+
+# Development dependencies
+pytest = "*"
+black = "*"
+flake8 = "*"
+
+[pypi-dependencies]
+vinca = { path = ".", editable = true}
