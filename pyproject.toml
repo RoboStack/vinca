@@ -1,0 +1,93 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vinca"
+dynamic = ["version"]
+description = "Conda recipe generator for ROS packages."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+  { name = "Sean Yen", email = "seanyen@microsoft.com" },
+  { name = "Silvio Traversaro", email = "silvio@traversaro.it" },
+  { name = "Tobias Fischer", email = "info@tobiasfischer.info" },
+]
+maintainers = [
+  { name = "Silvio Traversaro" },
+  { name = "Tobias Fischer" },
+]
+requires-python = ">=3.9"
+keywords = ["ros"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Operating System :: OS Independent",
+  "Topic :: Software Development :: Build Tools",
+]
+
+dependencies = [
+  "catkin_pkg >=0.4.16",
+  "ruamel.yaml >=0.16.6,<0.18.0",
+  "rosdistro >=0.8.0",
+  "empy >=3.3.4,<4.0.0",
+  "requests >=2.24.0",
+  "networkx >=2.5",
+  "rich >=10",
+  "jinja2 >=3.0.0",
+  "license-expression >=30.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/RoboStack/vinca"
+GitHub = "https://github.com/RoboStack/vinca"
+
+[project.scripts]
+vinca = "vinca.main:main"
+vinca-glab = "vinca.generate_gitlab:main"
+vinca-gha = "vinca.generate_gha:main"
+vinca-azure = "vinca.generate_azure:main"
+vinca-migrate = "vinca.migrate:main"
+vinca-snapshot = "vinca.snapshot:main"
+
+[tool.hatch.version]
+path = "vinca/__init__.py"
+
+[tool.hatch.build]
+include = [
+  "vinca/templates/**",
+  "vinca/azure_templates/**",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["vinca"]
+
+[tool.pixi.workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["win-64", "linux-64", "osx-arm64", "osx-64"]
+
+[tool.pixi.tasks]
+test = "pytest vinca/"
+fmt = "ruff format ."
+fmt-check = "ruff format --check ."
+lint = "ruff check --fix ."
+lint-check = "ruff check ."
+
+[tool.pixi.dependencies]
+python = ">=3.14.0,<3.15"
+catkin_pkg = ">=0.4.16"
+"ruamel.yaml" = ">=0.16.6,<0.18.0"
+rosdistro = ">=0.8.0"
+empy = ">=3.3.4,<4.0.0"
+requests = ">=2.24.0"
+networkx = ">=2.5"
+rich = ">=10"
+jinja2 = ">=3.0.0"
+license-expression = ">=30.0.0"
+pytest = "*"
+ruff = "*"
+
+[tool.pixi.pypi-dependencies]
+vinca = { path = ".", editable = true }
