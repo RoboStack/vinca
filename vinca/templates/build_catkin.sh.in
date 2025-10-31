@@ -5,7 +5,7 @@ set -eo pipefail
 
 CATKIN_BUILD_BINARY_PACKAGE="ON"
 
-if [ "${PKG_NAME}" == "ros-@(ros_distro)-catkin" ]; then
+if [ "${PKG_NAME}" == "@(ros_package_prefix)-catkin" ]; then
     # create catkin cookie to make it is a catkin workspace
     touch $PREFIX/.catkin
     # keep the workspace activation scripts (e.g., local_setup.bat)
@@ -85,7 +85,7 @@ fi
 
 export SKIP_TESTING=@(skip_testing)
 
-if [ "${PKG_NAME}" == "ros-noetic-euslisp" ] || [ "${PKG_NAME}" = "ros-noetic-jskeus" ] || [ "${PKG_NAME}" = "ros-noetic-roseus" ]; then
+if [ "${PKG_NAME}" == "ros-euslisp" ] || [ "${PKG_NAME}" = "ros-jskeus" ] || [ "${PKG_NAME}" = "ros-roseus" ]; then
   GENERATOR="Unix Makefiles"
 else
   GENERATOR="Ninja"
@@ -123,7 +123,7 @@ fi
 
 cmake --build . --config Release --target install
 
-if [ "${PKG_NAME}" == "ros-@(ros_distro)-catkin" ]; then
+if [ "${PKG_NAME}" == "@(ros_package_prefix)-catkin" ]; then
     # Copy the [de]activate scripts to $PREFIX/etc/conda/[de]activate.d.
     # This will allow them to be run on environment activation.
     for CHANGE in "activate" "deactivate"
@@ -133,7 +133,7 @@ if [ "${PKG_NAME}" == "ros-@(ros_distro)-catkin" ]; then
     done
 fi
 
-if [ "${PKG_NAME}" == "ros-@(ros_distro)-environment" ]; then
+if [ "${PKG_NAME}" == "@(ros_package_prefix)-environment" ]; then
    for SCRIPT in "1.ros_distro.sh" "1.ros_etc_dir.sh" "1.ros_package_path.sh" "1.ros_python_version.sh" "1.ros_version.sh"
    do
        mkdir -p "${PREFIX}/etc/conda/activate.d"
@@ -141,7 +141,7 @@ if [ "${PKG_NAME}" == "ros-@(ros_distro)-environment" ]; then
    done
 fi
 
-if [ "${PKG_NAME}" == "ros-@(ros_distro)-ros-workspace" ]; then
+if [ "${PKG_NAME}" == "@(ros_package_prefix)-ros-workspace" ]; then
     # Copy the [de]activate scripts to $PREFIX/etc/conda/[de]activate.d.
     # This will allow them to be run on environment activation.
     for CHANGE in "activate" "deactivate"
