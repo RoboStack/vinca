@@ -1,6 +1,7 @@
 import os
 from urllib.request import urlopen
 from vinca import config
+from vinca.naming import get_package_name
 
 map_platform_python_to_conda = {
     "linux-64": "linux",
@@ -68,10 +69,7 @@ def resolve_pkgname(pkg_shortname, vinca_conf, distro, is_rundep=False):
         ):
             return []
         else:
-            return [
-                "ros-%s-%s"
-                % (vinca_conf["ros_distro"], pkg_shortname.replace("_", "-"))
-            ]
+            return [get_package_name(pkg_shortname, distro, vinca_conf)]
     else:
         if is_rundep:  # for run dependencies, remove the version
             pkg_names_pinned = []

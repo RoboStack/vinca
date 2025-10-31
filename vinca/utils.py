@@ -60,12 +60,12 @@ def get_repodata(url_or_path, platform=None):
         print(f"Found cached repodata, age: {age}")
         max_age = 100_000  # seconds == 27 hours
         if age < max_age:
-            with open(fn) as fi:
-                try:
+            try:
+                with open(fn) as fi:
                     return json.load(fi)
-                except json.JSONDecodeError:
-                    print(f"Ignoring invalid cached repodata at {fn}")
-                    os.remove(fn)
+            except json.JSONDecodeError:
+                print(f"Ignoring invalid cached repodata at {fn}")
+                os.remove(fn)
 
     repodata = requests.get(url_or_path)
     if repodata.status_code == 404:
@@ -90,16 +90,59 @@ def get_repodata(url_or_path, platform=None):
 
 
 def ensure_name_is_without_distro_prefix_and_with_underscores(name, vinca_conf):
-    """
-    Ensure that the name is without distro prefix and with underscores
-    e.g. "ros-humble-pkg-name" -> "pkg_name"
-    """
+    """Normalize new and legacy ROS package names to their ROS package name."""
     newname = name.replace("-", "_")
-    distro_prefix = "ros_" + vinca_conf.get("ros_distro") + "_"
-    if newname.startswith(distro_prefix):
-        newname = newname.replace(distro_prefix, "")
+    prefixes = ["ros2_"]
+    if ros_distro := vinca_conf.get("ros_distro"):
+        prefixes.append(f"ros_{ros_distro}_")
+    prefixes.append("ros_")
+
+    for prefix in prefixes:
+        if newname.startswith(prefix):
+            return newname[len(prefix) :]
 
     return newname
+
+
+def extract_dependency_names(requirements):
+    """Extract dependency names from strings and conditional requirement structures."""
+    names = []
+
+    def visit(value):
+        if isinstance(value, str):
+            if value:
+                names.append(value.split()[0])
+        elif isinstance(value, dict):
+            for key, nested_value in value.items():
+                if key != "if":
+                    visit(nested_value)
+        elif isinstance(value, (list, tuple)):
+            for nested_value in value:
+                visit(nested_value)
+
+    visit(requirements)
+    return list(dict.fromkeys(names))
+
+
+def add_package_name_variants(entries, ros_distro):
+    """Make package-specific config entries available under old and new names."""
+    legacy_prefix = f"ros-{ros_distro}-"
+    for name, value in list(entries.items()):
+        if name.startswith(legacy_prefix):
+            shortname = name[len(legacy_prefix) :]
+        elif name.startswith("ros2-"):
+            shortname = name[len("ros2-") :]
+        elif name.startswith("ros-"):
+            shortname = name[len("ros-") :]
+        else:
+            shortname = name
+
+        for variant in (
+            f"{legacy_prefix}{shortname}",
+            f"ros-{shortname}",
+            f"ros2-{shortname}",
+        ):
+            entries.setdefault(variant, value)
 
 
 def get_pkg_additional_info(pkg_name, vinca_conf):

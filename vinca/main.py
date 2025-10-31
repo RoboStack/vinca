@@ -14,10 +14,19 @@ from .resolve import get_conda_index
 from .resolve import resolve_pkgname
 from .template import write_recipe, write_recipe_package
 from .distro import Distro
+from .naming import (
+    generate_legacy_compatibility_output,
+    get_package_name,
+    get_package_name_mode,
+    get_package_prefix,
+    is_legacy_compatibility_output,
+    normalize_package_dependency,
+)
 from .v1_selectors import evaluate_selectors
 
 from vinca import config
 from vinca.utils import (
+    add_package_name_variants,
     get_repodata,
     get_pkg_build_number,
     get_pkg_additional_info,
@@ -140,7 +149,7 @@ def parse_command_line(argv):
     return arguments
 
 
-def get_depmods(vinca_conf, pkg_name):
+def get_depmods(vinca_conf, pkg_name, distro):
     depmods = vinca_conf["depmods"].get(pkg_name, {})
     rm_deps, add_deps = (
         {"build": [], "host": [], "run": []},
@@ -148,19 +157,16 @@ def get_depmods(vinca_conf, pkg_name):
     )
 
     for dep_type in ["build", "host", "run"]:
-        if depmods.get("remove_" + dep_type):
-            for el in depmods["remove_" + dep_type]:
-                if isinstance(el, dict):
-                    rm_deps[dep_type].append(dict(el))
-                else:
-                    rm_deps[dep_type].append(el)
+        for dependency in depmods.get("remove_" + dep_type, []):
+            rm_deps[dep_type].append(
+                normalize_package_dependency(dependency, distro, vinca_conf)
+            )
 
-        if depmods.get("add_" + dep_type):
-            for el in depmods["add_" + dep_type]:
-                if isinstance(el, dict):
-                    add_deps[dep_type].append(dict(el))
-                else:
-                    add_deps[dep_type].append(el)
+        for dependency in depmods.get("add_" + dep_type, []):
+            add_deps[dep_type].append(
+                normalize_package_dependency(dependency, distro, vinca_conf)
+            )
+
     return rm_deps, add_deps
 
 
@@ -169,6 +175,7 @@ def read_vinca_yaml(filepath):
     vinca_conf = evaluate_selectors(
         yaml.load(open(filepath, "r")), target_platform=get_conda_subdir()
     )
+    vinca_conf["package_name_mode"] = get_package_name_mode(vinca_conf).value
 
     # normalize paths to absolute paths
     conda_index = []
@@ -204,15 +211,19 @@ def read_vinca_yaml(filepath):
 
         patches[splitted[0]]["any"].append(x)
 
+    add_package_name_variants(patches, vinca_conf["ros_distro"])
     vinca_conf["_patches"] = patches
 
     tests = {}
     test_dir = Path(filepath).parent / "tests"
-    # Store the test directory directly for use in template.py
-    vinca_conf["_test_dir"] = test_dir
     for x in test_dir.glob("*.yaml"):
         tests[os.path.basename(x).split(".")[0]] = x
+    add_package_name_variants(tests, vinca_conf["ros_distro"])
     vinca_conf["_tests"] = tests
+
+    test_folders = {path.name: path for path in test_dir.glob("*") if path.is_dir()}
+    add_package_name_variants(test_folders, vinca_conf["ros_distro"])
+    vinca_conf["_test_folders"] = test_folders
 
     if (patch_dir / "dependencies.yaml").exists():
         vinca_conf["depmods"] = evaluate_selectors(
@@ -268,6 +279,34 @@ def read_snapshot(vinca_conf):
     return snapshot, additional
 
 
+def should_skip_output(output, vinca_conf):
+    """Return whether an individual output is already available."""
+    name = output["package"]["name"]
+    version = output["package"]["version"]
+    skip_built_packages = vinca_conf.get("skip_built_packages", [])
+    if vinca_conf.get("trigger_new_versions"):
+        return (name, version) in skip_built_packages
+    return name in skip_built_packages
+
+
+def append_output_with_compatibility(
+    outputs, output, pkg_shortname, distro, vinca_conf
+):
+    """Append canonical and compatibility outputs, filtering each independently."""
+    candidate_outputs = [output]
+    compatibility_output = generate_legacy_compatibility_output(
+        output, pkg_shortname, distro, vinca_conf
+    )
+    if compatibility_output is not None:
+        candidate_outputs.append(compatibility_output)
+
+    for candidate in candidate_outputs:
+        if should_skip_output(candidate, vinca_conf):
+            print(f"Skipping {candidate['package']['name']} (already built)")
+        else:
+            outputs.append(candidate)
+
+
 def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     if not all_pkgs:
         all_pkgs = []
@@ -279,12 +318,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     if not pkg_names:
         return None
 
-    if vinca_conf.get("trigger_new_versions"):
-        if (pkg_names[0], version) in vinca_conf["skip_built_packages"]:
-            return None
-    else:
-        if pkg_names[0] in vinca_conf["skip_built_packages"]:
-            return None
     # handle dummy recipe generation for vendored packages
     output = {}
     if is_dummy_metapackage(pkg_shortname, vinca_conf):
@@ -424,13 +457,12 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         "ros_workspace",
         "ros_environment",
     ]:
-        output["requirements"]["host"].append(
-            f"ros-{config.ros_distro}-ros-environment"
-        )
-        output["requirements"]["host"].append(f"ros-{config.ros_distro}-ros-workspace")
-        output["requirements"]["run"].append(f"ros-{config.ros_distro}-ros-workspace")
+        package_prefix = get_package_prefix(distro, vinca_conf)
+        output["requirements"]["host"].append(f"{package_prefix}-ros-environment")
+        output["requirements"]["host"].append(f"{package_prefix}-ros-workspace")
+        output["requirements"]["run"].append(f"{package_prefix}-ros-workspace")
 
-    rm_deps, add_deps = get_depmods(vinca_conf, pkg.name)
+    rm_deps, add_deps = get_depmods(vinca_conf, pkg.name, distro)
     gdeps = []
     if pkg.group_depends:
         for gdep in pkg.group_depends:
@@ -469,7 +501,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             output["requirements"]["build"].append(
                 {
                     "if": "build_platform != target_platform",
-                    "then": [f"ros-{config.ros_distro}-cyclonedds"],
+                    "then": [f"{get_package_prefix(distro, vinca_conf)}-cyclonedds"],
                 }
             )
 
@@ -519,39 +551,40 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         if "cmake" not in output["requirements"]["build"]:
             output["requirements"]["build"].append("cmake")
 
-    if f"ros-{config.ros_distro}-mimick-vendor" in output["requirements"]["build"]:
-        output["requirements"]["build"].remove(f"ros-{config.ros_distro}-mimick-vendor")
+    package_prefix = get_package_prefix(distro, vinca_conf)
+    mimick_vendor_name = f"{package_prefix}-mimick-vendor"
+    if mimick_vendor_name in output["requirements"]["build"]:
+        output["requirements"]["build"].remove(mimick_vendor_name)
         output["requirements"]["build"].append(
             {
                 "if": "target_platform != 'emscripten-wasm32'",
-                "then": [f"ros-{config.ros_distro}-mimick-vendor"],
+                "then": [mimick_vendor_name],
             }
         )
 
-    if f"ros-{config.ros_distro}-mimick-vendor" in output["requirements"]["host"]:
-        output["requirements"]["host"].remove(f"ros-{config.ros_distro}-mimick-vendor")
+    if mimick_vendor_name in output["requirements"]["host"]:
+        output["requirements"]["host"].remove(mimick_vendor_name)
         output["requirements"]["build"].append(
             {
                 "if": "target_platform != 'emscripten-wasm32'",
-                "then": [f"ros-{config.ros_distro}-mimick-vendor"],
+                "then": [mimick_vendor_name],
             }
         )
 
-    if (
-        f"ros-{config.ros_distro}-rosidl-default-generators"
-        in output["requirements"]["host"]
-    ):
+    rosidl_generators_name = f"{package_prefix}-rosidl-default-generators"
+    if rosidl_generators_name in output["requirements"]["host"]:
         output["requirements"]["build"].append(
             {
                 "if": "target_platform == 'emscripten-wasm32'",
-                "then": [f"ros-{config.ros_distro}-rosidl-default-generators"],
+                "then": [rosidl_generators_name],
             }
         )
 
     output["requirements"]["run"] = sorted(output["requirements"]["run"], key=sortkey)
     output["requirements"]["host"] = sorted(output["requirements"]["host"], key=sortkey)
 
-    if f"ros-{config.ros_distro}-pybind11-vendor" in output["requirements"]["host"]:
+    pybind11_vendor_name = f"{package_prefix}-pybind11-vendor"
+    if pybind11_vendor_name in output["requirements"]["host"]:
         output["requirements"]["host"] += ["pybind11"]
     if "pybind11" in output["requirements"]["host"]:
         output["requirements"]["build"] += [
@@ -637,7 +670,9 @@ def generate_outputs(distro, vinca_conf):
         except AttributeError:
             print("Skip " + pkg_shortname + " due to invalid version / XML.")
         if output is not None:
-            outputs.append(output)
+            append_output_with_compatibility(
+                outputs, output, pkg_shortname, distro, vinca_conf
+            )
 
     # Generate mutex package if configured as dictionary
     mutex_recipe = generate_mutex_package_recipe(vinca_conf, distro)
@@ -665,7 +700,9 @@ def generate_outputs_version(distro, vinca_conf):
         version = distro.get_version(pkg_shortname)
         output = generate_output(pkg_shortname, vinca_conf, distro, version)
         if output is not None:
-            outputs.append(output)
+            append_output_with_compatibility(
+                outputs, output, pkg_shortname, distro, vinca_conf
+            )
 
     return outputs
 
@@ -1005,7 +1042,7 @@ def generate_mutex_package_recipe(vinca_conf, distro):
 
 def parse_package(pkg, distro, vinca_conf, path):
     name = pkg["name"].replace("_", "-")
-    final_name = f"ros-{distro.name}-{name}"
+    final_name = get_package_name(name, distro, vinca_conf)
 
     recipe = {
         "package": {"name": final_name, "version": pkg["version"]},
@@ -1130,7 +1167,8 @@ def print_generation_summary(distro, vinca_conf, outputs):
     required_by = provenance.get("required_by", {})
 
     # names that actually produced a recipe in this run
-    generated_names = {o["package"]["name"] for o in outputs}
+    generated_outputs = {output["package"]["name"]: output for output in outputs}
+    generated_names = set(generated_outputs)
     matched_names = set()
 
     rows = []
@@ -1173,7 +1211,11 @@ def print_generation_summary(distro, vinca_conf, outputs):
             depended_on or "[dim]-[/dim]",
         )
     for name in leftovers:
-        table.add_row(name, "[dim]no[/dim]", "[dim]auxiliary (e.g. mutex)[/dim]")
+        if is_legacy_compatibility_output(generated_outputs[name], distro, vinca_conf):
+            reason = "[dim]legacy compatibility package[/dim]"
+        else:
+            reason = "[dim]auxiliary (e.g. mutex)[/dim]"
+        table.add_row(name, "[dim]no[/dim]", reason)
 
     console = Console()
     console.print(table)
@@ -1221,18 +1263,26 @@ def main():
         for f in pkg_files:
             pkg = catkin_pkg.package.parse_package(f)
             recipe = parse_package(pkg, distro, vinca_conf, f)
+            recipes = [recipe]
+            compatibility_recipe = generate_legacy_compatibility_output(
+                recipe, pkg.name, distro, vinca_conf
+            )
+            if compatibility_recipe is not None:
+                recipes.append(compatibility_recipe)
 
             if arguments.multiple_file:
-                write_recipe_package(recipe)
+                for generated_recipe in recipes:
+                    write_recipe_package(generated_recipe)
             else:
-                outputs.append(recipe)
+                outputs.extend(recipes)
 
         if not arguments.multiple_file:
             sources = {}
-            for o in outputs:
-                sources[o["package"]["name"]] = o["source"]
-                del o["source"]
-            write_recipe(sources, outputs, vinca_conf)
+            for output in outputs:
+                source = output.pop("source", None)
+                if source is not None:
+                    sources[output["package"]["name"]] = source
+            write_recipe(sources, outputs, vinca_conf, distro)
 
     else:
         if arguments.skip_already_built_repodata or vinca_conf.get("skip_existing"):
@@ -1252,6 +1302,10 @@ def main():
                     additional_recipe_names.add(add_rec_y["package"]["name"])
                 else:
                     if add_rec_y["package"]["name"] not in [
+                        "ros2-rmw-wasm-cpp",
+                        "ros2-wasm-cpp",
+                        "ros2-dynmsg",
+                        "ros2-test-wasm",
                         "ros-humble-rmw-wasm-cpp",
                         "ros-humble-wasm-cpp",
                         "ros-humble-dynmsg",
@@ -1319,9 +1373,9 @@ def main():
             outputs = generate_outputs(distro, vinca_conf)
 
         if arguments.multiple_file:
-            write_recipe(source, outputs, vinca_conf, False)
+            write_recipe(source, outputs, vinca_conf, distro, False)
         else:
-            write_recipe(source, outputs, vinca_conf)
+            write_recipe(source, outputs, vinca_conf, distro)
 
         print_generation_summary(distro, vinca_conf, outputs)
 

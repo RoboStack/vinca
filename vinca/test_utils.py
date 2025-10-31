@@ -1,9 +1,26 @@
 import json
 from unittest.mock import Mock, patch
 
-from vinca.utils import get_repodata
+from vinca.utils import extract_dependency_names, get_repodata
 
 EMPTY_REPODATA = {"packages": {}, "packages.conda": {}}
+
+
+def test_extract_dependency_names_handles_conditional_requirements():
+    requirements = [
+        "ros2-rclcpp >=1",
+        {
+            "if": "target_platform == 'emscripten-wasm32'",
+            "then": ["ros2-rmw-wasm-cpp", "fmt"],
+        },
+        "ros2-rclcpp >=1",
+    ]
+
+    assert extract_dependency_names(requirements) == [
+        "ros2-rclcpp",
+        "ros2-rmw-wasm-cpp",
+        "fmt",
+    ]
 
 
 def test_get_repodata_returns_empty_for_missing_local_repodata(tmp_path):
