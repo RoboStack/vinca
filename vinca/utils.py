@@ -69,13 +69,14 @@ def get_repodata(url_or_path, platform=None):
 
 def ensure_name_is_without_distro_prefix_and_with_underscores(name, vinca_conf):
     """
-    Ensure that the name is without distro prefix and with underscores
-    e.g. "ros-humble-pkg-name" -> "pkg_name"
+    Ensure that the name is without ROS prefix and with underscores
+    e.g. "ros2-pkg-name" -> "pkg_name" or "ros-pkg-name" -> "pkg_name"
     """
     newname = name.replace("-", "_")
-    distro_prefix = "ros_" + vinca_conf.get("ros_distro") + "_"
-    if newname.startswith(distro_prefix):
-        newname = newname.replace(distro_prefix, "")
+    if newname.startswith("ros2_"):
+        newname = newname[5:]  # Remove "ros2_"
+    elif newname.startswith("ros_"):
+        newname = newname[4:]  # Remove "ros_"
 
     return newname
 

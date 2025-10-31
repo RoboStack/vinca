@@ -171,6 +171,14 @@ class Distro(object):
     def check_ros1(self):
         return self._distribution_type == "ros1"
 
+    def get_ros_version(self):
+        """Get ROS version number (1 or 2)"""
+        return "1" if self.check_ros1() else "2"
+
+    def get_package_prefix(self):
+        """Get the package name prefix (ros for ROS1, ros2 for ROS2)"""
+        return "ros" if self.check_ros1() else "ros2"
+
     def get_python_version(self):
         return self._python_version
 

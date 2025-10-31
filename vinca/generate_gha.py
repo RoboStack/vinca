@@ -480,8 +480,8 @@ def main():
             ]
             if platform == "emscripten-wasm32":
                 # Hot fix to add the only ros package inside a if else statement
-                if "ros-humble-rmw-wasm-cpp" in str(reqs):
-                    requirements[pkg_name].append("ros-humble-rmw-wasm-cpp")
+                if "ros2-rmw-wasm-cpp" in str(reqs):
+                    requirements[pkg_name].append("ros2-rmw-wasm-cpp")
 
         G = nx.DiGraph()
         for pkg, reqs in requirements.items():
