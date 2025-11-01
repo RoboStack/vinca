@@ -250,7 +250,9 @@ def test_additional_license_variants():
 
     # Eclipse variants
     assert convert_to_spdx_license(["Eclipse Public License 2.0"]) == "EPL-2.0"
-    assert convert_to_spdx_license(["Eclipse Distribution License 1.0"]) == "BSD-3-Clause"
+    assert (
+        convert_to_spdx_license(["Eclipse Distribution License 1.0"]) == "BSD-3-Clause"
+    )
 
     # Zlib
     assert convert_to_spdx_license(["zlib License"]) == "Zlib"
