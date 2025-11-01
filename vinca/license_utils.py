@@ -45,13 +45,14 @@ LICENSE_LOOKUP: Dict[str, str] = {
     "lgplv3": "LGPL-3.0-only",
     "lgpl-3": "LGPL-3.0-only",
     "lgpl-3.0": "LGPL-3.0-only",
+    "LGPL (amcl)": "LGPL-2.1-or-later",
     # Mozilla/MPL variants
     "mozilla": "MPL-2.0",
     "mpl": "MPL-2.0",
     "mozilla public license version 1.1": "MPL-1.1",
     # Eclipse variants
     "eclipse public license 2.0": "EPL-2.0",
-    "eclipse distribution license 1.0": "EDL-1.0",
+    "eclipse distribution license 1.0": "BSD-3-Clause",
     # Boost variants
     "boost": "BSL-1.0",
     "boost software license": "BSL-1.0",
@@ -63,6 +64,7 @@ LICENSE_LOOKUP: Dict[str, str] = {
     # Creative Commons
     "cc by-nc-sa 4.0": "CC-BY-NC-SA-4.0",
     "creative commons zero v1.0 universal": "CC0-1.0",
+    "creative commons": "CC0-1.0",  # The version is an assumption
     # Public Domain (choosing Unlicense as more appropriate for code)
     "public domain": "Unlicense",
 }
