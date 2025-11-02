@@ -322,7 +322,7 @@ def build_linux_pipeline(
 def build_osx_pipeline(
     stages,
     trigger_branch,
-    vm_imagename="macos-13",
+    vm_imagename="macos-15-intel",
     outfile="osx.yml",
     azure_template=None,
     script=azure_unix_script,
@@ -561,7 +561,7 @@ def main():
         build_osx_pipeline(
             stages,
             args.trigger_branch,
-            vm_imagename="macos-14",
+            vm_imagename="macos-15",
             outfile="osx_arm64.yml",
             script=azure_unix_script,
             target=platform,
