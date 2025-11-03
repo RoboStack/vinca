@@ -327,7 +327,7 @@ def build_osx_pipeline(
     azure_template=None,
     script=azure_unix_script,
     target="osx-64",
-    pipeline_name="build_osx_64",
+    pipeline_name="build_osx64",
 ):
     build_unix_pipeline(
         stages,
@@ -549,7 +549,12 @@ def main():
         fo.write("\n".join(order))
 
     if args.platform == "linux-64":
-        build_unix_pipeline(stages, args.trigger_branch, outfile="linux.yml")
+        build_unix_pipeline(
+            stages,
+            args.trigger_branch,
+            outfile="linux64.yml",
+            pipeline_name="build_linux64"
+        )
 
     if args.platform == "osx-64":
         build_osx_pipeline(
