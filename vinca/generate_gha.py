@@ -553,7 +553,7 @@ def main():
             stages,
             args.trigger_branch,
             outfile="linux64.yml",
-            pipeline_name="build_linux64"
+            pipeline_name="build_linux64",
         )
 
     if args.platform == "osx-64":
