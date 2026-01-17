@@ -14,16 +14,24 @@ LICENSE_LOOKUP: Dict[str, str] = {
     "bsd-3": "BSD-3-Clause",
     "bsd 3-clause": "BSD-3-Clause",
     "3-clause bsd": "BSD-3-Clause",
+    "bsd clause 3": "BSD-3-Clause",
+    "bsd 3 clause": "BSD-3-Clause",
+    "bsd 3-clause license": "BSD-3-Clause",
+    "bds-3": "BSD-3-Clause",
     "bsd 2-clause": "BSD-2-Clause",
     "bsd license 2.0": "BSD-2-Clause",
     # Apache variants
     "apache": "Apache-2.0",
     "apache 2": "Apache-2.0",
+    "apache-2": "Apache-2.0",
     "apache2": "Apache-2.0",
     "apache2.0": "Apache-2.0",
     "apache 2.0": "Apache-2.0",
+    "apache 2.0 license": "Apache-2.0",
     "apache license 2.0": "Apache-2.0",
     "apache license, version 2.0": "Apache-2.0",
+    "apache-2.0 license": "Apache-2.0",
+    "alv2": "Apache-2.0",
     # GPL variants
     "gplv2": "GPL-2.0-only",
     "gpl-2": "GPL-2.0-only",
@@ -42,13 +50,18 @@ LICENSE_LOOKUP: Dict[str, str] = {
     "lgplv2.1": "LGPL-2.1-or-later",
     "lgpl-2": "LGPL-2.1-or-later",
     "lgpl-2.1": "LGPL-2.1-or-later",
+    "lgpl v2.1": "LGPL-2.1-or-later",
     "lgplv3": "LGPL-3.0-only",
     "lgpl-3": "LGPL-3.0-only",
     "lgpl-3.0": "LGPL-3.0-only",
+    "lgpl-v3": "LGPL-3.0-only",
     "LGPL (amcl)": "LGPL-2.1-or-later",
+    "gnu lesser public license 2.1": "LGPL-2.1-only",
     # Mozilla/MPL variants
     "mozilla": "MPL-2.0",
     "mpl": "MPL-2.0",
+    "mpl-2.0 license": "MPL-2.0",
+    "mozilla public license 2.0": "MPL-2.0",
     "mozilla public license version 1.1": "MPL-1.1",
     # Eclipse variants
     "eclipse public license 2.0": "EPL-2.0",
@@ -63,7 +76,9 @@ LICENSE_LOOKUP: Dict[str, str] = {
     "zlib license": "Zlib",
     # Creative Commons
     "cc by-nc-sa 4.0": "CC-BY-NC-SA-4.0",
+    "cc0": "CC0-1.0",
     "creative commons zero v1.0 universal": "CC0-1.0",
+    "creative commons attribution-noncommercial-noderivatives 4.0 international public license": "CC-BY-NC-ND-4.0",
     "creative commons": "CC0-1.0",  # The version is an assumption
     # Public Domain (choosing Unlicense as more appropriate for code)
     "public domain": "Unlicense",
