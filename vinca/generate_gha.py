@@ -552,7 +552,7 @@ def main():
         build_unix_pipeline(
             stages,
             args.trigger_branch,
-            outfile="linux64.yml",
+            outfile="linux.yml",
             pipeline_name="build_linux64",
         )
 
