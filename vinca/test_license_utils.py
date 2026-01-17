@@ -212,6 +212,12 @@ def test_case_insensitive_lookup():
 
 def test_new_license_variants():
     """Test newly added common license variants."""
+    # BSD variants
+    assert convert_to_spdx_license(["BSD Clause 3"]) == "BSD-3-Clause"
+    assert convert_to_spdx_license(["BDS-3"]) == "BSD-3-Clause"
+    assert convert_to_spdx_license(["BSD 3-Clause License"]) == "BSD-3-Clause"
+    assert convert_to_spdx_license(["BSD 3 Clause"]) == "BSD-3-Clause"
+
     # GPL variants
     assert convert_to_spdx_license(["GPLv2"]) == "GPL-2.0-only"
     assert convert_to_spdx_license(["GPL-2"]) == "GPL-2.0-only"
@@ -221,7 +227,10 @@ def test_new_license_variants():
     assert convert_to_spdx_license(["LGPL"]) == "LGPL-2.1-or-later"
     assert convert_to_spdx_license(["LGPLv2"]) == "LGPL-2.1-or-later"
     assert convert_to_spdx_license(["LGPL-2.1"]) == "LGPL-2.1-or-later"
+    assert convert_to_spdx_license(["LGPL v2.1"]) == "LGPL-2.1-or-later"
     assert convert_to_spdx_license(["LGPLv3"]) == "LGPL-3.0-only"
+    assert convert_to_spdx_license(["LGPL-v3"]) == "LGPL-3.0-only"
+    assert convert_to_spdx_license(["GNU Lesser Public License 2.1"]) == "LGPL-2.1-only"
 
     # AGPL variants
     assert convert_to_spdx_license(["AGPLv3"]) == "AGPL-3.0-only"
@@ -234,6 +243,26 @@ def test_new_license_variants():
 
     # MIT variants
     assert convert_to_spdx_license(["MIT License"]) == "MIT"
+
+    # Apache variants
+    assert convert_to_spdx_license(["Apache-2"]) == "Apache-2.0"
+    assert convert_to_spdx_license(["Apache 2.0 License"]) == "Apache-2.0"
+    assert convert_to_spdx_license(["ALv2"]) == "Apache-2.0"
+
+    # MPL variants
+    assert convert_to_spdx_license(["MPL-2.0 license"]) == "MPL-2.0"
+    assert convert_to_spdx_license(["Mozilla Public License 2.0"]) == "MPL-2.0"
+
+    # Creative Commons variants
+    assert (
+        convert_to_spdx_license(
+            [
+                "Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International Public License"
+            ]
+        )
+        == "CC-BY-NC-ND-4.0"
+    )
+    assert convert_to_spdx_license(["CC0"]) == "CC0-1.0"
 
     # Public Domain
     assert convert_to_spdx_license(["Public Domain"]) == "Unlicense"
