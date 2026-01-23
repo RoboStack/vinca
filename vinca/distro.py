@@ -210,7 +210,7 @@ class Distro(object):
 
         try:
             with urllib.request.urlopen(raw_url) as resp:
-                xml_content = resp.read().decode('utf-8')
+                xml_content = resp.read().decode("utf-8")
                 self._additional_xml_cache[raw_url] = xml_content
                 return xml_content
         except Exception as e:
