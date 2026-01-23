@@ -38,6 +38,10 @@ class Distro(object):
         self._python_version = index.distributions[distro_name]["python_version"]
         self.build_packages = set()
 
+        # simple caches to avoid repeatedly fetching/processing the same data
+        self._additional_xml_cache = {}
+        self._depends_cache = {}
+
         os.environ["ROS_VERSION"] = "1" if self.check_ros1() else "2"
 
     @property
@@ -49,6 +53,10 @@ class Distro(object):
 
     def get_depends(self, pkg, ignore_pkgs=None):
         dependencies = set()
+
+        cache_key = (pkg, tuple(sorted(ignore_pkgs)) if ignore_pkgs else None)
+        if cache_key in self._depends_cache:
+            return set(self._depends_cache[cache_key])
 
         if not self.check_package(pkg):
             print(f"{pkg} not in available packages anymore")
@@ -89,6 +97,7 @@ class Distro(object):
                 if ignore_pkgs and dep in ignore_pkgs:
                     continue
                 dependencies |= self.get_depends(dep, ignore_pkgs=ignore_pkgs)
+            self._depends_cache[cache_key] = set(dependencies)
             return dependencies
 
         # If the package is from upstream rosdistro, use the walker to get dependencies
@@ -106,6 +115,7 @@ class Distro(object):
             ros_packages_only=True,
             ignore_pkgs=ignore_pkgs,
         )
+        self._depends_cache[cache_key] = set(dependencies)
         return dependencies
 
     def get_released_repo(self, pkg_name):
@@ -195,8 +205,13 @@ class Distro(object):
         if additional_folder != "":
             additional_folder = additional_folder + "/"
         raw_url = f"https://raw.githubusercontent.com/{owner_repo}/{ref}/{additional_folder}{xml_name}"
+        if raw_url in self._additional_xml_cache:
+            return self._additional_xml_cache[raw_url]
+
         try:
             with urllib.request.urlopen(raw_url) as resp:
-                return resp.read().decode("utf-8")
+                xml_content = resp.read().decode("utf-8")
+                self._additional_xml_cache[raw_url] = xml_content
+                return xml_content
         except Exception as e:
             raise RuntimeError(f"Failed to fetch package.xml from {raw_url}: {e}")
