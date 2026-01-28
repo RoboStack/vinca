@@ -77,7 +77,7 @@ def copyfile_with_exec_permissions(source_file, destination_file):
         )
 
 
-def write_recipe(source, outputs, vinca_conf, single_file=True):
+def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
     # single_file = False
     if single_file:
         file = yaml.YAML()
@@ -200,6 +200,7 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
                 generate_build_script_for_recipe(
                     script_filename,
                     recipe_dir / script_filename,
+                    distro.get_package_prefix(),
                     additional_cmake_args,
                     additional_folder,
                 )
@@ -238,7 +239,11 @@ def generate_template(template_in, template_out, extra_globals=None):
 
 
 def generate_build_script_for_recipe(
-    script_name, output_path, additional_cmake_args="", additional_folder=""
+    script_name,
+    output_path,
+    ros_package_prefix,
+    additional_cmake_args="",
+    additional_folder="",
 ):
     """Generate a specific build script directly in the recipe directory."""
     import pkg_resources
@@ -261,6 +266,7 @@ def generate_build_script_for_recipe(
         )
         with open(output_path, "w") as output_file:
             extra_globals = {}
+            extra_globals["ros_package_prefix"] = ros_package_prefix
             if additional_cmake_args:
                 extra_globals["additional_cmake_args"] = additional_cmake_args
             else:

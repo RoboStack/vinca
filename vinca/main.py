@@ -425,10 +425,14 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         "ros_environment",
     ]:
         output["requirements"]["host"].append(
-            f"ros-{config.ros_distro}-ros-environment"
+            f"{distro.get_package_prefix()}-ros-environment"
         )
-        output["requirements"]["host"].append(f"ros-{config.ros_distro}-ros-workspace")
-        output["requirements"]["run"].append(f"ros-{config.ros_distro}-ros-workspace")
+        output["requirements"]["host"].append(
+            f"{distro.get_package_prefix()}-ros-workspace"
+        )
+        output["requirements"]["run"].append(
+            f"{distro.get_package_prefix()}-ros-workspace"
+        )
 
     rm_deps, add_deps = get_depmods(vinca_conf, pkg.name)
     gdeps = []
@@ -469,7 +473,7 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             output["requirements"]["build"].append(
                 {
                     "if": "build_platform != target_platform",
-                    "then": [f"ros-{config.ros_distro}-cyclonedds"],
+                    "then": [f"{distro.get_package_prefix()}-cyclonedds"],
                 }
             )
 
@@ -519,32 +523,31 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         if "cmake" not in output["requirements"]["build"]:
             output["requirements"]["build"].append("cmake")
 
-    if f"ros-{config.ros_distro}-mimick-vendor" in output["requirements"]["build"]:
-        output["requirements"]["build"].remove(f"ros-{config.ros_distro}-mimick-vendor")
+    mimick_vendor_name = f"{distro.get_package_prefix()}-mimick-vendor"
+    if mimick_vendor_name in output["requirements"]["build"]:
+        output["requirements"]["build"].remove(mimick_vendor_name)
         output["requirements"]["build"].append(
             {
                 "if": "target_platform != 'emscripten-wasm32'",
-                "then": [f"ros-{config.ros_distro}-mimick-vendor"],
+                "then": [mimick_vendor_name],
             }
         )
 
-    if f"ros-{config.ros_distro}-mimick-vendor" in output["requirements"]["host"]:
-        output["requirements"]["host"].remove(f"ros-{config.ros_distro}-mimick-vendor")
+    if mimick_vendor_name in output["requirements"]["host"]:
+        output["requirements"]["host"].remove(mimick_vendor_name)
         output["requirements"]["build"].append(
             {
                 "if": "target_platform != 'emscripten-wasm32'",
-                "then": [f"ros-{config.ros_distro}-mimick-vendor"],
+                "then": [mimick_vendor_name],
             }
         )
 
-    if (
-        f"ros-{config.ros_distro}-rosidl-default-generators"
-        in output["requirements"]["host"]
-    ):
+    rosidl_generators_name = f"{distro.get_package_prefix()}-rosidl-default-generators"
+    if rosidl_generators_name in output["requirements"]["host"]:
         output["requirements"]["build"].append(
             {
                 "if": "target_platform == 'emscripten-wasm32'",
-                "then": [f"ros-{config.ros_distro}-rosidl-default-generators"],
+                "then": [rosidl_generators_name],
             }
         )
 
@@ -558,7 +561,8 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         }
     ]
 
-    if f"ros-{config.ros_distro}-pybind11-vendor" in output["requirements"]["host"]:
+    pybind11_vendor_name = f"{distro.get_package_prefix()}-pybind11-vendor"
+    if pybind11_vendor_name in output["requirements"]["host"]:
         output["requirements"]["host"] += ["pybind11"]
     if "pybind11" in output["requirements"]["host"]:
         output["requirements"]["build"] += [
@@ -983,7 +987,7 @@ def generate_mutex_package_recipe(vinca_conf, distro):
 
 def parse_package(pkg, distro, vinca_conf, path):
     name = pkg["name"].replace("_", "-")
-    final_name = f"ros-{distro.name}-{name}"
+    final_name = f"{distro.get_package_prefix()}-{name}"
 
     recipe = {
         "package": {"name": final_name, "version": pkg["version"]},
@@ -1148,7 +1152,7 @@ def main():
             for o in outputs:
                 sources[o["package"]["name"]] = o["source"]
                 del o["source"]
-            write_recipe(sources, outputs, vinca_conf)
+            write_recipe(sources, outputs, vinca_conf, distro)
 
     else:
         if arguments.skip_already_built_repodata or vinca_conf.get("skip_existing"):
@@ -1168,10 +1172,10 @@ def main():
                     additional_recipe_names.add(add_rec_y["package"]["name"])
                 else:
                     if add_rec_y["package"]["name"] not in [
-                        "ros-humble-rmw-wasm-cpp",
-                        "ros-humble-wasm-cpp",
-                        "ros-humble-dynmsg",
-                        "ros-humble-test-wasm",
+                        "ros2-rmw-wasm-cpp",
+                        "ros2-wasm-cpp",
+                        "ros2-dynmsg",
+                        "ros2-test-wasm",
                     ]:
                         additional_recipe_names.add(add_rec_y["package"]["name"])
 
@@ -1235,9 +1239,9 @@ def main():
             outputs = generate_outputs(distro, vinca_conf)
 
         if arguments.multiple_file:
-            write_recipe(source, outputs, vinca_conf, False)
+            write_recipe(source, outputs, vinca_conf, distro, False)
         else:
-            write_recipe(source, outputs, vinca_conf)
+            write_recipe(source, outputs, vinca_conf, distro)
 
         if unsatisfied_deps:
             print("Unsatisfied dependencies:", unsatisfied_deps)
