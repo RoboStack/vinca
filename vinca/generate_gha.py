@@ -372,12 +372,12 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                 "needs": prev_batch_keys,
                 "env": {"CONDA_BLD_PATH": "C:\\\\bld\\\\"},
                 "steps": [
-                    {"name": "Checkout code", "uses": "actions/checkout@v4"},
+                    {"name": "Checkout code", "uses": "actions/checkout@v6"},
                     {
                         "name": "Setup pixi",
-                        "uses": "prefix-dev/setup-pixi@v0.8.10",
+                        "uses": "prefix-dev/setup-pixi@v0.9.4",
                         "with": {
-                            "pixi-version": "v0.40.3",
+                            "pixi-version": "v0.63.2",
                             "cache": "true",
                         },
                     },
