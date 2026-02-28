@@ -239,6 +239,8 @@ def read_vinca_yaml(filepath):
     else:
         vinca_conf["_pkg_additional_info"] = {}
 
+    vinca_conf["_variant_overrides"] = vinca_conf.get("variant_overrides", {})
+
     # snapshot contains both rosdistro_snapshot.yaml and
     # rosdistro_additional_recipes.yaml
     snapshot, additional_packages_snapshot = read_snapshot(vinca_conf)

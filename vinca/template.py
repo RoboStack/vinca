@@ -7,7 +7,7 @@ import stat
 from ruamel import yaml
 from pathlib import Path
 
-from vinca.utils import get_pkg_build_number
+from vinca.utils import get_pkg_build_number, ensure_name_is_without_distro_prefix_and_with_underscores
 
 TEMPLATE = """\
 # yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
@@ -148,6 +148,18 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
 
             with open(recipe_dir / "recipe.yaml", "w") as stream:
                 file.dump(meta, stream)
+
+            # Write variants.yaml if this package has variant overrides
+            pkg_shortname = ensure_name_is_without_distro_prefix_and_with_underscores(
+                o["package"]["name"], vinca_conf
+            )
+            variant_overrides = vinca_conf.get("_variant_overrides", {}).get(pkg_shortname, {})
+            if variant_overrides:
+                variant_file = yaml.YAML()
+                variant_file.width = 4096
+                variant_file.indent(mapping=2, sequence=4, offset=2)
+                with open(recipe_dir / "variants.yaml", "w") as stream:
+                    variant_file.dump(dict(variant_overrides), stream)
 
             if meta.get("source") and meta["source"].get("patches"):
                 for p in meta["source"]["patches"]:
