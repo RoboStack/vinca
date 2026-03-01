@@ -177,7 +177,6 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
                 # Generate the build script directly in the recipe directory
                 # Get additional CMake arguments from pkg_additional_info
                 from vinca.utils import (
-                    get_pkg_additional_info,
                     ensure_name_is_without_distro_prefix_and_with_underscores,
                 )
 
