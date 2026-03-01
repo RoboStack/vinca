@@ -165,11 +165,10 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
             with open(recipe_dir / "recipe.yaml", "w") as stream:
                 file.dump(meta, stream)
 
-            # Write variants.yaml if this package has variant overrides
-            pkg_shortname = ensure_name_is_without_distro_prefix_and_with_underscores(
+            # Write variants.yaml if this package has variant overrides in pkg_additional_info
+            variant_overrides = get_pkg_additional_info(
                 o["package"]["name"], vinca_conf
-            )
-            variant_overrides = vinca_conf.get("_variant_overrides", {}).get(pkg_shortname, {})
+            ).get("variant_overrides", {})
             if variant_overrides:
                 variant_file = yaml.YAML()
                 variant_file.width = 4096
