@@ -551,13 +551,6 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     output["requirements"]["run"] = sorted(output["requirements"]["run"], key=sortkey)
     output["requirements"]["host"] = sorted(output["requirements"]["host"], key=sortkey)
 
-    output["requirements"]["run"] += [
-        {
-            "if": "osx and x86_64",
-            "then": ["__osx >=${{ MACOSX_DEPLOYMENT_TARGET|default('10.14') }}"],
-        }
-    ]
-
     if f"ros-{config.ros_distro}-pybind11-vendor" in output["requirements"]["host"]:
         output["requirements"]["host"] += ["pybind11"]
     if "pybind11" in output["requirements"]["host"]:
