@@ -10,8 +10,8 @@ set CXX=cl.exe
 
 :: If defined, can use a custom CMake build directory which can be useful
 :: to avoid too long path problems on windows
-if defined CUSTOM_CMAKE_BUILD_DIR (
-    cd /d "%CUSTOM_CMAKE_BUILD_DIR%"
+if defined VINCA_CUSTOM_CMAKE_BUILD_DIR (
+    cd /d "%VINCA_CUSTOM_CMAKE_BUILD_DIR%"
 )
 rd /s /q build
 mkdir build
