@@ -8,6 +8,11 @@ set "PYTHONPATH=%LIBRARY_PREFIX%\lib\site-packages;%SP_DIR%"
 set CC=cl.exe
 set CXX=cl.exe
 
+:: If defined, can use a custom CMake build directory which can be useful
+:: to avoid too long path problems on windows
+if defined CUSTOM_CMAKE_BUILD_DIR (
+    cd /d "%CUSTOM_CMAKE_BUILD_DIR%"
+)
 rd /s /q build
 mkdir build
 pushd build
