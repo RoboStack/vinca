@@ -3,6 +3,9 @@
 
 set -eo pipefail
 
+if [[ -n "$VINCA_CUSTOM_CMAKE_BUILD_DIR" ]]; then
+    cd "$VINCA_CUSTOM_CMAKE_BUILD_DIR"
+fi
 rm -rf build
 mkdir build
 cd build
