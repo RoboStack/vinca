@@ -370,7 +370,10 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                 "runs-on": vm_imagename,
                 "strategy": {"fail-fast": False},
                 "needs": prev_batch_keys,
-                "env": [{"CONDA_BLD_PATH": "C:\\\\bld\\\\"},{"VINCA_CUSTOM_CMAKE_BUILD_DIR": "C:\\\\x\\\\"}],
+                "env": [
+                    {"CONDA_BLD_PATH": "C:\\\\bld\\\\"},
+                    {"VINCA_CUSTOM_CMAKE_BUILD_DIR": "C:\\\\x\\\\"},
+                ],
                 "steps": [
                     {"name": "Checkout code", "uses": "actions/checkout@v6"},
                     {
