@@ -4,6 +4,7 @@
 set -eo pipefail
 
 if [[ -n "$VINCA_CUSTOM_CMAKE_BUILD_DIR" ]]; then
+    mkdir -p "$VINCA_CUSTOM_CMAKE_BUILD_DIR"
     cd "$VINCA_CUSTOM_CMAKE_BUILD_DIR"
 fi
 rm -rf build
