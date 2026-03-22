@@ -242,7 +242,6 @@ def generate_build_script_for_recipe(
     script_name, output_path, additional_cmake_args="", additional_folder=""
 ):
     """Generate a specific build script directly in the recipe directory."""
-    from importlib import resources
 
     # Map script names to their template files
     script_templates = {
@@ -283,7 +282,6 @@ def generate_build_script_for_recipe(
 
 def generate_activation_scripts_for_recipe(recipe_dir):
     """Generate activation scripts directly in the recipe directory."""
-    from importlib import resources
 
     activation_templates = {
         "activate.sh": "templates/activate.sh.in",
