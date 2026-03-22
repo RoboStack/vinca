@@ -1,4 +1,5 @@
 import datetime
+from importlib import resources
 import shutil
 import os
 import re
@@ -241,7 +242,7 @@ def generate_build_script_for_recipe(
     script_name, output_path, additional_cmake_args="", additional_folder=""
 ):
     """Generate a specific build script directly in the recipe directory."""
-    import pkg_resources
+    from importlib import resources
 
     # Map script names to their template files
     script_templates = {
@@ -256,9 +257,7 @@ def generate_build_script_for_recipe(
     }
 
     if script_name in script_templates:
-        template_in = pkg_resources.resource_filename(
-            "vinca", script_templates[script_name]
-        )
+        template_in = resources.files("vinca") / script_templates[script_name]
         with open(output_path, "w") as output_file:
             extra_globals = {}
             if additional_cmake_args:
@@ -284,7 +283,7 @@ def generate_build_script_for_recipe(
 
 def generate_activation_scripts_for_recipe(recipe_dir):
     """Generate activation scripts directly in the recipe directory."""
-    import pkg_resources
+    from importlib import resources
 
     activation_templates = {
         "activate.sh": "templates/activate.sh.in",
@@ -296,7 +295,7 @@ def generate_activation_scripts_for_recipe(recipe_dir):
     }
 
     for script_name, template_path in activation_templates.items():
-        template_in = pkg_resources.resource_filename("vinca", template_path)
+        template_in = resources.files("vinca") / template_path
         output_path = recipe_dir / script_name
         with open(output_path, "w") as output_file:
             generate_template(

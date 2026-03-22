@@ -5,7 +5,7 @@ import glob
 import sys
 import os
 import argparse
-import pkg_resources
+from importlib import resources
 from distutils.dir_util import copy_tree
 
 from rich import print
@@ -22,10 +22,9 @@ from vinca.main import (
 from vinca import config
 
 
+
 def read_azure_script(fn):
-    template_in = pkg_resources.resource_filename("vinca", f"azure_templates/{fn}")
-    with open(template_in, "r") as fi:
-        return fi.read()
+    return (resources.files("vinca") / "azure_templates" / fn).read_text(encoding="utf-8")
 
 
 azure_unix_script = lu(read_azure_script("unix.sh"))
