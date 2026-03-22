@@ -22,9 +22,10 @@ from vinca.main import (
 from vinca import config
 
 
-
 def read_azure_script(fn):
-    return (resources.files("vinca") / "azure_templates" / fn).read_text(encoding="utf-8")
+    return (resources.files("vinca") / "azure_templates" / fn).read_text(
+        encoding="utf-8"
+    )
 
 
 azure_unix_script = lu(read_azure_script("unix.sh"))
