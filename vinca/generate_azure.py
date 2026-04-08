@@ -26,9 +26,7 @@ def read_azure_script(fn):
     return (resources.files("vinca") / "azure_templates" / fn).read_text()
 
 
-azure_linux_script = lu(read_azure_script("linux.sh"))
-azure_osx_script = lu(read_azure_script("osx_64.sh"))
-azure_osx_arm64_script = lu(read_azure_script("osx_arm64.sh"))
+azure_unix_script = lu(read_azure_script("unix.sh"))
 azure_win_preconfig_script = lu(read_azure_script("win_preconfig.bat"))
 azure_win_script = lu(read_azure_script("win_build.bat"))
 
@@ -64,6 +62,26 @@ def parse_command_line(argv):
         "--additional-recipes",
         action="store_true",
         help="search for additional_recipes folder?",
+    )
+
+    parser.add_argument(
+        "-b",
+        "--batch_size",
+        dest="batch_size",
+        default=5,
+        type=int,
+        help="How many packages to build at most per stage",
+    )
+
+    parser.add_argument(
+        "--publish-mode",
+        dest="publish_mode",
+        choices=["immediate", "platform-finalize"],
+        default="immediate",
+        help=(
+            "When set to platform-finalize, batch jobs only build and publish pipeline "
+            "artifacts. A final stage uploads the full platform payload after all batches pass."
+        ),
     )
 
     arguments = parser.parse_args(argv[1:])
@@ -207,13 +225,158 @@ def add_additional_recipes(args):
     return additional_recipes
 
 
+def get_batch_artifact_name(target, batch_key):
+    return f"{normalize_name(target)}-{batch_key}"
+
+
+def get_build_output_path(target):
+    if target == "win-64":
+        return r"%CONDA_BLD_PATH%\\win-64"
+    return f"$HOME/conda-bld/{target}"
+
+
+def get_publish_stage_name(target):
+    return f"publish_{normalize_name(target)}"
+
+
+def get_unix_collect_script(target, batch_key):
+    artifact_name = get_batch_artifact_name(target, batch_key)
+    return lu(
+        f"""mkdir -p \"$(Build.ArtifactStagingDirectory)/{artifact_name}\"
+if [ -d \"{get_build_output_path(target)}\" ]; then
+    cp -a \"{get_build_output_path(target)}/.\" \"$(Build.ArtifactStagingDirectory)/{artifact_name}/\"
+fi"""
+    )
+
+
+def get_windows_collect_script(batch_key):
+    artifact_name = get_batch_artifact_name("win-64", batch_key)
+    return lu(
+        f"""if exist "%CONDA_BLD_PATH%\\win-64" (
+    mkdir "$(Build.ArtifactStagingDirectory)\\{artifact_name}" 2>NUL
+    xcopy "%CONDA_BLD_PATH%\\win-64\\*" "$(Build.ArtifactStagingDirectory)\\{artifact_name}\\" /E /I /Y >NUL
+)"""
+    )
+
+
+def get_unix_publish_script(target):
+    return lu(
+        f"""python3 -m pip install --user --disable-pip-version-check anaconda-client
+export PATH="$HOME/.local/bin:$PATH"
+shopt -s globstar nullglob
+files=("$(Pipeline.Workspace)"/artifacts/**/*.conda "$(Pipeline.Workspace)"/artifacts/**/*.tar.bz2)
+if (( ${{#files[@]}} == 0 )); then
+    echo "No built packages found for {target}"
+    exit 1
+fi
+anaconda -t "$ANACONDA_API_TOKEN" upload "${{files[@]}}" --force"""
+    )
+
+
+def get_windows_publish_script():
+    return lu(
+        r"""$files = Get-ChildItem -Path "$(Pipeline.Workspace)artifacts" -Recurse -Include *.conda,*.tar.bz2 -File
+if ($files.Count -eq 0) {
+    throw "No built packages found for win-64"
+}
+foreach ($file in $files) {
+    anaconda -t $env:ANACONDA_API_TOKEN upload "$($file.FullName)" --force
+}""".replace("\u000c", "\\")
+    )
+
+
+def append_azure_publish_stage(
+    azure_template, target, stage_names, pool, windows=False
+):
+    publish_stage = {
+        "stage": get_publish_stage_name(target),
+        "dependsOn": stage_names,
+        "jobs": [
+            {
+                "job": f"publish_{normalize_name(target)}",
+                "steps": [
+                    {
+                        "task": "DownloadPipelineArtifact@2",
+                        "displayName": f"Download built artifacts for {target}",
+                        "inputs": {
+                            "buildType": "current",
+                            "targetPath": "$(Pipeline.Workspace)/artifacts",
+                        },
+                    },
+                ],
+            }
+        ],
+    }
+
+    if windows:
+        publish_stage["jobs"][0]["variables"] = {"CONDA_BLD_PATH": "C:\\\\bld\\\\"}
+        publish_stage["jobs"][0]["steps"].extend(
+            [
+                {
+                    "task": "PythonScript@0",
+                    "displayName": "Download Miniforge",
+                    "inputs": {
+                        "scriptSource": "inline",
+                        "script": lu(
+                            """import urllib.request
+url = 'https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Windows-x86_64.exe'
+path = r\"$(Build.ArtifactStagingDirectory)/Miniforge.exe\"
+urllib.request.urlretrieve(url, path)"""
+                        ),
+                    },
+                },
+                {
+                    "script": lu(
+                        """start /wait \"\" %BUILD_ARTIFACTSTAGINGDIRECTORY%\\Miniforge.exe /InstallationType=JustMe /RegisterPython=0 /S /D=C:\\Miniforge"""
+                    ),
+                    "displayName": "Install Miniforge",
+                },
+                {
+                    "powershell": 'Write-Host "##vso[task.prependpath]C:\\Miniforge\\Scripts"',
+                    "displayName": "Add conda to PATH",
+                },
+                {
+                    "script": lu(
+                        """call activate base
+mamba.exe install -c conda-forge --yes --quiet anaconda-client"""
+                    ),
+                    "displayName": "Install anaconda-client",
+                },
+                {
+                    "powershell": get_windows_publish_script(),
+                    "env": {
+                        "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
+                    },
+                    "displayName": "Publish built packages",
+                },
+            ]
+        )
+    else:
+        publish_stage["jobs"][0]["steps"].append(
+            {
+                "script": get_unix_publish_script(target),
+                "env": {
+                    "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
+                },
+                "displayName": "Publish built packages",
+            }
+        )
+
+    if pool is not None:
+        publish_stage["pool"] = pool
+
+    azure_template.setdefault("stages", []).append(publish_stage)
+
+
 def build_linux_pipeline(
     stages,
     trigger_branch,
-    script=azure_linux_script,
+    script=azure_unix_script,
     azure_template=None,
     docker_image=None,
     outfile="linux.yml",
+    target="linux-64",
+    publish_mode="immediate",
 ):
     # Build Linux pipeline
     if azure_template is None:
@@ -223,27 +386,52 @@ def build_linux_pipeline(
         docker_image = "condaforge/linux-anvil-cos7-x86_64"
     azure_stages = []
 
-    stage_names = []
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
         stage = {"stage": stage_name, "jobs": []}
-        stage_names.append(stage_name)
 
         for batch in s:
+            batch_key = f"stage_{i}_job_{len(stage['jobs'])}"
+            steps = [
+                {
+                    "script": script,
+                    "env": {
+                        "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
+                        "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                        "DOCKER_IMAGE": docker_image,
+                        "BUILD_TARGET": target,
+                        "VINCA_SKIP_UPLOAD": "1"
+                        if publish_mode == "platform-finalize"
+                        else "0",
+                    },
+                    "displayName": f"Build {' '.join([pkg for pkg in batch])}",
+                }
+            ]
+            if publish_mode == "platform-finalize":
+                artifact_name = get_batch_artifact_name(target, batch_key)
+                steps.extend(
+                    [
+                        {
+                            "script": get_unix_collect_script(target, batch_key),
+                            "displayName": "Collect built artifacts",
+                            "condition": "always()",
+                        },
+                        {
+                            "task": "PublishPipelineArtifact@1",
+                            "displayName": f"Publish workflow artifact {artifact_name}",
+                            "condition": "always()",
+                            "inputs": {
+                                "targetPath": f"$(Build.ArtifactStagingDirectory)/{artifact_name}",
+                                "artifact": artifact_name,
+                            },
+                        },
+                    ]
+                )
+
             stage["jobs"].append(
                 {
-                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
-                    "steps": [
-                        {
-                            "script": script,
-                            "env": {
-                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                                "DOCKER_IMAGE": docker_image,
-                            },
-                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
-                        }
-                    ],
+                    "job": batch_key,
+                    "steps": steps,
                 }
             )
 
@@ -255,6 +443,14 @@ def build_linux_pipeline(
     azure_template["pr"] = "none"
     if azure_stages:
         azure_template["stages"] = azure_stages
+
+    if publish_mode == "platform-finalize" and azure_stages:
+        append_azure_publish_stage(
+            azure_template,
+            target,
+            [stage["stage"] for stage in azure_stages],
+            azure_template.get("pool"),
+        )
 
     if not len(azure_stages):
         return
@@ -268,33 +464,60 @@ def build_osx_pipeline(
     trigger_branch,
     vm_imagename="macOS-10.15",
     outfile="osx.yml",
-    script=azure_osx_script,
+    script=azure_unix_script,
+    target="osx-64",
+    publish_mode="immediate",
 ):
     # Build OSX pipeline
     azure_template = {"pool": {"vmImage": vm_imagename}}
 
     azure_stages = []
 
-    stage_names = []
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
         stage = {"stage": stage_name, "jobs": []}
-        stage_names.append(stage_name)
 
         for batch in s:
+            batch_key = f"stage_{i}_job_{len(stage['jobs'])}"
+            steps = [
+                {
+                    "script": script,
+                    "env": {
+                        "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
+                        "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                        "BUILD_TARGET": target,
+                        "VINCA_SKIP_UPLOAD": "1"
+                        if publish_mode == "platform-finalize"
+                        else "0",
+                    },
+                    "displayName": f"Build {' '.join([pkg for pkg in batch])}",
+                }
+            ]
+            if publish_mode == "platform-finalize":
+                artifact_name = get_batch_artifact_name(target, batch_key)
+                steps.extend(
+                    [
+                        {
+                            "script": get_unix_collect_script(target, batch_key),
+                            "displayName": "Collect built artifacts",
+                            "condition": "always()",
+                        },
+                        {
+                            "task": "PublishPipelineArtifact@1",
+                            "displayName": f"Publish workflow artifact {artifact_name}",
+                            "condition": "always()",
+                            "inputs": {
+                                "targetPath": f"$(Build.ArtifactStagingDirectory)/{artifact_name}",
+                                "artifact": artifact_name,
+                            },
+                        },
+                    ]
+                )
+
             stage["jobs"].append(
                 {
-                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
-                    "steps": [
-                        {
-                            "script": script,
-                            "env": {
-                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                            },
-                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
-                        }
-                    ],
+                    "job": batch_key,
+                    "steps": steps,
                 }
             )
 
@@ -307,6 +530,14 @@ def build_osx_pipeline(
     if azure_stages:
         azure_template["stages"] = azure_stages
 
+    if publish_mode == "platform-finalize" and azure_stages:
+        append_azure_publish_stage(
+            azure_template,
+            target,
+            [stage["stage"] for stage in azure_stages],
+            azure_template.get("pool"),
+        )
+
     if not len(azure_stages):
         return
 
@@ -314,7 +545,12 @@ def build_osx_pipeline(
         fo.write(yaml.dump(azure_template, sort_keys=False))
 
 
-def build_win_pipeline(stages, trigger_branch, outfile="win.yml"):
+def build_win_pipeline(
+    stages,
+    trigger_branch,
+    outfile="win.yml",
+    publish_mode="immediate",
+):
     azure_template = {"pool": {"vmImage": "windows-2019"}}
 
     azure_stages = []
@@ -325,62 +561,86 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml"):
         with open(".scripts/build_win.bat", "r") as fi:
             script = lu(fi.read())
 
-    stage_names = []
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
         stage = {"stage": stage_name, "jobs": []}
-        stage_names.append(stage_name)
 
         for batch in s:
-            stage["jobs"].append(
+            batch_key = f"stage_{i}_job_{len(stage['jobs'])}"
+            steps = [
                 {
-                    "job": f"stage_{i}_job_{len(stage['jobs'])}",
-                    "variables": {"CONDA_BLD_PATH": "C:\\\\bld\\\\"},
-                    "steps": [
-                        {
-                            "task": "PythonScript@0",
-                            "displayName": "Download Miniforge",
-                            "inputs": {
-                                "scriptSource": "inline",
-                                "script": lu(
-                                    """import urllib.request
+                    "task": "PythonScript@0",
+                    "displayName": "Download Miniforge",
+                    "inputs": {
+                        "scriptSource": "inline",
+                        "script": lu(
+                            """import urllib.request
 url = 'https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Windows-x86_64.exe'
 path = r"$(Build.ArtifactStagingDirectory)/Miniforge.exe"
 urllib.request.urlretrieve(url, path)"""
-                                ),
-                            },
-                        },
-                        {
-                            "script": lu(
-                                """start /wait "" %BUILD_ARTIFACTSTAGINGDIRECTORY%\\Miniforge.exe /InstallationType=JustMe /RegisterPython=0 /S /D=C:\\Miniforge"""
-                            ),
-                            "displayName": "Install Miniforge",
-                        },
-                        {
-                            "powershell": 'Write-Host "##vso[task.prependpath]C:\\Miniforge\\Scripts"',
-                            "displayName": "Add conda to PATH",
-                        },
-                        {
-                            "script": lu(
-                                """call activate base
+                        ),
+                    },
+                },
+                {
+                    "script": lu(
+                        """start /wait "" %BUILD_ARTIFACTSTAGINGDIRECTORY%\\Miniforge.exe /InstallationType=JustMe /RegisterPython=0 /S /D=C:\\Miniforge"""
+                    ),
+                    "displayName": "Install Miniforge",
+                },
+                {
+                    "powershell": 'Write-Host "##vso[task.prependpath]C:\\Miniforge\\Scripts"',
+                    "displayName": "Add conda to PATH",
+                },
+                {
+                    "script": lu(
+                        """call activate base
 mamba.exe install -c conda-forge --yes --quiet conda-build pip ruamel.yaml anaconda-client"""
-                            ),
-                            "displayName": "Install conda-build, boa and activate environment",
+                    ),
+                    "displayName": "Install conda-build, boa and activate environment",
+                },
+                {
+                    "script": azure_win_preconfig_script,
+                    "displayName": "conda-forge build setup",
+                },
+                {
+                    "script": script,
+                    "env": {
+                        "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
+                        "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                        "PYTHONUNBUFFERED": 1,
+                        "VINCA_SKIP_UPLOAD": "1"
+                        if publish_mode == "platform-finalize"
+                        else "0",
+                    },
+                    "displayName": f"Build {' '.join([pkg for pkg in batch])}",
+                },
+            ]
+            if publish_mode == "platform-finalize":
+                artifact_name = get_batch_artifact_name("win-64", batch_key)
+                steps.extend(
+                    [
+                        {
+                            "script": get_windows_collect_script(batch_key),
+                            "displayName": "Collect built artifacts",
+                            "condition": "always()",
                         },
                         {
-                            "script": azure_win_preconfig_script,
-                            "displayName": "conda-forge build setup",
-                        },
-                        {
-                            "script": script,
-                            "env": {
-                                "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
-                                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                                "PYTHONUNBUFFERED": 1,
+                            "task": "PublishPipelineArtifact@1",
+                            "displayName": f"Publish workflow artifact {artifact_name}",
+                            "condition": "always()",
+                            "inputs": {
+                                "targetPath": f"$(Build.ArtifactStagingDirectory)/{artifact_name}",
+                                "artifact": artifact_name,
                             },
-                            "displayName": f"Build {' '.join([pkg for pkg in batch])}",
                         },
-                    ],
+                    ]
+                )
+
+            stage["jobs"].append(
+                {
+                    "job": batch_key,
+                    "variables": {"CONDA_BLD_PATH": "C:\\\\bld\\\\"},
+                    "steps": steps,
                 }
             )
 
@@ -392,6 +652,15 @@ mamba.exe install -c conda-forge --yes --quiet conda-build pip ruamel.yaml anaco
     azure_template["pr"] = "none"
     if azure_stages:
         azure_template["stages"] = azure_stages
+
+    if publish_mode == "platform-finalize" and azure_stages:
+        append_azure_publish_stage(
+            azure_template,
+            "win-64",
+            [stage["stage"] for stage in azure_stages],
+            azure_template.get("pool"),
+            windows=True,
+        )
 
     if not len(azure_stages):
         return
@@ -511,7 +780,7 @@ def main():
         if len(filtered):
             filtered_stages.append(filtered)
 
-    stages = batch_stages(filtered_stages)
+    stages = batch_stages(filtered_stages, args.batch_size)
     print(stages)
 
     with open("buildorder.txt", "w") as fo:
@@ -524,13 +793,21 @@ def main():
         fo.write("\n".join(order))
 
     if args.platform == "linux-64":
-        build_linux_pipeline(stages, args.trigger_branch, outfile="linux.yml")
+        build_linux_pipeline(
+            stages,
+            args.trigger_branch,
+            outfile="linux.yml",
+            target="linux-64",
+            publish_mode=args.publish_mode,
+        )
 
     if args.platform == "osx-64":
         build_osx_pipeline(
             stages,
             args.trigger_branch,
-            script=azure_osx_script,
+            script=azure_unix_script,
+            target="osx-64",
+            publish_mode=args.publish_mode,
         )
 
     if args.platform == "osx-arm64":
@@ -539,7 +816,9 @@ def main():
             args.trigger_branch,
             vm_imagename="macOS-11",
             outfile="osx_arm64.yml",
-            script=azure_osx_arm64_script,
+            script=azure_unix_script,
+            target="osx-arm64",
+            publish_mode=args.publish_mode,
         )
 
     if args.platform == "linux-aarch64":
@@ -560,8 +839,15 @@ def main():
             azure_template=aarch64_azure_template,
             docker_image="condaforge/linux-anvil-aarch64",
             outfile="linux_aarch64.yml",
+            target="linux-aarch64",
+            publish_mode=args.publish_mode,
         )
 
     # windows
     if args.platform == "win-64":
-        build_win_pipeline(stages, args.trigger_branch, outfile="win.yml")
+        build_win_pipeline(
+            stages,
+            args.trigger_branch,
+            outfile="win.yml",
+            publish_mode=args.publish_mode,
+        )
