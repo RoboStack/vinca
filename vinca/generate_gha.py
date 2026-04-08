@@ -396,7 +396,9 @@ def build_unix_pipeline(
                         "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
                         "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
                         "BUILD_TARGET": target,
-                        "VINCA_SKIP_UPLOAD": "1" if publish_mode == "platform-finalize" else "0",
+                        "VINCA_SKIP_UPLOAD": "1"
+                        if publish_mode == "platform-finalize"
+                        else "0",
                     },
                     "run": script,
                 },
@@ -530,7 +532,9 @@ def build_win_pipeline(
                         "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
                         "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
                         "PYTHONUNBUFFERED": 1,
-                        "VINCA_SKIP_UPLOAD": "1" if publish_mode == "platform-finalize" else "0",
+                        "VINCA_SKIP_UPLOAD": "1"
+                        if publish_mode == "platform-finalize"
+                        else "0",
                     },
                     "name": f"Build {' '.join([pkg for pkg in batch])}",
                 },

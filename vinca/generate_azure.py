@@ -261,15 +261,15 @@ def get_windows_collect_script(batch_key):
 
 def get_unix_publish_script(target):
     return lu(
-        f"""curl -fsSL https://pixi.sh/install.sh | bash
-export PATH="$HOME/.pixi/bin:$PATH"
+        f"""python3 -m pip install --user --disable-pip-version-check anaconda-client
+export PATH="$HOME/.local/bin:$PATH"
 shopt -s globstar nullglob
 files=("$(Pipeline.Workspace)"/artifacts/**/*.conda "$(Pipeline.Workspace)"/artifacts/**/*.tar.bz2)
 if (( ${{#files[@]}} == 0 )); then
     echo "No built packages found for {target}"
     exit 1
 fi
-pixi run upload "${{files[@]}}" --force"""
+anaconda -t "$ANACONDA_API_TOKEN" upload "${{files[@]}}" --force"""
     )
 
 
@@ -285,7 +285,9 @@ foreach ($file in $files) {
     )
 
 
-def append_azure_publish_stage(azure_template, target, stage_names, pool, windows=False):
+def append_azure_publish_stage(
+    azure_template, target, stage_names, pool, windows=False
+):
     publish_stage = {
         "stage": get_publish_stage_name(target),
         "dependsOn": stage_names,
@@ -384,11 +386,9 @@ def build_linux_pipeline(
         docker_image = "condaforge/linux-anvil-cos7-x86_64"
     azure_stages = []
 
-    stage_names = []
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
         stage = {"stage": stage_name, "jobs": []}
-        stage_names.append(stage_name)
 
         for batch in s:
             batch_key = f"stage_{i}_job_{len(stage['jobs'])}"
@@ -400,7 +400,9 @@ def build_linux_pipeline(
                         "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
                         "DOCKER_IMAGE": docker_image,
                         "BUILD_TARGET": target,
-                        "VINCA_SKIP_UPLOAD": "1" if publish_mode == "platform-finalize" else "0",
+                        "VINCA_SKIP_UPLOAD": "1"
+                        if publish_mode == "platform-finalize"
+                        else "0",
                     },
                     "displayName": f"Build {' '.join([pkg for pkg in batch])}",
                 }
@@ -446,7 +448,7 @@ def build_linux_pipeline(
         append_azure_publish_stage(
             azure_template,
             target,
-            stage_names,
+            [stage["stage"] for stage in azure_stages],
             azure_template.get("pool"),
         )
 
@@ -471,11 +473,9 @@ def build_osx_pipeline(
 
     azure_stages = []
 
-    stage_names = []
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
         stage = {"stage": stage_name, "jobs": []}
-        stage_names.append(stage_name)
 
         for batch in s:
             batch_key = f"stage_{i}_job_{len(stage['jobs'])}"
@@ -486,7 +486,9 @@ def build_osx_pipeline(
                         "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
                         "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
                         "BUILD_TARGET": target,
-                        "VINCA_SKIP_UPLOAD": "1" if publish_mode == "platform-finalize" else "0",
+                        "VINCA_SKIP_UPLOAD": "1"
+                        if publish_mode == "platform-finalize"
+                        else "0",
                     },
                     "displayName": f"Build {' '.join([pkg for pkg in batch])}",
                 }
@@ -532,7 +534,7 @@ def build_osx_pipeline(
         append_azure_publish_stage(
             azure_template,
             target,
-            stage_names,
+            [stage["stage"] for stage in azure_stages],
             azure_template.get("pool"),
         )
 
@@ -559,11 +561,9 @@ def build_win_pipeline(
         with open(".scripts/build_win.bat", "r") as fi:
             script = lu(fi.read())
 
-    stage_names = []
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
         stage = {"stage": stage_name, "jobs": []}
-        stage_names.append(stage_name)
 
         for batch in s:
             batch_key = f"stage_{i}_job_{len(stage['jobs'])}"
@@ -608,7 +608,9 @@ mamba.exe install -c conda-forge --yes --quiet conda-build pip ruamel.yaml anaco
                         "ANACONDA_API_TOKEN": "$(ANACONDA_API_TOKEN)",
                         "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
                         "PYTHONUNBUFFERED": 1,
-                        "VINCA_SKIP_UPLOAD": "1" if publish_mode == "platform-finalize" else "0",
+                        "VINCA_SKIP_UPLOAD": "1"
+                        if publish_mode == "platform-finalize"
+                        else "0",
                     },
                     "displayName": f"Build {' '.join([pkg for pkg in batch])}",
                 },
@@ -655,7 +657,7 @@ mamba.exe install -c conda-forge --yes --quiet conda-build pip ruamel.yaml anaco
         append_azure_publish_stage(
             azure_template,
             "win-64",
-            stage_names,
+            [stage["stage"] for stage in azure_stages],
             azure_template.get("pool"),
             windows=True,
         )

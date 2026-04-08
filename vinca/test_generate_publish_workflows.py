@@ -13,7 +13,7 @@ def test_generate_gha_platform_finalize_linux(tmp_path):
     outfile = tmp_path / "linux.yml"
 
     generate_gha.build_linux_pipeline(
-        [[ ["ros-demo-a"] ], [ ["ros-demo-b"] ]],
+        [[["ros-demo-a"]], [["ros-demo-b"]]],
         "buildbranch_linux",
         outfile=str(outfile),
         pipeline_name="build_linux64",
@@ -102,3 +102,32 @@ def test_generate_azure_platform_finalize_windows(tmp_path):
     publish_stage = stages[1]
     assert publish_stage["stage"] == "publish_win_64"
     assert publish_stage["jobs"][0]["steps"][0]["task"] == "DownloadPipelineArtifact@2"
+
+
+def test_generate_azure_platform_finalize_depends_on_emitted_stages_only(tmp_path):
+    outfile = tmp_path / "linux_skipped_stage.yml"
+
+    generate_azure.build_linux_pipeline(
+        [[], [["ros-demo-a"]]],
+        "buildbranch_linux",
+        outfile=str(outfile),
+        target="linux-64",
+        publish_mode="platform-finalize",
+    )
+
+    data = _load_yaml(outfile)
+    publish_stage = data["stages"][-1]
+    assert publish_stage["stage"] == "publish_linux_64"
+    assert publish_stage["dependsOn"] == ["stage_1"]
+
+
+def test_generate_azure_unix_publish_script_uses_anaconda_client():
+    script = generate_azure.get_unix_publish_script("linux-64")
+
+    assert (
+        "python3 -m pip install --user --disable-pip-version-check anaconda-client"
+        in script
+    )
+    assert 'anaconda -t "$ANACONDA_API_TOKEN" upload' in script
+    assert "pixi run upload" not in script
+    assert "pixi.sh/install.sh" not in script
