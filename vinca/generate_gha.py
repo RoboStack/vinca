@@ -75,6 +75,17 @@ def parse_command_line(argv):
         help="How many packages to build at most per stage",
     )
 
+    parser.add_argument(
+        "--publish-mode",
+        dest="publish_mode",
+        choices=["immediate", "platform-finalize"],
+        default="immediate",
+        help=(
+            "When set to platform-finalize, batch jobs only build and upload workflow "
+            "artifacts. A final job uploads the full platform payload after all batches pass."
+        ),
+    )
+
     arguments = parser.parse_args(argv[1:])
     config.parsed_args = arguments
     return arguments
@@ -241,6 +252,113 @@ def get_stage_name(batch):
     return " ".join(stage_name)
 
 
+def get_batch_artifact_name(target, batch_key):
+    return f"{normalize_name(target)}-{batch_key}"
+
+
+def get_build_artifact_path(target):
+    if target == "win-64":
+        return r"C:\\bld\\win-64"
+    return f"~/conda-bld/{target}"
+
+
+def get_publish_job_key(target):
+    return f"publish_{normalize_name(target)}"
+
+
+def get_github_publish_command(target):
+    if target == "win-64":
+        return lu(
+            f"""$files = Get-ChildItem -Path \"output/{target}\" -Recurse -Include *.conda,*.tar.bz2 -File
+if ($files.Count -eq 0) {{
+    throw \"No built packages found for {target}\"
+}}
+foreach ($file in $files) {{
+    pixi run upload \"$($file.FullName)\" --force
+}}"""
+        )
+
+    return lu(
+        f"""shopt -s globstar nullglob
+files=(output/{target}/**/*.conda output/{target}/**/*.tar.bz2)
+if (( ${{#files[@]}} == 0 )); then
+    echo \"No built packages found for {target}\"
+    exit 1
+fi
+pixi run upload "${{files[@]}}" --force"""
+    )
+
+
+def get_artifact_upload_step(target, batch_key):
+    return {
+        "name": f"Upload built artifacts for {batch_key}",
+        "if": "always()",
+        "uses": "actions/upload-artifact@v6",
+        "with": {
+            "name": get_batch_artifact_name(target, batch_key),
+            "path": get_build_artifact_path(target),
+            "if-no-files-found": "ignore",
+            "retention-days": 7,
+        },
+    }
+
+
+def add_publish_job(azure_template, target, runs_on, needs):
+    publish_job_key = get_publish_job_key(target)
+    steps = [
+        {
+            "name": "Checkout code",
+            "uses": "actions/checkout@v6",
+        },
+        {
+            "name": "Setup pixi",
+            "uses": "prefix-dev/setup-pixi@v0.9.4",
+            "with": {
+                "frozen": True,
+            },
+        },
+    ]
+
+    if target == "win-64":
+        steps.append(
+            {
+                "uses": "egor-tensin/cleanup-path@v5",
+                "with": {
+                    "dirs": "C:\\Program Files\\Git\\usr\\bin;C:\\Program Files\\Git\\bin;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\mingw64\\bin"
+                },
+            }
+        )
+
+    steps.extend(
+        [
+            {
+                "name": f"Download built artifacts for {target}",
+                "uses": "actions/download-artifact@v5",
+                "with": {
+                    "pattern": f"{normalize_name(target)}-*",
+                    "path": f"output/{target}",
+                    "merge-multiple": True,
+                },
+            },
+            {
+                "name": f"Publish built packages for {target}",
+                "run": get_github_publish_command(target),
+                "shell": "powershell" if target == "win-64" else "bash",
+                "env": {
+                    "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
+                },
+            },
+        ]
+    )
+
+    azure_template["jobs"][publish_job_key] = {
+        "name": f"Publish {target}",
+        "runs-on": runs_on,
+        "needs": needs,
+        "steps": steps,
+    }
+
+
 def build_unix_pipeline(
     stages,
     trigger_branch,
@@ -250,6 +368,7 @@ def build_unix_pipeline(
     outfile="linux.yml",
     pipeline_name="build_unix",
     target="",
+    publish_mode="immediate",
 ):
     blurb = {"jobs": {}, "name": pipeline_name}
 
@@ -266,32 +385,40 @@ def build_unix_pipeline(
             batch_keys.append(batch_key)
 
             pretty_stage_name = get_stage_name(batch)
+            steps = [
+                {
+                    "name": "Checkout code",
+                    "uses": "actions/checkout@v6",
+                },
+                {
+                    "name": f"Build {' '.join([pkg for pkg in batch])}",
+                    "env": {
+                        "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
+                        "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                        "BUILD_TARGET": target,
+                        "VINCA_SKIP_UPLOAD": "1" if publish_mode == "platform-finalize" else "0",
+                    },
+                    "run": script,
+                },
+            ]
+            if publish_mode == "platform-finalize":
+                steps.append(get_artifact_upload_step(target, batch_key))
+
             azure_template["jobs"][batch_key] = {
                 "name": pretty_stage_name,
                 "runs-on": runs_on,
                 "strategy": {"fail-fast": False},
                 "needs": prev_batch_keys,
-                "steps": [
-                    {
-                        "name": "Checkout code",
-                        "uses": "actions/checkout@v6",
-                    },
-                    {
-                        "name": f"Build {' '.join([pkg for pkg in batch])}",
-                        "env": {
-                            "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
-                            "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                            "BUILD_TARGET": target,  # use for cross-compilation
-                        },
-                        "run": script,
-                    },
-                ],
+                "steps": steps,
             }
 
         prev_batch_keys = batch_keys
 
     if len(azure_template.get("jobs", [])) == 0:
         return
+
+    if publish_mode == "platform-finalize" and prev_batch_keys:
+        add_publish_job(azure_template, target, runs_on, prev_batch_keys)
 
     azure_template["on"] = {"push": {"branches": [trigger_branch]}}
 
@@ -306,6 +433,7 @@ def build_linux_pipeline(
     runs_on="ubuntu-latest",
     outfile="linux.yml",
     pipeline_name="build_linux",
+    publish_mode="immediate",
 ):
     build_unix_pipeline(
         stages,
@@ -316,6 +444,7 @@ def build_linux_pipeline(
         outfile=outfile,
         pipeline_name=pipeline_name,
         target="linux-64",
+        publish_mode=publish_mode,
     )
 
 
@@ -328,6 +457,7 @@ def build_osx_pipeline(
     script=azure_unix_script,
     target="osx-64",
     pipeline_name="build_osx64",
+    publish_mode="immediate",
 ):
     build_unix_pipeline(
         stages,
@@ -338,10 +468,17 @@ def build_osx_pipeline(
         outfile=outfile,
         target=target,
         pipeline_name=pipeline_name,
+        publish_mode=publish_mode,
     )
 
 
-def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template=None):
+def build_win_pipeline(
+    stages,
+    trigger_branch,
+    outfile="win.yml",
+    azure_template=None,
+    publish_mode="immediate",
+):
     vm_imagename = "windows-2022"
     # Build Win pipeline
     blurb = {"jobs": {}, "name": "build_win"}
@@ -365,6 +502,42 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
             batch_keys.append(batch_key)
 
             pretty_stage_name = get_stage_name(batch)
+            steps = [
+                {"name": "Checkout code", "uses": "actions/checkout@v6"},
+                {
+                    "name": "Setup pixi",
+                    "uses": "prefix-dev/setup-pixi@v0.9.4",
+                    "with": {
+                        "pixi-version": "v0.63.2",
+                        "cache": "true",
+                    },
+                },
+                {
+                    "uses": "egor-tensin/cleanup-path@v5",
+                    "with": {
+                        "dirs": "C:\\Program Files\\Git\\usr\\bin;C:\\Program Files\\Git\\bin;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\mingw64\\bin"
+                    },
+                },
+                {
+                    "shell": "cmd",
+                    "run": azure_win_preconfig_script,
+                    "name": "conda-forge build setup",
+                },
+                {
+                    "shell": "cmd",
+                    "run": script,
+                    "env": {
+                        "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
+                        "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                        "PYTHONUNBUFFERED": 1,
+                        "VINCA_SKIP_UPLOAD": "1" if publish_mode == "platform-finalize" else "0",
+                    },
+                    "name": f"Build {' '.join([pkg for pkg in batch])}",
+                },
+            ]
+            if publish_mode == "platform-finalize":
+                steps.append(get_artifact_upload_step("win-64", batch_key))
+
             azure_template["jobs"][batch_key] = {
                 "name": pretty_stage_name,
                 "runs-on": vm_imagename,
@@ -374,44 +547,16 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                     "CONDA_BLD_PATH": "C:\\\\bld\\\\",
                     "VINCA_CUSTOM_CMAKE_BUILD_DIR": "C:\\\\x\\\\",
                 },
-                "steps": [
-                    {"name": "Checkout code", "uses": "actions/checkout@v6"},
-                    {
-                        "name": "Setup pixi",
-                        "uses": "prefix-dev/setup-pixi@v0.9.4",
-                        "with": {
-                            "pixi-version": "v0.63.2",
-                            "cache": "true",
-                        },
-                    },
-                    {
-                        "uses": "egor-tensin/cleanup-path@v5",
-                        "with": {
-                            "dirs": "C:\\Program Files\\Git\\usr\\bin;C:\\Program Files\\Git\\bin;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\mingw64\\bin"
-                        },
-                    },
-                    {
-                        "shell": "cmd",
-                        "run": azure_win_preconfig_script,
-                        "name": "conda-forge build setup",
-                    },
-                    {
-                        "shell": "cmd",
-                        "run": script,
-                        "env": {
-                            "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
-                            "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                            "PYTHONUNBUFFERED": 1,
-                        },
-                        "name": f"Build {' '.join([pkg for pkg in batch])}",
-                    },
-                ],
+                "steps": steps,
             }
 
         prev_batch_keys = batch_keys
 
     if len(azure_template.get("jobs", [])) == 0:
         return
+
+    if publish_mode == "platform-finalize" and prev_batch_keys:
+        add_publish_job(azure_template, "win-64", vm_imagename, prev_batch_keys)
 
     azure_template["on"] = {"push": {"branches": [trigger_branch]}}
 
@@ -557,12 +702,14 @@ def main():
             args.trigger_branch,
             outfile="linux.yml",
             pipeline_name="build_linux64",
+            publish_mode=args.publish_mode,
         )
 
     if args.platform == "osx-64":
         build_osx_pipeline(
             stages,
             args.trigger_branch,
+            publish_mode=args.publish_mode,
         )
 
     if args.platform == "osx-arm64":
@@ -574,6 +721,7 @@ def main():
             script=azure_unix_script,
             target=platform,
             pipeline_name="build_osx_arm64",
+            publish_mode=args.publish_mode,
         )
 
     if args.platform == "linux-aarch64":
@@ -585,11 +733,17 @@ def main():
             outfile="linux_aarch64.yml",
             target=platform,
             pipeline_name="build_linux_aarch64",
+            publish_mode=args.publish_mode,
         )
 
     # windows
     if args.platform == "win-64":
-        build_win_pipeline(stages, args.trigger_branch, outfile="win.yml")
+        build_win_pipeline(
+            stages,
+            args.trigger_branch,
+            outfile="win.yml",
+            publish_mode=args.publish_mode,
+        )
 
     if args.platform == "emscripten-wasm32":
         build_unix_pipeline(
@@ -598,4 +752,5 @@ def main():
             outfile="emscripten_wasm32.yml",
             pipeline_name="build_emscripten_wasm32",
             target="emscripten-wasm32",
+            publish_mode=args.publish_mode,
         )
