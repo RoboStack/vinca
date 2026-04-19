@@ -75,6 +75,13 @@ def parse_command_line(argv):
         help="How many packages to build at most per stage",
     )
 
+    parser.add_argument(
+        "--prefix-channel",
+        dest="prefix_channel",
+        default=None,
+        help="Publish to this prefix.dev channel using trusted publishing (replaces anaconda upload)",
+    )
+
     arguments = parser.parse_args(argv[1:])
     config.parsed_args = arguments
     return arguments
@@ -250,6 +257,7 @@ def build_unix_pipeline(
     outfile="linux.yml",
     pipeline_name="build_unix",
     target="",
+    prefix_channel=None,
 ):
     blurb = {"jobs": {}, "name": pipeline_name}
 
@@ -266,27 +274,62 @@ def build_unix_pipeline(
             batch_keys.append(batch_key)
 
             pretty_stage_name = get_stage_name(batch)
-            azure_template["jobs"][batch_key] = {
+
+            build_env = {
+                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                "BUILD_TARGET": target,
+            }
+            if prefix_channel:
+                build_env["PREFIX_UPLOAD_CHANNEL"] = prefix_channel
+            else:
+                build_env["ANACONDA_API_TOKEN"] = "${{ secrets.ANACONDA_API_TOKEN }}"
+
+            steps = [
+                {
+                    "name": "Checkout code",
+                    "uses": "actions/checkout@v6",
+                },
+                {
+                    "name": f"Build {' '.join([pkg for pkg in batch])}",
+                    "env": build_env,
+                    "run": script,
+                },
+            ]
+
+            if prefix_channel:
+                target_glob = f"{target}*" if target else "*"
+                upload_script = lu(
+                    f"if compgen -G \"$HOME/conda-bld/{target_glob}/*.conda\" > /dev/null; then\n"
+                    f"    ~/.pixi/bin/rattler-build upload prefix"
+                    f" --channel {prefix_channel}"
+                    f" --generate-attestation"
+                    f" $HOME/conda-bld/{target_glob}/*.conda\n"
+                    f"else\n"
+                    f"    echo \"No packages to upload to prefix.dev\"\n"
+                    f"fi\n"
+                )
+                steps.append(
+                    {
+                        "name": "Upload to prefix.dev",
+                        "run": upload_script,
+                    }
+                )
+
+            job = {
                 "name": pretty_stage_name,
                 "runs-on": runs_on,
                 "strategy": {"fail-fast": False},
                 "needs": prev_batch_keys,
-                "steps": [
-                    {
-                        "name": "Checkout code",
-                        "uses": "actions/checkout@v6",
-                    },
-                    {
-                        "name": f"Build {' '.join([pkg for pkg in batch])}",
-                        "env": {
-                            "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
-                            "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                            "BUILD_TARGET": target,  # use for cross-compilation
-                        },
-                        "run": script,
-                    },
-                ],
+                "steps": steps,
             }
+
+            if prefix_channel:
+                job["permissions"] = {
+                    "id-token": "write",
+                    "attestations": "write",
+                }
+
+            azure_template["jobs"][batch_key] = job
 
         prev_batch_keys = batch_keys
 
@@ -306,6 +349,7 @@ def build_linux_pipeline(
     runs_on="ubuntu-latest",
     outfile="linux.yml",
     pipeline_name="build_linux",
+    prefix_channel=None,
 ):
     build_unix_pipeline(
         stages,
@@ -316,6 +360,7 @@ def build_linux_pipeline(
         outfile=outfile,
         pipeline_name=pipeline_name,
         target="linux-64",
+        prefix_channel=prefix_channel,
     )
 
 
@@ -328,6 +373,7 @@ def build_osx_pipeline(
     script=azure_unix_script,
     target="osx-64",
     pipeline_name="build_osx64",
+    prefix_channel=None,
 ):
     build_unix_pipeline(
         stages,
@@ -338,10 +384,13 @@ def build_osx_pipeline(
         outfile=outfile,
         target=target,
         pipeline_name=pipeline_name,
+        prefix_channel=prefix_channel,
     )
 
 
-def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template=None):
+def build_win_pipeline(
+    stages, trigger_branch, outfile="win.yml", azure_template=None, prefix_channel=None
+):
     vm_imagename = "windows-2022"
     # Build Win pipeline
     blurb = {"jobs": {}, "name": "build_win"}
@@ -365,7 +414,61 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
             batch_keys.append(batch_key)
 
             pretty_stage_name = get_stage_name(batch)
-            azure_template["jobs"][batch_key] = {
+
+            build_env = {
+                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                "PYTHONUNBUFFERED": 1,
+            }
+            if prefix_channel:
+                build_env["PREFIX_UPLOAD_CHANNEL"] = prefix_channel
+            else:
+                build_env["ANACONDA_API_TOKEN"] = "${{ secrets.ANACONDA_API_TOKEN }}"
+
+            steps = [
+                {"name": "Checkout code", "uses": "actions/checkout@v6"},
+                {
+                    "name": "Setup pixi",
+                    "uses": "prefix-dev/setup-pixi@v0.9.4",
+                    "with": {
+                        "pixi-version": "v0.63.2",
+                        "cache": "true",
+                    },
+                },
+                {
+                    "uses": "egor-tensin/cleanup-path@v5",
+                    "with": {
+                        "dirs": "C:\\Program Files\\Git\\usr\\bin;C:\\Program Files\\Git\\bin;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\mingw64\\bin"
+                    },
+                },
+                {
+                    "shell": "cmd",
+                    "run": azure_win_preconfig_script,
+                    "name": "conda-forge build setup",
+                },
+                {
+                    "shell": "cmd",
+                    "run": script,
+                    "env": build_env,
+                    "name": f"Build {' '.join([pkg for pkg in batch])}",
+                },
+            ]
+
+            if prefix_channel:
+                upload_script = lu(
+                    f"pixi run rattler-build upload prefix"
+                    f" --channel {prefix_channel}"
+                    f" --generate-attestation"
+                    f" C:\\bld\\win-64\\*.conda\n"
+                )
+                steps.append(
+                    {
+                        "shell": "cmd",
+                        "name": "Upload to prefix.dev",
+                        "run": upload_script,
+                    }
+                )
+
+            job = {
                 "name": pretty_stage_name,
                 "runs-on": vm_imagename,
                 "strategy": {"fail-fast": False},
@@ -374,39 +477,16 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                     "CONDA_BLD_PATH": "C:\\\\bld\\\\",
                     "VINCA_CUSTOM_CMAKE_BUILD_DIR": "C:\\\\x\\\\",
                 },
-                "steps": [
-                    {"name": "Checkout code", "uses": "actions/checkout@v6"},
-                    {
-                        "name": "Setup pixi",
-                        "uses": "prefix-dev/setup-pixi@v0.9.4",
-                        "with": {
-                            "pixi-version": "v0.63.2",
-                            "cache": "true",
-                        },
-                    },
-                    {
-                        "uses": "egor-tensin/cleanup-path@v5",
-                        "with": {
-                            "dirs": "C:\\Program Files\\Git\\usr\\bin;C:\\Program Files\\Git\\bin;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\mingw64\\bin"
-                        },
-                    },
-                    {
-                        "shell": "cmd",
-                        "run": azure_win_preconfig_script,
-                        "name": "conda-forge build setup",
-                    },
-                    {
-                        "shell": "cmd",
-                        "run": script,
-                        "env": {
-                            "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
-                            "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                            "PYTHONUNBUFFERED": 1,
-                        },
-                        "name": f"Build {' '.join([pkg for pkg in batch])}",
-                    },
-                ],
+                "steps": steps,
             }
+
+            if prefix_channel:
+                job["permissions"] = {
+                    "id-token": "write",
+                    "attestations": "write",
+                }
+
+            azure_template["jobs"][batch_key] = job
 
         prev_batch_keys = batch_keys
 
@@ -551,18 +631,22 @@ def main():
 
         fo.write("\n".join(order))
 
+    prefix_channel = args.prefix_channel
+
     if args.platform == "linux-64":
         build_unix_pipeline(
             stages,
             args.trigger_branch,
             outfile="linux.yml",
             pipeline_name="build_linux64",
+            prefix_channel=prefix_channel,
         )
 
     if args.platform == "osx-64":
         build_osx_pipeline(
             stages,
             args.trigger_branch,
+            prefix_channel=prefix_channel,
         )
 
     if args.platform == "osx-arm64":
@@ -574,6 +658,7 @@ def main():
             script=azure_unix_script,
             target=platform,
             pipeline_name="build_osx_arm64",
+            prefix_channel=prefix_channel,
         )
 
     if args.platform == "linux-aarch64":
@@ -585,11 +670,17 @@ def main():
             outfile="linux_aarch64.yml",
             target=platform,
             pipeline_name="build_linux_aarch64",
+            prefix_channel=prefix_channel,
         )
 
     # windows
     if args.platform == "win-64":
-        build_win_pipeline(stages, args.trigger_branch, outfile="win.yml")
+        build_win_pipeline(
+            stages,
+            args.trigger_branch,
+            outfile="win.yml",
+            prefix_channel=prefix_channel,
+        )
 
     if args.platform == "emscripten-wasm32":
         build_unix_pipeline(
@@ -598,4 +689,5 @@ def main():
             outfile="emscripten_wasm32.yml",
             pipeline_name="build_emscripten_wasm32",
             target="emscripten-wasm32",
+            prefix_channel=prefix_channel,
         )
