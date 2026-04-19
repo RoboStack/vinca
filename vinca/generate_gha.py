@@ -299,13 +299,13 @@ def build_unix_pipeline(
             if prefix_channel:
                 target_glob = f"{target}*" if target else "*"
                 upload_script = lu(
-                    f"if compgen -G \"$HOME/conda-bld/{target_glob}/*.conda\" > /dev/null; then\n"
+                    f'if compgen -G "$HOME/conda-bld/{target_glob}/*.conda" > /dev/null; then\n'
                     f"    ~/.pixi/bin/rattler-build upload prefix"
                     f" --channel {prefix_channel}"
                     f" --generate-attestation"
                     f" $HOME/conda-bld/{target_glob}/*.conda\n"
                     f"else\n"
-                    f"    echo \"No packages to upload to prefix.dev\"\n"
+                    f'    echo "No packages to upload to prefix.dev"\n'
                     f"fi\n"
                 )
                 steps.append(
