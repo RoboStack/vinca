@@ -266,27 +266,39 @@ def build_unix_pipeline(
             batch_keys.append(batch_key)
 
             pretty_stage_name = get_stage_name(batch)
-            azure_template["jobs"][batch_key] = {
+
+            build_env = {
+                "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
+                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                "BUILD_TARGET": target,
+            }
+
+            steps = [
+                {
+                    "name": "Checkout code",
+                    "uses": "actions/checkout@v6",
+                },
+                {
+                    "name": f"Build {' '.join([pkg for pkg in batch])}",
+                    "env": build_env,
+                    "run": script,
+                },
+            ]
+
+            job = {
                 "name": pretty_stage_name,
                 "runs-on": runs_on,
                 "strategy": {"fail-fast": False},
                 "needs": prev_batch_keys,
-                "steps": [
-                    {
-                        "name": "Checkout code",
-                        "uses": "actions/checkout@v6",
-                    },
-                    {
-                        "name": f"Build {' '.join([pkg for pkg in batch])}",
-                        "env": {
-                            "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
-                            "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                            "BUILD_TARGET": target,  # use for cross-compilation
-                        },
-                        "run": script,
-                    },
-                ],
+                "steps": steps,
             }
+
+            job["permissions"] = {
+                "id-token": "write",
+                "attestations": "write",
+            }
+
+            azure_template["jobs"][batch_key] = job
 
         prev_batch_keys = batch_keys
 
@@ -365,7 +377,43 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
             batch_keys.append(batch_key)
 
             pretty_stage_name = get_stage_name(batch)
-            azure_template["jobs"][batch_key] = {
+
+            build_env = {
+                "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
+                "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
+                "PYTHONUNBUFFERED": 1,
+            }
+
+            steps = [
+                {"name": "Checkout code", "uses": "actions/checkout@v6"},
+                {
+                    "name": "Setup pixi",
+                    "uses": "prefix-dev/setup-pixi@v0.9.4",
+                    "with": {
+                        "pixi-version": "v0.63.2",
+                        "cache": "true",
+                    },
+                },
+                {
+                    "uses": "egor-tensin/cleanup-path@v5",
+                    "with": {
+                        "dirs": "C:\\Program Files\\Git\\usr\\bin;C:\\Program Files\\Git\\bin;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\mingw64\\bin"
+                    },
+                },
+                {
+                    "shell": "cmd",
+                    "run": azure_win_preconfig_script,
+                    "name": "conda-forge build setup",
+                },
+                {
+                    "shell": "cmd",
+                    "run": script,
+                    "env": build_env,
+                    "name": f"Build {' '.join([pkg for pkg in batch])}",
+                },
+            ]
+
+            job = {
                 "name": pretty_stage_name,
                 "runs-on": vm_imagename,
                 "strategy": {"fail-fast": False},
@@ -374,39 +422,15 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                     "CONDA_BLD_PATH": "C:\\\\bld\\\\",
                     "VINCA_CUSTOM_CMAKE_BUILD_DIR": "C:\\\\x\\\\",
                 },
-                "steps": [
-                    {"name": "Checkout code", "uses": "actions/checkout@v6"},
-                    {
-                        "name": "Setup pixi",
-                        "uses": "prefix-dev/setup-pixi@v0.9.4",
-                        "with": {
-                            "pixi-version": "v0.63.2",
-                            "cache": "true",
-                        },
-                    },
-                    {
-                        "uses": "egor-tensin/cleanup-path@v5",
-                        "with": {
-                            "dirs": "C:\\Program Files\\Git\\usr\\bin;C:\\Program Files\\Git\\bin;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\mingw64\\bin"
-                        },
-                    },
-                    {
-                        "shell": "cmd",
-                        "run": azure_win_preconfig_script,
-                        "name": "conda-forge build setup",
-                    },
-                    {
-                        "shell": "cmd",
-                        "run": script,
-                        "env": {
-                            "ANACONDA_API_TOKEN": "${{ secrets.ANACONDA_API_TOKEN }}",
-                            "CURRENT_RECIPES": f"{' '.join([pkg for pkg in batch])}",
-                            "PYTHONUNBUFFERED": 1,
-                        },
-                        "name": f"Build {' '.join([pkg for pkg in batch])}",
-                    },
-                ],
+                "steps": steps,
             }
+
+            job["permissions"] = {
+                "id-token": "write",
+                "attestations": "write",
+            }
+
+            azure_template["jobs"][batch_key] = job
 
         prev_batch_keys = batch_keys
 
