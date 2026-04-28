@@ -8,7 +8,7 @@ import stat
 from ruamel import yaml
 from pathlib import Path
 
-from vinca.utils import get_pkg_build_number
+from vinca.utils import get_pkg_build_number, get_pkg_additional_info
 
 TEMPLATE = """\
 # yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
@@ -150,6 +150,17 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
             with open(recipe_dir / "recipe.yaml", "w") as stream:
                 file.dump(meta, stream)
 
+            # Write variants.yaml if this package has variant overrides in pkg_additional_info
+            variant_overrides = get_pkg_additional_info(
+                o["package"]["name"], vinca_conf
+            ).get("variant_overrides", {})
+            if variant_overrides:
+                variant_file = yaml.YAML()
+                variant_file.width = 4096
+                variant_file.indent(mapping=2, sequence=4, offset=2)
+                with open(recipe_dir / "variants.yaml", "w") as stream:
+                    variant_file.dump(dict(variant_overrides), stream)
+
             if meta.get("source") and meta["source"].get("patches"):
                 for p in meta["source"]["patches"]:
                     patch_dir, _ = os.path.split(p)
@@ -167,7 +178,6 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
                 # Generate the build script directly in the recipe directory
                 # Get additional CMake arguments from pkg_additional_info
                 from vinca.utils import (
-                    get_pkg_additional_info,
                     ensure_name_is_without_distro_prefix_and_with_underscores,
                 )
 
