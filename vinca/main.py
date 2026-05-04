@@ -251,19 +251,24 @@ def read_vinca_yaml(filepath):
 
 
 def read_snapshot(vinca_conf):
-    if "rosdistro_snapshot" not in vinca_conf:
+    snapshot_key = "rosdistro_snapshot"
+    additional_key = "rosdistro_additional_recipes"
+
+    if snapshot_key not in vinca_conf and not vinca_conf.get(additional_key):
         return None, None
 
     yaml = ruamel.yaml.YAML()
-    # load primary snapshot
-    snapshot = yaml.load(open(vinca_conf["rosdistro_snapshot"], "r")) or {}
-    # if additional snapshot file specified, load and merge
-    additional_key = "rosdistro_additional_recipes"
+
+    snapshot = None
+    if snapshot_key in vinca_conf:
+        snapshot = yaml.load(open(vinca_conf[snapshot_key], "r")) or {}
+
     additional = None
-    if additional_key in vinca_conf and vinca_conf[additional_key]:
+    if vinca_conf.get(additional_key):
         additional = yaml.load(open(vinca_conf[additional_key], "r")) or {}
-        # merge additional entries, overriding or adding
-        snapshot.update(additional)
+        if snapshot is not None:
+            # merge additional entries, overriding or adding
+            snapshot.update(additional)
 
     return snapshot, additional
 
@@ -1172,34 +1177,17 @@ def main():
 
             fns = list(fn)
             for fn in fns:
-                selected_bn = None
-
                 print(f"Fetching repodata: {fn}")
                 repodata = get_repodata(fn, get_conda_subdir())
-                # currently we don't check the build numbers of local repodatas,
-                # only URLs
-                if "://" in fn:
-                    selected_bn = vinca_conf.get("build_number", 0)
 
                 all_pkgs = repodata.get("packages", {})
                 all_pkgs.update(repodata.get("packages.conda", {}))
                 for _, pkg in all_pkgs.items():
-                    is_built = False
-                    if selected_bn is not None:
-                        pkg_build_number = get_pkg_build_number(
-                            selected_bn, pkg["name"], vinca_conf
-                        )
-                        if pkg["build_number"] == pkg_build_number:
-                            is_built = True
+                    print(f"Skipping {pkg['name']}")
+                    if vinca_conf["trigger_new_versions"]:
+                        skip_built_packages.add((pkg["name"], pkg["version"]))
                     else:
-                        is_built = True
-
-                    if is_built:
-                        print(f"Skipping {pkg['name']}")
-                        if vinca_conf["trigger_new_versions"]:
-                            skip_built_packages.add((pkg["name"], pkg["version"]))
-                        else:
-                            skip_built_packages.add(pkg["name"])
+                        skip_built_packages.add(pkg["name"])
 
                 vinca_conf["skip_built_packages"] = skip_built_packages
         else:
