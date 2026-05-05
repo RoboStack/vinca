@@ -1,6 +1,6 @@
 import os
-from urllib.request import urlopen
 from vinca import config
+from vinca import http as vinca_http
 
 map_platform_python_to_conda = {
     "linux-64": "linux",
@@ -22,7 +22,7 @@ def get_conda_index(vinca_conf, base_dir):
         if os.path.isfile(ip):
             rawdata = yaml.load(open(ip, "r"))
         else:
-            rawdata = yaml.load(urlopen(i))
+            rawdata = yaml.load(vinca_http.fetch(i).text)
         conda_index.append(rawdata)
     return conda_index
 

@@ -3,7 +3,8 @@ import hashlib
 import os
 import time
 import json
-import requests
+
+from vinca import http as vinca_http
 
 
 class folded_unicode(str):
@@ -60,7 +61,7 @@ def get_repodata(url_or_path, platform=None):
             with open(fn) as fi:
                 return json.load(fi)
 
-    repodata = requests.get(url_or_path)
+    repodata = vinca_http.fetch(url_or_path)
     content = repodata.content
     with open(fn, "w") as fcache:
         fcache.write(content.decode("utf-8"))

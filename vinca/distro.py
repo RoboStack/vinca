@@ -1,9 +1,10 @@
 import os
-import urllib.request
 
 from rosdistro import get_cached_distribution, get_index, get_index_url
 from rosdistro.dependency_walker import DependencyWalker
 from rosdistro.manifest_provider import get_release_tag
+
+from vinca import http as vinca_http
 
 
 class Distro(object):
@@ -209,9 +210,8 @@ class Distro(object):
             return self._additional_xml_cache[raw_url]
 
         try:
-            with urllib.request.urlopen(raw_url) as resp:
-                xml_content = resp.read().decode("utf-8")
-                self._additional_xml_cache[raw_url] = xml_content
-                return xml_content
+            xml_content = vinca_http.fetch(raw_url).text
+            self._additional_xml_cache[raw_url] = xml_content
+            return xml_content
         except Exception as e:
             raise RuntimeError(f"Failed to fetch package.xml from {raw_url}: {e}")
