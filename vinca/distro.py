@@ -129,6 +129,9 @@ class Distro(object):
             if "tag" in self.snapshot[pkg_name].keys():
                 tag_or_rev = self.snapshot[pkg_name].get("tag", None)
                 ref_type = "tag"
+            elif "branch" in self.snapshot[pkg_name].keys():
+                tag_or_rev = self.snapshot[pkg_name].get("branch", None)
+                ref_type = "branch"
             else:
                 tag_or_rev = self.snapshot[pkg_name].get("rev", None)
                 ref_type = "rev"
@@ -200,8 +203,8 @@ class Distro(object):
             raise RuntimeError(f"Cannot handle non-GitHub URL: {raw_url_base}")
         # Extract owner/repo
         owner_repo = raw_url_base.split("github.com/")[-1]
-        # Use rev if available, otherwise fallback to tag
-        ref = pkg_info.get("rev") or pkg_info.get("tag")
+        # Use rev if available, otherwise fallback to tag, otherwise branch
+        ref = pkg_info.get("rev") or pkg_info.get("tag") or pkg_info.get("branch")
         xml_name = pkg_info.get("package_xml_name", "package.xml")
         additional_folder = pkg_info.get("additional_folder", "")
         path = f"{additional_folder}/{xml_name}" if additional_folder else xml_name

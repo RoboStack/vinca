@@ -413,6 +413,21 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         )
         resolved_setuptools = resolve_pkgname("python-setuptools", vinca_conf, distro)
         output["requirements"]["host"].extend(resolved_setuptools)
+    elif pkg.get_build_type() in ["ament_cargo"]:
+        # ament_cargo currently supports unix only — the .bat path will print a
+        # benign "Unknown build script template" warning during recipe gen and
+        # is unreachable at build time on linux/macos.
+        output["build"]["script"] = (
+            "${{ '$RECIPE_DIR/build_ament_cargo.sh' if unix else '%RECIPE_DIR%\\\\bld_ament_cargo.bat' }}"
+        )
+        # Rust toolchain + cargo-ament-build wrapper must be on PATH at build time.
+        # cargo-ament-build is packaged separately (no package.xml upstream, so
+        # it cannot flow through vinca itself) — see the hand-authored
+        # ros-<distro>-cargo-ament-build recipe.
+        output["requirements"]["build"].append("rust")
+        output["requirements"]["build"].append(
+            f"ros-{distro.name}-cargo-ament-build"
+        )
     else:
         print(f"Unknown build type for {pkg_shortname}: {pkg.get_build_type()}")
         return None
