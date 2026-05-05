@@ -1,9 +1,11 @@
 import os
-import urllib.request
+import urllib.parse
 
 from rosdistro import get_cached_distribution, get_index, get_index_url
 from rosdistro.dependency_walker import DependencyWalker
 from rosdistro.manifest_provider import get_release_tag
+
+from vinca import http as vinca_http
 
 
 class Distro(object):
@@ -202,16 +204,23 @@ class Distro(object):
         ref = pkg_info.get("rev") or pkg_info.get("tag")
         xml_name = pkg_info.get("package_xml_name", "package.xml")
         additional_folder = pkg_info.get("additional_folder", "")
-        if additional_folder != "":
-            additional_folder = additional_folder + "/"
-        raw_url = f"https://raw.githubusercontent.com/{owner_repo}/{ref}/{additional_folder}{xml_name}"
-        if raw_url in self._additional_xml_cache:
-            return self._additional_xml_cache[raw_url]
+        path = f"{additional_folder}/{xml_name}" if additional_folder else xml_name
+        # Use the contents API so GitHub App installation tokens work.
+        # raw.githubusercontent.com does not reliably accept App tokens.
+        api_url = (
+            f"https://api.github.com/repos/{owner_repo}/contents/"
+            f"{urllib.parse.quote(path)}"
+            f"?ref={urllib.parse.quote(ref, safe='')}"
+        )
+        if api_url in self._additional_xml_cache:
+            return self._additional_xml_cache[api_url]
 
         try:
-            with urllib.request.urlopen(raw_url) as resp:
-                xml_content = resp.read().decode("utf-8")
-                self._additional_xml_cache[raw_url] = xml_content
-                return xml_content
+            resp = vinca_http.fetch(
+                api_url, headers={"Accept": "application/vnd.github.raw"}
+            )
+            xml_content = resp.text
+            self._additional_xml_cache[api_url] = xml_content
+            return xml_content
         except Exception as e:
-            raise RuntimeError(f"Failed to fetch package.xml from {raw_url}: {e}")
+            raise RuntimeError(f"Failed to fetch package.xml from {api_url}: {e}")
