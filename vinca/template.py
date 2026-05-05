@@ -249,6 +249,7 @@ def generate_build_script_for_recipe(
         "bld_ament_cmake.bat": "templates/bld_ament_cmake.bat.in",
         "build_ament_python.sh": "templates/build_ament_python.sh.in",
         "bld_ament_python.bat": "templates/bld_ament_python.bat.in",
+        "build_ament_cargo.sh": "templates/build_ament_cargo.sh.in",
         "build_catkin.sh": "templates/build_catkin.sh.in",
         "bld_catkin.bat": "templates/bld_catkin.bat.in",
         "bld_colcon_merge.bat": "templates/bld_colcon_merge.bat.in",
