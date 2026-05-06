@@ -91,3 +91,17 @@ ruff = "*"
 
 [tool.pixi.pypi-dependencies]
 vinca = { path = ".", editable = true }
+
+[tool.pixi.feature.dev.dependencies]
+mypy = "*"
+
+[tool.pixi.environments]
+dev = ["dev"]
+
+[tool.mypy]
+strict = true
+files = ["vinca/pixi_manifest.py", "vinca/test_pixi_manifest.py"]
+
+[[tool.mypy.overrides]]
+module = ["catkin_pkg.*"]
+ignore_missing_imports = true

@@ -1,0 +1,30 @@
+[package]
+name = "with_deps"
+version = "0.1.0"
+description = "Demonstrates dep mapping"
+license = "MIT"
+authors = ["Bob <bob@example.com>"]
+
+[package.build.backend]
+name = "pixi-build-cmake"
+version = "*"
+
+# host-only → build_depends (recipe host:)
+[package.host-dependencies]
+cmake = "*"
+ros-kilted-ament-cmake = "*"
+
+# run-only → exec_depends (recipe run:)
+[package.run-dependencies]
+psutil = "*"
+ros-kilted-rclcpp = "*"
+
+# Items present in BOTH host and run get treated as <depend> equivalents.
+# (Encoded by listing the same key in both tables above where needed.)
+
+[package.metadata.ros]
+build_type = "ament_cmake"
+
+[package.metadata.ros.test_dependencies]
+pytest = "*"
+ros-kilted-ament-pytest = ">=0.14"

@@ -1,11 +1,13 @@
 import os
 import urllib.parse
 
+import catkin_pkg.package
 from rosdistro import get_cached_distribution, get_index, get_index_url
 from rosdistro.dependency_walker import DependencyWalker
 from rosdistro.manifest_provider import get_release_tag
 
 from vinca import http as vinca_http
+from vinca.pixi_manifest import parse_additional_manifest
 
 
 class Distro(object):
@@ -64,34 +66,24 @@ class Distro(object):
             print(f"{pkg} not in available packages anymore")
             return dependencies
 
-        # if pkg comes from additional_packages_snapshot, extract from its package.xml
+        # if pkg comes from additional_packages_snapshot, extract from its manifest
         if (
             self.additional_packages_snapshot
             and pkg in self.additional_packages_snapshot
         ):
-            pkg_info = self.additional_packages_snapshot[pkg]
-            xml_str = self.get_package_xml_for_additional_package(pkg_info)
-            # parse XML
-            import xml.etree.ElementTree as ET
-
-            root = ET.fromstring(xml_str)
-            # collect direct dependencies tags from package.xml
-            dep_tags = [
-                "depend",
-                "build_depend",
-                "buildtool_depend",
-                "buildtool_export_depend",
-                "exec_depend",
-                "run_depend",
-                "test_depend",
-                "build_export_depend",
-            ]
-            direct = set()
-            for tag in dep_tags:
-                for elem in root.findall(f".//{tag}"):
-                    if elem.text:
-                        name = elem.text.strip()
-                        direct.add(name)
+            parsed = self.get_release_package(pkg)
+            direct = {
+                d.name
+                for slot in (
+                    parsed.build_depends,
+                    parsed.buildtool_depends,
+                    parsed.build_export_depends,
+                    parsed.buildtool_export_depends,
+                    parsed.exec_depends,
+                    parsed.test_depends,
+                )
+                for d in slot
+            }
             # add direct deps
             dependencies |= direct
             # recursively collect dependencies
@@ -174,14 +166,33 @@ class Distro(object):
         repo = self._distro.repositories[pkg.repository_name].release_repository
         return repo.version.split("-")[0]
 
-    def get_release_package_xml(self, pkg_name):
+    def get_release_package(self, pkg_name):
+        """Return a parsed catkin_pkg.Package, or None if not available.
+
+        Dispatches between the additional-packages snapshot (which may use
+        either pixi.toml or package.xml) and the upstream rosdistro release.
+        Conditional deps are evaluated against the current environment.
+        """
         if (
             self.additional_packages_snapshot
             and pkg_name in self.additional_packages_snapshot
         ):
             pkg_info = self.additional_packages_snapshot[pkg_name]
-            return self.get_package_xml_for_additional_package(pkg_info)
-        return self._distro.get_release_package_xml(pkg_name)
+            filename, content = self._fetch_additional_manifest(pkg_info)
+            pkg = parse_additional_manifest(
+                filename,
+                content,
+                ros_distro=self.distro_name,
+                source=f"{pkg_info.get('url', '<unknown>')}@{pkg_info.get('rev') or pkg_info.get('tag') or pkg_info.get('branch')}",
+            )
+        else:
+            xml = self._distro.get_release_package_xml(pkg_name)
+            if not xml:
+                return None
+            pkg = catkin_pkg.package.parse_package_string(xml)
+
+        pkg.evaluate_conditions(os.environ)
+        return pkg
 
     def check_ros1(self):
         return self._distribution_type == "ros1"
@@ -193,37 +204,42 @@ class Distro(object):
         return self._distro.release_packages.keys()
 
     # Based on https://github.com/ros-infrastructure/rosdistro/blob/fad8d9f647631945847cb18bc1d1f43008d7a282/src/rosdistro/manifest_provider/github.py#L51C1-L69C29
-    # But with the option to specify the name of the package.xml file in case the repo uses a non-standard name
-    def get_package_xml_for_additional_package(self, pkg_info):
-        # Build raw GitHub URL for package.xml
+    # Manifest filename defaults to `pixi.toml` (Greenroom convention) but
+    # can be overridden via `manifest_file` or the legacy `package_xml_name`.
+    def _fetch_additional_manifest(self, pkg_info):
+        """Fetch the manifest file for an additional package from GitHub.
+
+        Returns (filename, content) so callers can dispatch on filename to
+        pick the right parser.
+        """
         raw_url_base = pkg_info.get("url")
         if raw_url_base.endswith(".git"):
             raw_url_base = raw_url_base[:-4]
         if "github.com" not in raw_url_base:
             raise RuntimeError(f"Cannot handle non-GitHub URL: {raw_url_base}")
-        # Extract owner/repo
         owner_repo = raw_url_base.split("github.com/")[-1]
-        # Use rev if available, otherwise fallback to tag, otherwise branch
         ref = pkg_info.get("rev") or pkg_info.get("tag") or pkg_info.get("branch")
-        xml_name = pkg_info.get("package_xml_name", "package.xml")
+        manifest_name = pkg_info.get(
+            "manifest_file", pkg_info.get("package_xml_name", "pixi.toml")
+        )
         additional_folder = pkg_info.get("additional_folder", "")
-        path = f"{additional_folder}/{xml_name}" if additional_folder else xml_name
-        # Use the contents API so GitHub App installation tokens work.
-        # raw.githubusercontent.com does not reliably accept App tokens.
+        path = (
+            f"{additional_folder}/{manifest_name}" if additional_folder else manifest_name
+        )
         api_url = (
             f"https://api.github.com/repos/{owner_repo}/contents/"
             f"{urllib.parse.quote(path)}"
             f"?ref={urllib.parse.quote(ref, safe='')}"
         )
         if api_url in self._additional_xml_cache:
-            return self._additional_xml_cache[api_url]
+            return manifest_name, self._additional_xml_cache[api_url]
 
         try:
             resp = vinca_http.fetch(
                 api_url, headers={"Accept": "application/vnd.github.raw"}
             )
-            xml_content = resp.text
-            self._additional_xml_cache[api_url] = xml_content
-            return xml_content
+            content = resp.text
+            self._additional_xml_cache[api_url] = content
+            return manifest_name, content
         except Exception as e:
-            raise RuntimeError(f"Failed to fetch package.xml from {api_url}: {e}")
+            raise RuntimeError(f"Failed to fetch {manifest_name} from {api_url}: {e}")

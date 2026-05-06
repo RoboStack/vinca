@@ -14,6 +14,7 @@ from .resolve import get_conda_index
 from .resolve import resolve_pkgname
 from .template import write_recipe, write_recipe_package
 from .distro import Distro
+from .pixi_manifest import parse_pixi_package
 from .v1_selectors import evaluate_selectors
 
 from vinca import config
@@ -125,7 +126,11 @@ def parse_command_line(argv):
         help="Create recipe with develop repo.",
     )
     parser.add_argument(
-        "-p", "--package", dest="package", default=None, help="The package.xml path."
+        "-p",
+        "--package",
+        dest="package",
+        default=None,
+        help="Glob for a manifest path. Accepts package.xml or pixi.toml.",
     )
     parser.add_argument(
         "--platform",
@@ -375,22 +380,18 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
             "build": {"script": ""},
         }
 
-    xml = distro.get_release_package_xml(pkg_shortname)
+    pkg = distro.get_release_package(pkg_shortname)
 
     # If the snapshot is not aligned with the latest rosdistro (for example if a package is removed,
-    # see https://github.com/RoboStack/ros-jazzy/pull/107#issuecomment-3338962041), get_release_package_xml can return none,
+    # see https://github.com/RoboStack/ros-jazzy/pull/107#issuecomment-3338962041), get_release_package can return none,
     # in that case we can just skip the package, remove if https://github.com/RoboStack/vinca/issues/93 is fixed
-    if not xml:
+    if pkg is None:
         print(
             "Skip "
             + pkg_shortname
             + " as it is present in our snapshot, but not in the latest rosdistro cache."
         )
         return None
-
-    pkg = catkin_pkg.package.parse_package_string(xml)
-
-    pkg.evaluate_conditions(os.environ)
 
     resolved_python = resolve_pkgname("python", vinca_conf, distro)
     output["requirements"]["run"].extend(resolved_python)
@@ -633,11 +634,7 @@ def generate_outputs(distro, vinca_conf):
     outputs = []
 
     def get_pkg(pkg_name):
-        pkg = catkin_pkg.package.parse_package_string(
-            distro.get_release_package_xml(pkg_name)
-        )
-        pkg.evaluate_conditions(os.environ)
-        return pkg
+        return distro.get_release_package(pkg_name)
 
     all_pkgs = [get_pkg(pkg) for pkg in distro.get_depends("ros_base")]
 
@@ -994,6 +991,17 @@ def generate_mutex_package_recipe(vinca_conf, distro):
     return recipe
 
 
+def _parse_manifest(path: str, ros_distro: str):
+    """Parse a manifest file as a catkin_pkg.Package.
+
+    Dispatches on filename: pixi.toml uses the local shim, anything else
+    is delegated to catkin_pkg's package.xml parser.
+    """
+    if os.path.basename(path) == "pixi.toml":
+        return parse_pixi_package(path, ros_distro)
+    return catkin_pkg.package.parse_package(path)
+
+
 def parse_package(pkg, distro, vinca_conf, path):
     name = pkg["name"].replace("_", "-")
     final_name = f"ros-{distro.name}-{name}"
@@ -1140,7 +1148,7 @@ def main():
         )
         additional_pkgs, parsed_pkgs = [], []
         for f in pkg_files:
-            parsed_pkg = catkin_pkg.package.parse_package(f)
+            parsed_pkg = _parse_manifest(f, vinca_conf["ros_distro"])
             additional_pkgs.append(parsed_pkg.name)
             parsed_pkgs.append(parsed_pkg)
 
@@ -1148,7 +1156,7 @@ def main():
 
         outputs = []
         for f in pkg_files:
-            pkg = catkin_pkg.package.parse_package(f)
+            pkg = _parse_manifest(f, vinca_conf["ros_distro"])
             recipe = parse_package(pkg, distro, vinca_conf, f)
 
             if arguments.multiple_file:

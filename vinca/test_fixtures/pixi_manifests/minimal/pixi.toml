@@ -1,0 +1,19 @@
+[package]
+name = "minimal_pkg"
+version = "1.2.3"
+description = "A minimal package"
+license = "MIT"
+authors = ["Alice <alice@example.com>"]
+
+[package.build.backend]
+name = "pixi-build-python"
+version = "*"
+
+[package.host-dependencies]
+python = "*"
+
+[package.run-dependencies]
+python = "*"
+
+[package.metadata.ros]
+build_type = "ament_python"

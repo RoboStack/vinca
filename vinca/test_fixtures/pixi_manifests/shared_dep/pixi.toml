@@ -1,0 +1,9 @@
+[package]
+name = "shared_dep"
+version = "0.1.0"
+[package.host-dependencies]
+ros-kilted-rclcpp = "*"
+[package.run-dependencies]
+ros-kilted-rclcpp = "*"
+[package.metadata.ros]
+build_type = "ament_cmake"

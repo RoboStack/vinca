@@ -1,0 +1,20 @@
+[package]
+name = "my_msgs"
+version = "0.1.0"
+description = "Some msgs"
+license = "MIT"
+authors = ["Carol <carol@example.com>"]
+
+[package.build.backend]
+name = "pixi-build-cmake"
+version = "*"
+
+[package.host-dependencies]
+ros-kilted-rosidl-default-generators = "*"
+
+[package.run-dependencies]
+ros-kilted-rosidl-default-runtime = "*"
+
+[package.metadata.ros]
+build_type = "ament_cmake"
+is_message_package = true

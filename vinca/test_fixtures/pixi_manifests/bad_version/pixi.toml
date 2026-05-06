@@ -1,0 +1,7 @@
+[package]
+name = "bad"
+version = "0.1.0"
+[package.run-dependencies]
+wildcarded = "1.2.*"
+[package.metadata.ros]
+build_type = "ament_python"

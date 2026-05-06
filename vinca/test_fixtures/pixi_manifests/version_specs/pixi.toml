@@ -1,0 +1,11 @@
+[package]
+name = "vs"
+version = "0.1.0"
+[package.run-dependencies]
+unbounded = "*"
+pinned = "==1.2.3"
+ranged = ">=2.5,<3"
+just_lower = ">1.0"
+just_upper = "<=4"
+[package.metadata.ros]
+build_type = "ament_python"
