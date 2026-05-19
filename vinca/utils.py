@@ -44,6 +44,9 @@ def get_repodata(url_or_path, platform=None):
         url_or_path += f"{platform}/repodata.json"
 
     if "://" not in url_or_path:
+        if not os.path.exists(url_or_path):
+            print(f"No repodata found at {url_or_path}, assuming no existing packages")
+            return {"packages": {}, "packages.conda": {}}
         with open(url_or_path) as fi:
             return json.load(fi)
     print("Downloading repodata from ", url_or_path)
@@ -58,13 +61,32 @@ def get_repodata(url_or_path, platform=None):
         max_age = 100_000  # seconds == 27 hours
         if age < max_age:
             with open(fn) as fi:
-                return json.load(fi)
+                try:
+                    return json.load(fi)
+                except json.JSONDecodeError:
+                    print(f"Ignoring invalid cached repodata at {fn}")
+                    os.remove(fn)
 
     repodata = requests.get(url_or_path)
+    if repodata.status_code == 404:
+        print(f"No repodata found at {url_or_path}, assuming no existing packages")
+        return {"packages": {}, "packages.conda": {}}
+    repodata.raise_for_status()
     content = repodata.content
+    if not content.strip():
+        print(f"No repodata found at {url_or_path}, assuming no existing packages")
+        return {"packages": {}, "packages.conda": {}}
+    try:
+        parsed_repodata = json.loads(content)
+    except json.JSONDecodeError:
+        print(
+            f"No valid repodata found at {url_or_path}, assuming no existing packages"
+        )
+        return {"packages": {}, "packages.conda": {}}
+
     with open(fn, "w") as fcache:
         fcache.write(content.decode("utf-8"))
-    return json.loads(content)
+    return parsed_repodata
 
 
 def ensure_name_is_without_distro_prefix_and_with_underscores(name, vinca_conf):
