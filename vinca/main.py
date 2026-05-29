@@ -1119,9 +1119,12 @@ def parse_package(pkg, distro, vinca_conf, path):
 
 
 def print_generation_summary(distro, vinca_conf, outputs):
-    """Print a human-readable summary of the generated recipes and, for each,
-    *why* it was generated: whether it was requested directly by the config and
-    which already-selected packages depend on it."""
+    """Print a summary of the generated recipes and, for each, *why* it was
+    generated: whether it was requested directly by the config and which
+    already-selected packages depend on it."""
+    from rich.console import Console
+    from rich.table import Table
+
     provenance = vinca_conf.get("_pkg_provenance", {})
     requested = provenance.get("requested_by_config", set())
     required_by = provenance.get("required_by", {})
@@ -1141,37 +1144,42 @@ def print_generation_summary(distro, vinca_conf, outputs):
         name = pkg_names[0]
         matched_names.add(name)
 
-        reasons = []
-        if shortname in requested:
-            reasons.append("requested by config")
-        deps = sorted(d for d in required_by.get(shortname, set()))
+        is_requested = shortname in requested
+        deps = sorted(required_by.get(shortname, set()))
         if deps:
-            shown = ", ".join(deps[:8])
+            depended_on = ", ".join(deps[:8])
             if len(deps) > 8:
-                shown += f", ... (+{len(deps) - 8} more)"
-            reasons.append(f"depended on by: {shown}")
-        if not reasons:
-            reasons.append("selected (reason not recorded)")
-        rows.append((name, reasons))
-
-    print("\n" + "=" * 72)
-    print("Generated recipes and why they were selected")
-    print("=" * 72)
-    for name, reasons in sorted(rows):
-        print(f"- {name}")
-        for r in reasons:
-            print(f"    - {r}")
+                depended_on += f", ... (+{len(deps) - 8} more)"
+        else:
+            depended_on = ""
+        rows.append((name, is_requested, depended_on))
 
     # auxiliary recipes that don't map back to a selected package (e.g. mutex)
     leftovers = sorted(generated_names - matched_names)
-    for name in leftovers:
-        print(f"- {name}")
-        print("    - auxiliary package (e.g. mutex)")
 
-    total = len(rows) + len(leftovers)
-    print("-" * 72)
-    print(f"Total generated recipes: {total}")
-    print("=" * 72 + "\n")
+    table = Table(
+        title="Generated recipes and why they were selected",
+        title_style="bold",
+        header_style="bold",
+    )
+    table.add_column("Recipe", style="cyan", no_wrap=True)
+    table.add_column("Requested by config", justify="center")
+    table.add_column("Depended on by")
+
+    for name, is_requested, depended_on in sorted(rows):
+        table.add_row(
+            name,
+            "[green]yes[/green]" if is_requested else "[dim]no[/dim]",
+            depended_on or "[dim]-[/dim]",
+        )
+    for name in leftovers:
+        table.add_row(name, "[dim]no[/dim]", "[dim]auxiliary (e.g. mutex)[/dim]")
+
+    console = Console()
+    console.print(table)
+    console.print(
+        f"Total generated recipes: [bold]{len(rows) + len(leftovers)}[/bold]"
+    )
 
 
 def main():

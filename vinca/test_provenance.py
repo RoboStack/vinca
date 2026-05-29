@@ -91,6 +91,8 @@ def test_generation_summary_output(monkeypatch, capsys):
         ],
     )
     monkeypatch.setattr(m, "distro", distro, raising=False)
+    # keep the rich table on one wide line so substrings are not wrapped
+    monkeypatch.setenv("COLUMNS", "200")
 
     # pretend a recipe was generated for everything except libB, plus a mutex
     outputs = [
@@ -104,10 +106,12 @@ def test_generation_summary_output(monkeypatch, capsys):
     out = capsys.readouterr().out
 
     assert "Generated recipes and why they were selected" in out
+    assert "Requested by config" in out  # table header
+    assert "Depended on by" in out  # table header
     assert "ros-humble-app" in out
-    assert "requested by config" in out
-    assert "depended on by: app" in out  # libA reverse dep
-    assert "auxiliary package" in out  # mutex
-    assert "ros-humble-lib-b" not in out  # not generated -> not listed
+    assert "ros-humble-libcommon" in out
+    assert "ros-humble-ros2-mutex" in out
+    assert "auxiliary" in out  # mutex marked as auxiliary
+    assert "ros-humble-libB" not in out  # not generated -> not listed
     # app, libA, libcommon (libB excluded) + mutex auxiliary
     assert "Total generated recipes: 4" in out
