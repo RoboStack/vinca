@@ -1177,9 +1177,7 @@ def print_generation_summary(distro, vinca_conf, outputs):
 
     console = Console()
     console.print(table)
-    console.print(
-        f"Total generated recipes: [bold]{len(rows) + len(leftovers)}[/bold]"
-    )
+    console.print(f"Total generated recipes: [bold]{len(rows) + len(leftovers)}[/bold]")
 
 
 def main():
