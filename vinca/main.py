@@ -797,8 +797,17 @@ def get_selected_packages(distro, vinca_conf):
     selected_packages = set()
     skipped_packages = set()
 
+    # Provenance tracking: record *why* each package ended up being selected.
+    #   requested_by_config: package was explicitly listed in the config
+    #                        (packages_select_by_deps / build_all / additional recipes)
+    #   required_by:         map of package -> set of config-requested packages whose
+    #                        (transitive) dependency closure pulled this package in
+    requested_by_config = set()
+    required_by = {}
+
     if vinca_conf.get("build_all", False):
         selected_packages = set(distro._distro.release_packages.keys())
+        requested_by_config |= selected_packages
         # Add packages from rosdistro_additional_recipes.yaml when build_all is True
         if (
             "_additional_packages_snapshot" in vinca_conf
@@ -808,6 +817,7 @@ def get_selected_packages(distro, vinca_conf):
                 vinca_conf["_additional_packages_snapshot"].keys()
             )
             selected_packages = selected_packages.union(additional_packages)
+            requested_by_config |= additional_packages
     elif vinca_conf["packages_select_by_deps"]:
         if (
             "packages_skip_by_deps" in vinca_conf
@@ -820,6 +830,7 @@ def get_selected_packages(distro, vinca_conf):
         for i in vinca_conf["packages_select_by_deps"]:
             i = i.replace("-", "_")
             selected_packages = selected_packages.union([i])
+            requested_by_config.add(i)
             if i in skipped_packages:
                 continue
             try:
@@ -830,7 +841,13 @@ def get_selected_packages(distro, vinca_conf):
                 pkgs = distro.get_depends(i.replace("_", "-"))
                 selected_packages.remove(i)
                 selected_packages.add(i.replace("_", "-"))
+                requested_by_config.discard(i)
+                i = i.replace("_", "-")
+                requested_by_config.add(i)
             selected_packages = selected_packages.union(pkgs)
+            # record that the (config-requested) package `i` depends on each `dep`
+            for dep in pkgs:
+                required_by.setdefault(dep, set()).add(i)
 
     # Automatically include ros_workspace and ros_environment for ROS2 distributions
     # if any ROS2 packages are selected (these are added as dependencies automatically)
@@ -849,8 +866,20 @@ def get_selected_packages(distro, vinca_conf):
         if has_ros_packages:
             if distro.check_package("ros_workspace"):
                 selected_packages.add("ros_workspace")
+                required_by.setdefault("ros_workspace", set()).add(
+                    "(automatic ROS2 dependency)"
+                )
             if distro.check_package("ros_environment"):
                 selected_packages.add("ros_environment")
+                required_by.setdefault("ros_environment", set()).add(
+                    "(automatic ROS2 dependency)"
+                )
+
+    # expose provenance so a summary of *why* each recipe was generated can be printed
+    vinca_conf["_pkg_provenance"] = {
+        "requested_by_config": requested_by_config,
+        "required_by": required_by,
+    }
 
     result = sorted(list(selected_packages))
     return result
@@ -1089,6 +1118,68 @@ def parse_package(pkg, distro, vinca_conf, path):
     return recipe
 
 
+def print_generation_summary(distro, vinca_conf, outputs):
+    """Print a summary of the generated recipes and, for each, *why* it was
+    generated: whether it was requested directly by the config and which
+    already-selected packages depend on it."""
+    from rich.console import Console
+    from rich.table import Table
+
+    provenance = vinca_conf.get("_pkg_provenance", {})
+    requested = provenance.get("requested_by_config", set())
+    required_by = provenance.get("required_by", {})
+
+    # names that actually produced a recipe in this run
+    generated_names = {o["package"]["name"] for o in outputs}
+    matched_names = set()
+
+    rows = []
+    for shortname in vinca_conf.get("_selected_pkgs", []):
+        try:
+            pkg_names = resolve_pkgname(shortname, vinca_conf, distro)
+        except Exception:
+            pkg_names = []
+        if not pkg_names or pkg_names[0] not in generated_names:
+            continue
+        name = pkg_names[0]
+        matched_names.add(name)
+
+        is_requested = shortname in requested
+        deps = sorted(required_by.get(shortname, set()))
+        if deps:
+            depended_on = ", ".join(deps[:8])
+            if len(deps) > 8:
+                depended_on += f", ... (+{len(deps) - 8} more)"
+        else:
+            depended_on = ""
+        rows.append((name, is_requested, depended_on))
+
+    # auxiliary recipes that don't map back to a selected package (e.g. mutex)
+    leftovers = sorted(generated_names - matched_names)
+
+    table = Table(
+        title="Generated recipes and why they were selected",
+        title_style="bold",
+        header_style="bold",
+    )
+    table.add_column("Recipe", style="cyan", no_wrap=True)
+    table.add_column("Requested by config", justify="center")
+    table.add_column("Depended on by")
+
+    for name, is_requested, depended_on in sorted(rows):
+        table.add_row(
+            name,
+            "[green]yes[/green]" if is_requested else "[dim]no[/dim]",
+            depended_on or "[dim]-[/dim]",
+        )
+    for name in leftovers:
+        table.add_row(name, "[dim]no[/dim]", "[dim]auxiliary (e.g. mutex)[/dim]")
+
+    console = Console()
+    console.print(table)
+    console.print(f"Total generated recipes: [bold]{len(rows) + len(leftovers)}[/bold]")
+
+
 def main():
     global distro, unsatisfied_deps
 
@@ -1231,6 +1322,8 @@ def main():
             write_recipe(source, outputs, vinca_conf, False)
         else:
             write_recipe(source, outputs, vinca_conf)
+
+        print_generation_summary(distro, vinca_conf, outputs)
 
         if unsatisfied_deps:
             print("Unsatisfied dependencies:", unsatisfied_deps)
