@@ -214,6 +214,17 @@ class Distro(object):
         except Exception as e:
             raise RuntimeError(f"Failed to fetch package.xml from {raw_url}: {e}")
 
+    def _download_raw_pkg_xml_or_cached(self, url):
+        if url in self._additional_xml_cache:
+            return self._additional_xml_cache[url]
+        try:
+            with urllib.request.urlopen(url) as resp:
+                xml_content = resp.read().decode("utf-8")
+                self._additional_xml_cache[url] = xml_content
+                return xml_content
+        except Exception as e:
+            raise RuntimeError(f"Failed to fetch package.xml from {url}: {e}")
+
     # Based on https://github.com/ros-infrastructure/rosdistro/blob/fad8d9f647631945847cb18bc1d1f43008d7a282/src/rosdistro/manifest_provider/github.py#L51C1-L69C29
     # But with the option to specify the name of the package.xml file in case the repo uses a non-standard name
     def _construct_raw_url_github(self, pkg_info):
