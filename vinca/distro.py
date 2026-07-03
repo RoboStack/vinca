@@ -192,6 +192,9 @@ class Distro(object):
         if "github.com" in raw_url_base:
             raw_url = self._construct_raw_url_github(pkg_info)
             return self._download_raw_pkg_xml_or_cached(url=raw_url)
+        if "gitlab.com" in raw_url_base:
+            raw_url = self._construct_raw_url_gitlab(pkg_info)
+            return self._download_raw_pkg_xml_or_cached(url=raw_url)
         raise RuntimeError(f"Cannot handle unknown repository hoster: {raw_url_base}")
 
     def _download_raw_pkg_xml_or_cached(self, url):
