@@ -187,8 +187,6 @@ class Distro(object):
     def get_package_names(self):
         return self._distro.release_packages.keys()
 
-    # Based on https://github.com/ros-infrastructure/rosdistro/blob/fad8d9f647631945847cb18bc1d1f43008d7a282/src/rosdistro/manifest_provider/github.py#L51C1-L69C29
-    # But with the option to specify the name of the package.xml file in case the repo uses a non-standard name
     def get_package_xml_for_additional_package(self, pkg_info):
         # Build raw GitHub URL for package.xml
         raw_url_base = pkg_info.get("url")
@@ -215,3 +213,39 @@ class Distro(object):
                 return xml_content
         except Exception as e:
             raise RuntimeError(f"Failed to fetch package.xml from {raw_url}: {e}")
+
+    # Based on https://github.com/ros-infrastructure/rosdistro/blob/fad8d9f647631945847cb18bc1d1f43008d7a282/src/rosdistro/manifest_provider/github.py#L51C1-L69C29
+    # But with the option to specify the name of the package.xml file in case the repo uses a non-standard name
+    def _construct_raw_url_github(self, pkg_info):
+        # Build raw GitHub URL for package.xml
+        raw_url_base = pkg_info.get("url")
+        if raw_url_base.endswith(".git"):
+            raw_url_base = raw_url_base[:-4]
+        if "github.com" not in raw_url_base:
+            raise RuntimeError(f"Cannot handle non-GitHub URL: {raw_url_base}")
+        # Extract owner/repo
+        owner_repo = raw_url_base.split("github.com/")[-1]
+        # Use rev if available, otherwise fallback to tag
+        ref = pkg_info.get("rev") or pkg_info.get("tag")
+        xml_name = pkg_info.get("package_xml_name", "package.xml")
+        additional_folder = pkg_info.get("additional_folder", "")
+        if additional_folder != "":
+            additional_folder = additional_folder + "/"
+        raw_url = f"https://raw.githubusercontent.com/{owner_repo}/{ref}/{additional_folder}{xml_name}"
+        return raw_url
+
+    # format (checked against GitLab 19.x): https://gitlab.com/<NAMESPACE>/-/raw/<REV>/<PATH>
+    def _construct_raw_url_gitlab(self, pkg_info):
+        raw_url_base = pkg_info.get("url")
+        if raw_url_base.endswith(".git"):
+            raw_url_base = raw_url_base[:-4]
+        if "gitlab.com" not in raw_url_base:
+            raise RuntimeError(f"Cannot handle non-GitLab URL: {raw_url_base}")
+        # Use rev if available, otherwise fallback to tag
+        ref = pkg_info.get("rev") or pkg_info.get("tag")
+        xml_name = pkg_info.get("package_xml_name", "package.xml")
+        additional_folder = pkg_info.get("additional_folder", "")
+        if additional_folder != "":
+            additional_folder = additional_folder + "/"
+        raw_url = f"{raw_url_base}/-/raw/{ref}/{additional_folder}{xml_name}"
+        return raw_url
