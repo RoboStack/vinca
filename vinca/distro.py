@@ -187,9 +187,30 @@ class Distro(object):
     def get_package_names(self):
         return self._distro.release_packages.keys()
 
+    def get_package_xml_for_additional_package(self, pkg_info):
+        raw_url_base = pkg_info.get("url")
+        if "github.com" in raw_url_base:
+            raw_url = self._construct_raw_url_github(pkg_info)
+            return self._download_raw_pkg_xml_or_cached(url=raw_url)
+        if "gitlab.com" in raw_url_base:
+            raw_url = self._construct_raw_url_gitlab(pkg_info)
+            return self._download_raw_pkg_xml_or_cached(url=raw_url)
+        raise RuntimeError(f"Cannot handle unknown repository hoster: {raw_url_base}")
+
+    def _download_raw_pkg_xml_or_cached(self, url):
+        if url in self._additional_xml_cache:
+            return self._additional_xml_cache[url]
+        try:
+            with urllib.request.urlopen(url) as resp:
+                xml_content = resp.read().decode("utf-8")
+                self._additional_xml_cache[url] = xml_content
+                return xml_content
+        except Exception as e:
+            raise RuntimeError(f"Failed to fetch package.xml from {url}: {e}")
+
     # Based on https://github.com/ros-infrastructure/rosdistro/blob/fad8d9f647631945847cb18bc1d1f43008d7a282/src/rosdistro/manifest_provider/github.py#L51C1-L69C29
     # But with the option to specify the name of the package.xml file in case the repo uses a non-standard name
-    def get_package_xml_for_additional_package(self, pkg_info):
+    def _construct_raw_url_github(self, pkg_info):
         # Build raw GitHub URL for package.xml
         raw_url_base = pkg_info.get("url")
         if raw_url_base.endswith(".git"):
@@ -205,13 +226,20 @@ class Distro(object):
         if additional_folder != "":
             additional_folder = additional_folder + "/"
         raw_url = f"https://raw.githubusercontent.com/{owner_repo}/{ref}/{additional_folder}{xml_name}"
-        if raw_url in self._additional_xml_cache:
-            return self._additional_xml_cache[raw_url]
+        return raw_url
 
-        try:
-            with urllib.request.urlopen(raw_url) as resp:
-                xml_content = resp.read().decode("utf-8")
-                self._additional_xml_cache[raw_url] = xml_content
-                return xml_content
-        except Exception as e:
-            raise RuntimeError(f"Failed to fetch package.xml from {raw_url}: {e}")
+    # format (checked against GitLab 19.x): https://gitlab.com/<NAMESPACE>/-/raw/<REV>/<PATH>
+    def _construct_raw_url_gitlab(self, pkg_info):
+        raw_url_base = pkg_info.get("url")
+        if raw_url_base.endswith(".git"):
+            raw_url_base = raw_url_base[:-4]
+        if "gitlab.com" not in raw_url_base:
+            raise RuntimeError(f"Cannot handle non-GitLab URL: {raw_url_base}")
+        # Use rev if available, otherwise fallback to tag
+        ref = pkg_info.get("rev") or pkg_info.get("tag")
+        xml_name = pkg_info.get("package_xml_name", "package.xml")
+        additional_folder = pkg_info.get("additional_folder", "")
+        if additional_folder != "":
+            additional_folder = additional_folder + "/"
+        raw_url = f"{raw_url_base}/-/raw/{ref}/{additional_folder}{xml_name}"
+        return raw_url
