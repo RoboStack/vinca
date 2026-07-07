@@ -51,6 +51,8 @@ vinca-gha = "vinca.generate_gha:main"
 vinca-azure = "vinca.generate_azure:main"
 vinca-migrate = "vinca.migrate:main"
 vinca-snapshot = "vinca.snapshot:main"
+vinca-sort-vinca-lists = "vinca.sort_vinca_lists:main"
+vinca-sort-yaml-keys = "vinca.sort_yaml_keys:main"
 
 [tool.hatch.version]
 path = "vinca/__init__.py"
