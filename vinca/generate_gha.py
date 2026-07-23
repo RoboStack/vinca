@@ -10,7 +10,7 @@ from distutils.dir_util import copy_tree
 
 from rich import print
 
-from vinca.utils import get_repodata, NoAliasDumper
+from vinca.utils import extract_dependency_names, get_repodata, NoAliasDumper
 from vinca.utils import literal_unicode as lu
 from vinca.distro import Distro
 from vinca.main import (
@@ -500,15 +500,9 @@ def main():
                 "host", []
             ) + req_section.get("run", [])
 
-        # sort out requirements that are not built in this run
+        # Normalize direct and conditional requirements to package names.
         for pkg_name, reqs in requirements.items():
-            requirements[pkg_name] = [
-                r.split()[0] for r in reqs if (isinstance(r, str) and r in reqs)
-            ]
-            if platform == "emscripten-wasm32":
-                # Hot fix to add the only ros package inside a if else statement
-                if "ros-humble-rmw-wasm-cpp" in str(reqs):
-                    requirements[pkg_name].append("ros-humble-rmw-wasm-cpp")
+            requirements[pkg_name] = extract_dependency_names(reqs)
 
         G = nx.DiGraph()
         for pkg, reqs in requirements.items():

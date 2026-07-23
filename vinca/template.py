@@ -8,7 +8,12 @@ import stat
 from ruamel import yaml
 from pathlib import Path
 
-from vinca.utils import get_pkg_build_number
+from vinca.naming import get_package_prefix, is_legacy_compatibility_output
+from vinca.utils import (
+    ensure_name_is_without_distro_prefix_and_with_underscores,
+    get_pkg_additional_info,
+    get_pkg_build_number,
+)
 
 TEMPLATE = """\
 # yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
@@ -78,7 +83,7 @@ def copyfile_with_exec_permissions(source_file, destination_file):
         )
 
 
-def write_recipe(source, outputs, vinca_conf, single_file=True):
+def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
     # single_file = False
     if single_file:
         file = yaml.YAML()
@@ -115,37 +120,47 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
             meta["package"]["name"] = o["package"]["name"]
             meta["package"]["version"] = o["package"]["version"]
 
+            package_name = o["package"]["name"]
+            package_shortname = (
+                ensure_name_is_without_distro_prefix_and_with_underscores(
+                    package_name, vinca_conf
+                )
+            )
+            is_compatibility_output = is_legacy_compatibility_output(
+                o, distro, vinca_conf
+            )
+
             meta["build"]["number"] = get_pkg_build_number(
-                vinca_conf.get("build_number", 0), o["package"]["name"], vinca_conf
+                vinca_conf.get("build_number", 0), package_name, vinca_conf
             )
             meta["build"]["post_process"] = post_process_items
 
-            if test := vinca_conf["_tests"].get(o["package"]["name"]):
+            if not is_compatibility_output and (
+                test := vinca_conf["_tests"].get(package_name)
+            ):
                 print("Using test: ", test)
                 text = test.read_text()
                 test_content = yaml.safe_load(text)
                 meta["tests"] = test_content["tests"]
 
-            recipe_dir = (Path("recipes") / o["package"]["name"]).absolute()
+            recipe_dir = (Path("recipes") / package_name).absolute()
             os.makedirs(recipe_dir, exist_ok=True)
 
-            # Copy test folder contents if corresponding test folder exists
-            test_dir = vinca_conf.get("_test_dir")
-            if test_dir is not None:
-                test_folder_name = o["package"]["name"]
-                test_folder_path = test_dir / test_folder_name
-
-                if test_folder_path.exists() and test_folder_path.is_dir():
-                    # Copy all contents of the test folder to the recipe directory
-                    for item in test_folder_path.iterdir():
-                        if item.is_file():
-                            shutil.copy2(item, recipe_dir / item.name)
-                        elif item.is_dir():
-                            # Use copytree for directories, but handle existing directories
-                            dest_dir = recipe_dir / item.name
-                            if dest_dir.exists():
-                                shutil.rmtree(dest_dir)
-                            shutil.copytree(item, dest_dir)
+            if not is_compatibility_output and (
+                test_folder_path := vinca_conf.get("_test_folders", {}).get(
+                    package_name
+                )
+            ):
+                # Copy all contents of the test folder to the recipe directory
+                for item in test_folder_path.iterdir():
+                    if item.is_file():
+                        shutil.copy2(item, recipe_dir / item.name)
+                    elif item.is_dir():
+                        # Use copytree for directories, but handle existing directories
+                        dest_dir = recipe_dir / item.name
+                        if dest_dir.exists():
+                            shutil.rmtree(dest_dir)
+                        shutil.copytree(item, dest_dir)
 
             with open(recipe_dir / "recipe.yaml", "w") as stream:
                 file.dump(meta, stream)
@@ -166,24 +181,11 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
                 )
                 # Generate the build script directly in the recipe directory
                 # Get additional CMake arguments from pkg_additional_info
-                from vinca.utils import (
-                    get_pkg_additional_info,
-                    ensure_name_is_without_distro_prefix_and_with_underscores,
-                )
-
-                pkg_name = o["package"]["name"]
-                # Use the proper utility function to normalize the package name
-                pkg_shortname = (
-                    ensure_name_is_without_distro_prefix_and_with_underscores(
-                        pkg_name, vinca_conf
-                    )
-                )
-
                 additional_cmake_args = ""
                 additional_folder = ""
-                if pkg_shortname:
+                if package_shortname:
                     pkg_additional_info = get_pkg_additional_info(
-                        pkg_shortname, vinca_conf
+                        package_shortname, vinca_conf
                     )
                     additional_cmake_args = pkg_additional_info.get(
                         "additional_cmake_args", ""
@@ -192,19 +194,23 @@ def write_recipe(source, outputs, vinca_conf, single_file=True):
                     # Check if this package has folder info from additional_packages_snapshot
                     if (
                         vinca_conf.get("_additional_packages_snapshot")
-                        and pkg_shortname in vinca_conf["_additional_packages_snapshot"]
+                        and package_shortname
+                        in vinca_conf["_additional_packages_snapshot"]
                     ):
                         additional_folder = vinca_conf["_additional_packages_snapshot"][
-                            pkg_shortname
+                            package_shortname
                         ].get("additional_folder", "")
 
                 generate_build_script_for_recipe(
                     script_filename,
                     recipe_dir / script_filename,
+                    get_package_prefix(distro, vinca_conf),
                     additional_cmake_args,
                     additional_folder,
                 )
-            if "catkin" in o["package"]["name"] or "workspace" in o["package"]["name"]:
+            if not is_compatibility_output and (
+                "catkin" in package_name or "workspace" in package_name
+            ):
                 # Generate activation scripts directly in the recipe directory
                 generate_activation_scripts_for_recipe(recipe_dir)
 
@@ -239,7 +245,11 @@ def generate_template(template_in, template_out, extra_globals=None):
 
 
 def generate_build_script_for_recipe(
-    script_name, output_path, additional_cmake_args="", additional_folder=""
+    script_name,
+    output_path,
+    ros_package_prefix,
+    additional_cmake_args="",
+    additional_folder="",
 ):
     """Generate a specific build script directly in the recipe directory."""
 
@@ -259,6 +269,7 @@ def generate_build_script_for_recipe(
         template_in = resources.files("vinca") / script_templates[script_name]
         with open(output_path, "w") as output_file:
             extra_globals = {}
+            extra_globals["ros_package_prefix"] = ros_package_prefix
             if additional_cmake_args:
                 extra_globals["additional_cmake_args"] = additional_cmake_args
             else:

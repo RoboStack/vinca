@@ -7,6 +7,7 @@ import networkx as nx
 import subprocess
 import shutil
 import ruamel.yaml
+from .naming import PackageNameMode, get_package_name_mode, get_package_prefix
 from .utils import get_repodata
 from vinca import config
 from vinca.distro import Distro
@@ -44,7 +45,10 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
 
     global distro_version, ros_prefix
     distro_version = vinca_conf["ros_distro"]
-    ros_prefix = f"ros-{distro_version}"
+    distro = Distro(distro_version)
+    ros_prefix = get_package_prefix(distro, vinca_conf)
+    legacy_prefix = distro.get_legacy_package_prefix()
+    package_name_mode = get_package_name_mode(vinca_conf)
 
     repodata = get_repodata(url, arch)
 
@@ -52,7 +56,11 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     to_migrate = set()
     ros_pkgs = set()
     for pkey in packages:
-        if not pkey.startswith(ros_prefix):
+        if not pkey.startswith(f"{ros_prefix}-"):
+            continue
+        if package_name_mode is not PackageNameMode.LEGACY and pkey.startswith(
+            f"{legacy_prefix}-"
+        ):
             continue
 
         pname = pkey.rsplit("-", 2)[0]
@@ -104,7 +112,6 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
 
     print("Sorted to migrate: ", to_migrate)
 
-    distro = Distro(distro_version)
     # import IPython; IPython.embed()
 
     ros_names = []

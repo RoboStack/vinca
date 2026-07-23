@@ -4,6 +4,8 @@ import glob
 import sys
 import os
 
+from vinca.utils import extract_dependency_names
+
 try:
     from yaml import CLoader as Loader, CDumper as Dumper
 except ImportError:
@@ -41,8 +43,9 @@ def main():
     requirements = {}
 
     for pkg in metas:
-        requirements[pkg["package"]["name"]] = (
-            pkg["requirements"]["host"] + pkg["requirements"]["run"]
+        requirement_section = pkg.get("requirements", {})
+        requirements[pkg["package"]["name"]] = extract_dependency_names(
+            requirement_section.get("host", []) + requirement_section.get("run", [])
         )
 
     print(requirements)
@@ -50,9 +53,9 @@ def main():
     G = nx.DiGraph()
     for pkg, reqs in requirements.items():
         G.add_node(pkg)
-        for r in reqs:
-            if r.startswith("ros-"):
-                G.add_edge(pkg, r)
+        for requirement in reqs:
+            if requirement.startswith(("ros-", "ros2-")):
+                G.add_edge(pkg, requirement)
 
     # import matplotlib.pyplot as plt
     # nx.draw(G, with_labels=True, font_weight='bold')
@@ -60,7 +63,6 @@ def main():
 
     tg = list(reversed(list(nx.topological_sort(G))))
     print(tg)
-    print(requirements["ros-melodic-ros-core"])
 
     stages = []
     current_stage = []
