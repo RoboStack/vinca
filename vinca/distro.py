@@ -1,4 +1,5 @@
 import os
+import urllib.parse
 import urllib.request
 
 from rosdistro import get_cached_distribution, get_index, get_index_url
@@ -209,11 +210,23 @@ class Distro(object):
             return self._download_raw_pkg_xml_or_cached(url=raw_url)
         raise RuntimeError(f"Cannot handle unknown repository hoster: {raw_url_base}")
 
+    def _get_auth_headers(self, url):
+        host = urllib.parse.urlparse(url).netloc
+        for env_var, domains in (
+            ("GITHUB_TOKEN", ("github.com", "githubusercontent.com")),
+            ("GITLAB_TOKEN", ("gitlab.com",)),
+        ):
+            token = os.environ.get(env_var)
+            if token and any(d in host for d in domains):
+                return {"Authorization": f"token {token}"}
+        return {}
+
     def _download_raw_pkg_xml_or_cached(self, url):
         if url in self._additional_xml_cache:
             return self._additional_xml_cache[url]
+        req = urllib.request.Request(url, headers=self._get_auth_headers(url))
         try:
-            with urllib.request.urlopen(url) as resp:
+            with urllib.request.urlopen(req) as resp:
                 xml_content = resp.read().decode("utf-8")
                 self._additional_xml_cache[url] = xml_content
                 return xml_content
