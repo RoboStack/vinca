@@ -390,7 +390,7 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                     "name": "Setup pixi",
                     "uses": "prefix-dev/setup-pixi@v0.9.5",
                     "with": {
-                        "pixi-version": "v0.68.1",
+                        "pixi-version": "v0.74.0",
                         "cache": "true",
                     },
                 },
