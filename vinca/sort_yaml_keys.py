@@ -16,6 +16,16 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
 
+def _contains_build_number(value: object) -> bool:
+    return isinstance(value, dict) and "build_number" in value
+
+
+def _sort_key(key: object, data: CommentedMap) -> tuple[int, str]:
+    # Keep regular entries first, and group build_number overrides at the bottom.
+    has_build_number = _contains_build_number(data[key])
+    return (1 if has_build_number else 0, str(key).casefold())
+
+
 def sort_mapping_keys(path: Path) -> bool:
     """Sort top-level keys of a YAML mapping file in place. Returns True if changed."""
     yaml = YAML()
@@ -27,7 +37,7 @@ def sort_mapping_keys(path: Path) -> bool:
     if not hasattr(data, "keys"):
         return False
 
-    sorted_keys = sorted(data.keys(), key=str.casefold)
+    sorted_keys = sorted(data.keys(), key=lambda key: _sort_key(key, data))
     if list(data.keys()) == sorted_keys:
         return False
 
