@@ -1,10 +1,97 @@
+import io
 import os
+import posixpath
+import tarfile
 import urllib.parse
-import urllib.request
+import zipfile
 
+import requests
 from rosdistro import get_cached_distribution, get_index, get_index_url
 from rosdistro.dependency_walker import DependencyWalker
 from rosdistro.manifest_provider import get_release_tag
+
+# Source archive suffixes an additional recipe may point at instead of a git repository.
+# Such a package is fetched by URL (checksummed with sha256) rather than cloned.
+# Zstandard is left out on purpose: tarfile only reads it from Python 3.14 on, while
+# vinca still supports older interpreters, so accepting it here would promise a format
+# that fails to open on most of them.
+ARCHIVE_SUFFIXES = (
+    ".zip",
+    ".tar",
+    ".tar.gz",
+    ".tgz",
+    ".tar.bz2",
+    ".tbz2",
+    ".tar.xz",
+    ".txz",
+)
+
+
+def is_archive_url(url):
+    """Return True when url points at a source archive rather than a git repository."""
+    if not url:
+        return False
+    path = urllib.parse.urlparse(url).path.lower()
+    return path.endswith(ARCHIVE_SUFFIXES)
+
+
+def _normalize_member(name):
+    """Return an archive member name without its './' prefix and trailing slash."""
+    name = name.strip("/")
+    while name.startswith("./"):
+        name = name[2:]
+    return "" if name == "." else name
+
+
+def _strip_common_root(entries):
+    """Return the single top-level directory shared by entries, or an empty string.
+
+    Entries are (name, is_dir) pairs. Build tools unpack an archive whose contents all
+    live under one directory by dropping that directory, so member lookups do the same.
+    """
+    names = [(_normalize_member(name), is_dir) for name, is_dir in entries]
+    roots = {name.split("/", 1)[0] for name, _ in names if name}
+    if len(roots) != 1:
+        return ""
+    root = roots.pop()
+    # A lone top-level file, rather than a directory, is not a root to strip.
+    if any(name == root and not is_dir for name, is_dir in names):
+        return ""
+    return root
+
+
+def _resolve_member(*, entries, member):
+    """Return the name entries use for member, resolved against the stripped root.
+
+    Names are compared normalized, so an archive listing its members as './pkg/...'
+    resolves like one listing them as 'pkg/...'.
+    """
+    wanted = posixpath.join(_strip_common_root(entries), member)
+    for name, is_dir in entries:
+        if not is_dir and _normalize_member(name) == wanted:
+            return name
+    raise KeyError(member)
+
+
+def _read_archive_member(*, payload, url, member):
+    """Return the text of member inside the archive payload, stripping its common root."""
+    member = _normalize_member(member)
+    if zipfile.is_zipfile(io.BytesIO(payload)):
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            entries = [(info.filename, info.is_dir()) for info in archive.infolist()]
+            return archive.read(_resolve_member(entries=entries, member=member)).decode(
+                "utf-8"
+            )
+    try:
+        archive = tarfile.open(fileobj=io.BytesIO(payload), mode="r:*")
+    except tarfile.TarError:
+        raise RuntimeError(f"Unsupported archive format: {url}")
+    with archive:
+        entries = [(m.name, m.isdir()) for m in archive.getmembers()]
+        extracted = archive.extractfile(_resolve_member(entries=entries, member=member))
+        if extracted is None:
+            raise KeyError(member)
+        return extracted.read().decode("utf-8")
 
 
 class Distro(object):
@@ -41,6 +128,7 @@ class Distro(object):
 
         # simple caches to avoid repeatedly fetching/processing the same data
         self._additional_xml_cache = {}
+        self._last_archive = None
         self._depends_cache = {}
 
         os.environ["ROS_VERSION"] = "1" if self.check_ros1() else "2"
@@ -125,6 +213,14 @@ class Distro(object):
             # we also support a 'rev' field, so depending on what is available
             # we return either the tag or the rev, and the third argument is either 'rev' or 'tag'
             url = self.snapshot[pkg_name].get("url", None)
+            # An archive URL is not a git repository: the reference is its sha256 checksum.
+            if is_archive_url(url):
+                sha256 = self.snapshot[pkg_name].get("sha256", None)
+                if not sha256:
+                    raise RuntimeError(
+                        f"The archive source of '{pkg_name}' has no sha256 checksum: {url}"
+                    )
+                return url, sha256, "sha256"
             if "tag" in self.snapshot[pkg_name].keys():
                 tag_or_rev = self.snapshot[pkg_name].get("tag", None)
                 ref_type = "tag"
@@ -202,6 +298,9 @@ class Distro(object):
 
     def get_package_xml_for_additional_package(self, pkg_info):
         raw_url_base = pkg_info.get("url")
+        # An archive has no raw-file endpoint, so read package.xml out of the archive itself.
+        if is_archive_url(raw_url_base):
+            return self._package_xml_from_archive_or_cached(pkg_info)
         if "github.com" in raw_url_base:
             raw_url = self._construct_raw_url_github(pkg_info)
             return self._download_raw_pkg_xml_or_cached(url=raw_url)
@@ -211,6 +310,12 @@ class Distro(object):
         raise RuntimeError(f"Cannot handle unknown repository hoster: {raw_url_base}")
 
     def _get_auth_headers(self, url):
+        """Token header for the hosters vinca knows, empty otherwise.
+
+        Any other credential (a private artifact server such as Artifactory, a proxy,
+        a custom CA) is resolved by requests from the standard environment, so vinca
+        does not need to know about it.
+        """
         host = urllib.parse.urlparse(url).netloc
         for env_var, domains in (
             ("GITHUB_TOKEN", ("github.com", "githubusercontent.com")),
@@ -221,17 +326,65 @@ class Distro(object):
                 return {"Authorization": f"token {token}"}
         return {}
 
+    def _get(self, url):
+        """Fetch url, letting requests apply the ambient credentials and proxy settings.
+
+        requests also drops the Authorization header when a redirect leaves the original
+        host, which matters because an Artifactory server usually redirects a download
+        to a presigned URL on a separate storage host.
+        """
+        response = requests.get(url, headers=self._get_auth_headers(url), timeout=60)
+        response.raise_for_status()
+        return response
+
     def _download_raw_pkg_xml_or_cached(self, url):
         if url in self._additional_xml_cache:
             return self._additional_xml_cache[url]
-        req = urllib.request.Request(url, headers=self._get_auth_headers(url))
         try:
-            with urllib.request.urlopen(req) as resp:
-                xml_content = resp.read().decode("utf-8")
-                self._additional_xml_cache[url] = xml_content
-                return xml_content
+            xml_content = self._get(url).text
         except Exception as e:
             raise RuntimeError(f"Failed to fetch package.xml from {url}: {e}")
+        self._additional_xml_cache[url] = xml_content
+        return xml_content
+
+    def _package_xml_from_archive_or_cached(self, pkg_info):
+        """Read package.xml out of a source archive referenced by an additional recipe.
+
+        The member is looked up under the archive's additional_folder, after dropping a
+        single common top-level directory. That mirrors how the build tool unpacks the
+        archive, so one additional_folder value describes both the recipe and this lookup.
+        """
+        url = pkg_info.get("url")
+        xml_name = pkg_info.get("package_xml_name", "package.xml")
+        member = posixpath.join(pkg_info.get("additional_folder", ""), xml_name)
+        cache_key = f"{url}#{member}"
+        if cache_key in self._additional_xml_cache:
+            return self._additional_xml_cache[cache_key]
+
+        payload = self._download_archive_or_cached(url)
+        try:
+            xml_content = _read_archive_member(payload=payload, url=url, member=member)
+        except KeyError:
+            raise RuntimeError(f"Could not find '{member}' inside the archive {url}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to read '{member}' from the archive {url}: {e}")
+        self._additional_xml_cache[cache_key] = xml_content
+        return xml_content
+
+    def _download_archive_or_cached(self, url):
+        """Download the archive at url, keeping only the most recent payload in memory.
+
+        Several packages can share one archive, so reusing the last download avoids
+        fetching it again without holding every archive of the run in memory.
+        """
+        if self._last_archive and self._last_archive[0] == url:
+            return self._last_archive[1]
+        try:
+            payload = self._get(url).content
+        except Exception as e:
+            raise RuntimeError(f"Failed to download the archive {url}: {e}")
+        self._last_archive = (url, payload)
+        return payload
 
     # Based on https://github.com/ros-infrastructure/rosdistro/blob/fad8d9f647631945847cb18bc1d1f43008d7a282/src/rosdistro/manifest_provider/github.py#L51C1-L69C29
     # But with the option to specify the name of the package.xml file in case the repo uses a non-standard name
