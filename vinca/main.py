@@ -190,7 +190,7 @@ def read_vinca_yaml(filepath):
     vinca_conf["_patch_dir"] = patch_dir
     patches = {}
 
-    for x in glob.glob(os.path.join(vinca_conf["_patch_dir"], "*.patch")):
+    for x in sorted(glob.glob(os.path.join(vinca_conf["_patch_dir"], "*.patch"))):
         splitted = os.path.basename(x).split(".")
         if splitted[0] not in patches:
             patches[splitted[0]] = {
