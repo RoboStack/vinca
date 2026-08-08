@@ -100,6 +100,8 @@ else
   export CMAKE_BLD="cmake"
 fi;
 
+# CMake tries to find arm64-apple-darwin20.0.0-clang-scan-deps but only clang-scan-deps (without prefix)
+# are found if using clang < 22.*, so we need to manually specify the path
 CMAKE_CLANG_SCAN_DEPS_ARGS=()
 if [[ $target_platform =~ osx.* ]]; then
   CLANG_SCAN_DEPS="$BUILD_PREFIX/bin/clang-scan-deps"
