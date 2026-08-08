@@ -100,6 +100,18 @@ else
   export CMAKE_BLD="cmake"
 fi;
 
+CMAKE_CLANG_SCAN_DEPS_ARGS=()
+if [[ $target_platform =~ osx.* ]]; then
+  CLANG_SCAN_DEPS="$BUILD_PREFIX/bin/clang-scan-deps"
+  if [[ ! -x "$CLANG_SCAN_DEPS" ]]; then
+    echo "Missing executable clang-scan-deps at $CLANG_SCAN_DEPS" >&2
+    exit 1
+  fi
+  CMAKE_CLANG_SCAN_DEPS_ARGS+=(
+    "-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=$CLANG_SCAN_DEPS"
+  )
+fi
+
 if [ "${PKG_NAME}" == "@(ros_package_prefix)-rmw-wasm-cpp" ]; then
   WORK_DIR=$SRC_DIR/$PKG_NAME/src/work/rmw_wasm_cpp
 elif [ "${PKG_NAME}" == "@(ros_package_prefix)-wasm-cpp" ]; then
@@ -132,6 +144,7 @@ $CMAKE_GEN \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
     --compile-no-warning-as-error \
     $EXTRA_CMAKE_ARGS \
+    "${CMAKE_CLANG_SCAN_DEPS_ARGS[@@]}" \
     @(additional_cmake_args) \
     $WORK_DIR
 
