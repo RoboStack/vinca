@@ -707,6 +707,17 @@ def generate_outputs_version(distro, vinca_conf):
     return outputs
 
 
+def _source_reference(*, url, ref, ref_type):
+    """Return the source keys locating url at ref, for a git repository or an archive.
+
+    An archive is identified by a sha256 ref_type and is fetched by URL, so it carries
+    a checksum instead of a git revision.
+    """
+    if ref_type == "sha256":
+        return {"url": url, "sha256": ref}
+    return {"git": url, ref_type: ref}
+
+
 def generate_source(distro, vinca_conf):
     source = {}
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
@@ -717,9 +728,7 @@ def generate_source(distro, vinca_conf):
         if is_dummy_metapackage(pkg_shortname, vinca_conf):
             continue
         url, ref, ref_type = distro.get_released_repo(pkg_shortname)
-        entry = {}
-        entry["git"] = url
-        entry[ref_type] = ref
+        entry = _source_reference(url=url, ref=ref, ref_type=ref_type)
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
         pkg_version = distro.get_version(pkg_shortname)
         print("Checking ", pkg_shortname, pkg_version)
@@ -772,9 +781,7 @@ def generate_source_version(distro, vinca_conf):
 
         url, ref, ref_type = distro.get_released_repo(pkg_shortname)
 
-        entry = {}
-        entry["git"] = url
-        entry[ref_type] = ref
+        entry = _source_reference(url=url, ref=ref, ref_type=ref_type)
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
         version = distro.get_version(pkg_shortname)
         if vinca_conf.get("trigger_new_versions"):
@@ -813,9 +820,7 @@ def generate_fat_source(distro, vinca_conf):
             continue
 
         url, ref, ref_type = distro.get_released_repo(pkg_shortname)
-        entry = {}
-        entry["git"] = url
-        entry[ref_type] = ref
+        entry = _source_reference(url=url, ref=ref, ref_type=ref_type)
         pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
         if not pkg_names:
             continue
