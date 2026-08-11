@@ -81,20 +81,6 @@ if [[ $target_platform =~ emscripten.* ]]; then
   "
 fi
 
-# CMake tries to find arm64-apple-darwin20.0.0-clang-scan-deps but only clang-scan-deps (without prefix)
-# are found if using clang < 22.*, so we need to manually specify the path
-CMAKE_CLANG_SCAN_DEPS_ARGS=()
-if [[ $target_platform =~ osx.* ]]; then
-  CLANG_SCAN_DEPS="$BUILD_PREFIX/bin/clang-scan-deps"
-  if [[ ! -x "$CLANG_SCAN_DEPS" ]]; then
-    echo "Missing executable clang-scan-deps at $CLANG_SCAN_DEPS" >&2
-    exit 1
-  fi
-  CMAKE_CLANG_SCAN_DEPS_ARGS+=(
-    "-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=$CLANG_SCAN_DEPS"
-  )
-fi
-
 export SKIP_TESTING=@(skip_testing)
 
 if [ "${PKG_NAME}" == "@(ros_package_prefix)-euslisp" ] || [ "${PKG_NAME}" = "@(ros_package_prefix)-jskeus" ] || [ "${PKG_NAME}" = "@(ros_package_prefix)-roseus" ]; then
@@ -123,7 +109,6 @@ cmake ${CMAKE_ARGS} --compile-no-warning-as-error \
          -DCATKIN_BUILD_BINARY_PACKAGE=$CATKIN_BUILD_BINARY_PACKAGE \
          -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
          $EXTRA_CMAKE_ARGS \
-         "${CMAKE_CLANG_SCAN_DEPS_ARGS[@@]}" \
          @(additional_cmake_args) \
          -G "$GENERATOR" \
          $SRC_DIR/$PKG_NAME/src/work/@(additional_folder)
