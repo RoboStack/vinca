@@ -424,26 +424,40 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
     output["requirements"]["run"].extend(resolved_python)
     output["requirements"]["host"].extend(resolved_python)
 
-    if is_dummy_metapackage(pkg_shortname, vinca_conf):
+    is_dummy_package = is_dummy_metapackage(pkg_shortname, vinca_conf)
+    build_type = pkg.get_build_type()
+
+    if is_dummy_package:
         # Dummy recipes do not actually build anything, so we set the script to empty
         output["build"]["script"] = ""
-    elif pkg.get_build_type() in ["cmake", "catkin"]:
+    elif build_type in ["cmake", "catkin"]:
         output["build"]["script"] = (
             "${{ '$RECIPE_DIR/build_catkin.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
         )
-    elif pkg.get_build_type() in ["ament_cmake"]:
+    elif build_type in ["ament_cmake"]:
         output["build"]["script"] = (
             "${{ '$RECIPE_DIR/build_ament_cmake.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_ament_cmake.bat' }}"
         )
-    elif pkg.get_build_type() in ["ament_python"]:
+    elif build_type in ["ament_python"]:
         output["build"]["script"] = (
             "${{ '$RECIPE_DIR/build_ament_python.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_ament_python.bat' }}"
         )
         resolved_setuptools = resolve_pkgname("python-setuptools", vinca_conf, distro)
         output["requirements"]["host"].extend(resolved_setuptools)
     else:
-        print(f"Unknown build type for {pkg_shortname}: {pkg.get_build_type()}")
+        print(f"Unknown build type for {pkg_shortname}: {build_type}")
         return None
+
+    if not is_dummy_package and build_type in ["cmake", "catkin", "ament_cmake"]:
+        output["requirements"]["build"].append(
+            {
+                "if": "osx",
+                "then": [
+                    "clang-tools ${{ (cxx_compiler_version ~ '.*') if "
+                    "cxx_compiler_version is defined else '*' }}"
+                ],
+            }
+        )
 
     if vinca_conf.get("mutex_package"):
         mutex_dep = get_mutex_package_dependency(vinca_conf, distro)
@@ -1155,6 +1169,17 @@ def parse_package(pkg, distro, vinca_conf, path):
     if pkg.get_build_type() in ["cmake", "catkin"]:
         recipe["build"]["script"] = (
             "${{ '$RECIPE_DIR/build_catkin.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
+        )
+
+    if pkg.get_build_type() in ["cmake", "catkin", "ament_cmake"]:
+        recipe["requirements"]["build"].append(
+            {
+                "if": "osx",
+                "then": [
+                    "clang-tools ${{ (cxx_compiler_version ~ '.*') if "
+                    "cxx_compiler_version is defined else '*' }}"
+                ],
+            }
         )
 
     return recipe
