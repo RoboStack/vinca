@@ -1,6 +1,5 @@
 from vinca.license_utils import convert_to_spdx_license, is_valid_spdx_license
 
-
 # Tests for is_valid_spdx_license function
 
 

@@ -1,6 +1,8 @@
 import argparse
-import yaml
 import datetime
+
+import yaml
+
 from .distro import Distro
 
 

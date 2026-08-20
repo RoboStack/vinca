@@ -1,15 +1,17 @@
+import glob
+import os
+import sys
+
 import networkx as nx
 import yaml
-import glob
-import sys
-import os
 
 from vinca.utils import extract_dependency_names
 
 try:
-    from yaml import CLoader as Loader, CDumper as Dumper
+    from yaml import CDumper as Dumper
+    from yaml import CLoader as Loader
 except ImportError:
-    from yaml import Loader, Dumper
+    from yaml import Dumper, Loader
 
 # def setup_yaml():
 #   """ https://stackoverflow.com/a/8661021 """

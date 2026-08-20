@@ -84,8 +84,8 @@ def _read_archive_member(*, payload, url, member):
             )
     try:
         archive = tarfile.open(fileobj=io.BytesIO(payload), mode="r:*")
-    except tarfile.TarError:
-        raise RuntimeError(f"Unsupported archive format: {url}")
+    except tarfile.TarError as error:
+        raise RuntimeError(f"Unsupported archive format: {url}") from error
     with archive:
         entries = [(m.name, m.isdir()) for m in archive.getmembers()]
         extracted = archive.extractfile(_resolve_member(entries=entries, member=member))
@@ -342,8 +342,10 @@ class Distro(object):
             return self._additional_xml_cache[url]
         try:
             xml_content = self._get(url).text
-        except Exception as e:
-            raise RuntimeError(f"Failed to fetch package.xml from {url}: {e}")
+        except Exception as error:
+            raise RuntimeError(
+                f"Failed to fetch package.xml from {url}: {error}"
+            ) from error
         self._additional_xml_cache[url] = xml_content
         return xml_content
 
@@ -364,10 +366,14 @@ class Distro(object):
         payload = self._download_archive_or_cached(url)
         try:
             xml_content = _read_archive_member(payload=payload, url=url, member=member)
-        except KeyError:
-            raise RuntimeError(f"Could not find '{member}' inside the archive {url}")
-        except Exception as e:
-            raise RuntimeError(f"Failed to read '{member}' from the archive {url}: {e}")
+        except KeyError as error:
+            raise RuntimeError(
+                f"Could not find '{member}' inside the archive {url}"
+            ) from error
+        except Exception as error:
+            raise RuntimeError(
+                f"Failed to read '{member}' from the archive {url}: {error}"
+            ) from error
         self._additional_xml_cache[cache_key] = xml_content
         return xml_content
 
@@ -381,8 +387,10 @@ class Distro(object):
             return self._last_archive[1]
         try:
             payload = self._get(url).content
-        except Exception as e:
-            raise RuntimeError(f"Failed to download the archive {url}: {e}")
+        except Exception as error:
+            raise RuntimeError(
+                f"Failed to download the archive {url}: {error}"
+            ) from error
         self._last_archive = (url, payload)
         return payload
 
