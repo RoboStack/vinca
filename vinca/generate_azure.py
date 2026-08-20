@@ -1,39 +1,38 @@
+import argparse
+import glob
+import os
+import sys
+from distutils.dir_util import copy_tree
+from importlib import resources
+
 import networkx as nx
 import yaml
-import re
-import glob
-import sys
-import os
-import argparse
-from importlib import resources
-from distutils.dir_util import copy_tree
-
 from rich import print
 
+from vinca import config
+from vinca.distro import Distro
+from vinca.main import (
+    generate_outputs,
+    get_conda_subdir,
+    get_selected_packages,
+    read_vinca_yaml,
+)
+from vinca.pipeline import batch_stages, get_all_ancestors, get_skip_existing
 from vinca.utils import (
     add_test_requirements,
     build_requirement_graph,
     extract_dependency_names,
-    get_repodata,
 )
 from vinca.utils import literal_unicode as lu
-from vinca.distro import Distro
-from vinca.main import (
-    get_selected_packages,
-    generate_outputs,
-    read_vinca_yaml,
-    get_conda_subdir,
-)
-from vinca import config
 
 
 def read_azure_script(fn):
-    return (resources.files("vinca") / "azure_templates" / fn).read_text()
+    return (resources.files("vinca") / "azure_templates" / fn).read_text(
+        encoding="utf-8"
+    )
 
 
-azure_linux_script = lu(read_azure_script("linux.sh"))
-azure_osx_script = lu(read_azure_script("osx_64.sh"))
-azure_osx_arm64_script = lu(read_azure_script("osx_arm64.sh"))
+azure_unix_script = lu(read_azure_script("unix.sh"))
 azure_win_preconfig_script = lu(read_azure_script("win_preconfig.bat"))
 azure_win_script = lu(read_azure_script("win_build.bat"))
 
@@ -74,94 +73,6 @@ def parse_command_line(argv):
     arguments = parser.parse_args(argv[1:])
     config.parsed_args = arguments
     return arguments
-
-
-def normalize_name(s):
-    s = s.replace("-", "_")
-    return re.sub("[^a-zA-Z0-9_]+", "", s)
-
-
-def batch_stages(stages, max_batch_size=5):
-    with open("vinca.yaml", "r") as vinca_yaml:
-        vinca_conf = yaml.safe_load(vinca_yaml)
-
-    # this reduces the number of individual builds to try to save some time
-    stage_lengths = [len(s) for s in stages]
-    merged_stages = []
-    curr_stage = []
-    build_individually = vinca_conf.get("build_in_own_azure_stage", [])
-
-    def chunks(lst, n):
-        """Yield successive n-sized chunks from lst."""
-        for i in range(0, len(lst), n):
-            yield lst[i : i + n]
-
-    i = 0
-    while i < len(stages):
-        for build_individually_pkg in build_individually:
-            if build_individually_pkg in stages[i]:
-                merged_stages.append([[build_individually_pkg]])
-                stages[i].remove(build_individually_pkg)
-
-        if (
-            stage_lengths[i] < max_batch_size
-            and len(curr_stage) + stage_lengths[i] < max_batch_size
-        ):
-            # merge with previous stage
-            curr_stage += stages[i]
-        else:
-            if len(curr_stage):
-                merged_stages.append([curr_stage])
-                curr_stage = []
-            if stage_lengths[i] < max_batch_size:
-                curr_stage += stages[i]
-            else:
-                # split this stage into multiple
-                merged_stages.append(list(chunks(stages[i], max_batch_size)))
-        i += 1
-    if len(curr_stage):
-        merged_stages.append([curr_stage])
-    return merged_stages
-
-
-def get_skip_existing(vinca_conf, platform):
-    fn = vinca_conf.get("skip_existing")
-    repodatas = []
-    if fn is not None:
-        fns = list(fn)
-    else:
-        fns = []
-
-    for fn in fns:
-        print(f"Fetching repodata: {fn}")
-        repodata = get_repodata(fn, platform)
-        repodatas.append(repodata)
-
-    return repodatas
-
-
-def get_all_ancestors(graph, node):
-    ancestors = set()
-    visited = set()
-    current_node = node
-
-    while True:
-        a = {
-            a
-            for a in graph.get(node, [])
-            if a.startswith("ros-") or a.startswith("ros2")
-        }
-        if not graph.get(node):
-            print(f"[yellow]{node} not found")
-
-        ancestors |= a
-        visited.add(current_node)
-
-        if len(ancestors - visited) == 0:
-            print(f"Returning all ancestors for {node} : {ancestors}")
-            return ancestors
-        else:
-            current_node = list(ancestors - visited)[0]
 
 
 def add_additional_recipes(args):
@@ -215,7 +126,7 @@ def add_additional_recipes(args):
 def build_linux_pipeline(
     stages,
     trigger_branch,
-    script=azure_linux_script,
+    script=azure_unix_script,
     azure_template=None,
     docker_image=None,
     outfile="linux.yml",
@@ -273,7 +184,7 @@ def build_osx_pipeline(
     trigger_branch,
     vm_imagename="macOS-10.15",
     outfile="osx.yml",
-    script=azure_osx_script,
+    script=azure_unix_script,
 ):
     # Build OSX pipeline
     azure_template = {"pool": {"vmImage": vm_imagename}}
@@ -527,11 +438,7 @@ def main():
         build_linux_pipeline(stages, args.trigger_branch, outfile="linux.yml")
 
     if args.platform == "osx-64":
-        build_osx_pipeline(
-            stages,
-            args.trigger_branch,
-            script=azure_osx_script,
-        )
+        build_osx_pipeline(stages, args.trigger_branch)
 
     if args.platform == "osx-arm64":
         build_osx_pipeline(
@@ -539,7 +446,6 @@ def main():
             args.trigger_branch,
             vm_imagename="macOS-11",
             outfile="osx_arm64.yml",
-            script=azure_osx_arm64_script,
         )
 
     if args.platform == "linux-aarch64":
