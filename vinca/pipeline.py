@@ -31,7 +31,7 @@ def batch_stages(
 
     with Path(config_path).open(encoding="utf-8") as stream:
         vinca_conf = yaml.safe_load(stream) or {}
-    build_individually = set(vinca_conf.get("build_in_own_azure_stage", []))
+    build_individually = set(vinca_conf.get("build_in_own_stage", []))
 
     result: list[list[list[str]]] = []
     pending: list[str] = []

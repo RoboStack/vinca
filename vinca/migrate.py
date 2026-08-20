@@ -150,7 +150,7 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     recipe_dir = os.path.join(config.parsed_args.dir, "recipes")
     subprocess.check_call(
         [
-            "vinca-azure",
+            "vinca-gha",
             "--platform",
             arch,
             "--trigger-branch",
@@ -164,7 +164,7 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
 
 def parse_command_line(argv):
     parser = argparse.ArgumentParser(
-        description="Conda recipe Azure pipeline generator for ROS packages"
+        description="Generate migration recipes and GitHub Actions workflows"
     )
 
     default_dir = "./recipes"
@@ -177,7 +177,10 @@ def parse_command_line(argv):
     )
 
     parser.add_argument(
-        "-t", "--trigger-branch", dest="trigger_branch", help="Trigger branch for Azure"
+        "-t",
+        "--trigger-branch",
+        dest="trigger_branch",
+        help="Branch that triggers the generated workflow",
     )
 
     parser.add_argument(
