@@ -65,7 +65,8 @@ def generate_source(
             print(patches)
             common_root = os.path.commonpath([os.getcwd(), *patches])
             entry["patches"] = [
-                os.path.relpath(patch, common_root) for patch in patches
+                Path(os.path.relpath(patch, common_root)).as_posix()
+                for patch in patches
             ]
         sources[package_name] = entry
 
