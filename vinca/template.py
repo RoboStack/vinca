@@ -1,3 +1,4 @@
+import copy
 import datetime
 from importlib import resources
 import shutil
@@ -83,6 +84,16 @@ def copyfile_with_exec_permissions(source_file, destination_file):
         )
 
 
+def get_recipe_variants(package_name, vinca_conf):
+    """Merge repository-wide variants with overrides for one package."""
+    variants = copy.deepcopy(vinca_conf.get("_variant_config") or {})
+    variant_overrides = get_pkg_additional_info(package_name, vinca_conf).get(
+        "variant_overrides", {}
+    )
+    variants.update(copy.deepcopy(variant_overrides))
+    return variants
+
+
 def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
     # single_file = False
     if single_file:
@@ -165,16 +176,15 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
             with open(recipe_dir / "recipe.yaml", "w") as stream:
                 file.dump(meta, stream)
 
-            # Write variants.yaml if this package has variant overrides in pkg_additional_info
-            variant_overrides = get_pkg_additional_info(
-                o["package"]["name"], vinca_conf
-            ).get("variant_overrides", {})
-            if variant_overrides:
+            # Put the complete variant config next to each recipe so local and PR
+            # builds do not need an explicit -m/--variant-config argument.
+            variants = get_recipe_variants(o["package"]["name"], vinca_conf)
+            if variants:
                 variant_file = yaml.YAML()
                 variant_file.width = 4096
                 variant_file.indent(mapping=2, sequence=4, offset=2)
                 with open(recipe_dir / "variants.yaml", "w") as stream:
-                    variant_file.dump(dict(variant_overrides), stream)
+                    variant_file.dump(variants, stream)
 
             if meta.get("source") and meta["source"].get("patches"):
                 for p in meta["source"]["patches"]:

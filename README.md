@@ -33,3 +33,16 @@ package_name_mode: both
 ```
 
 Once users and downstream projects have migrated, switch to `new` to stop generating the compatibility packages. New ROS 1 package names use the `ros-` prefix; new ROS 2 package names use `ros2-`.
+
+## Package-specific variant overrides
+
+Vinca copies the repository's `conda_build_config.yaml` to each generated recipe as `variants.yaml`. A package can replace or add variant keys through `pkg_additional_info.yaml`:
+
+```yaml
+my_ros_package:
+  variant_overrides:
+    python:
+      - 3.13.* *_cpython
+```
+
+Because rattler-build gives an explicitly passed `-m/--variant-config` file higher priority than an auto-discovered `variants.yaml`, builds should not pass the repository-level config explicitly.

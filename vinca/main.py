@@ -242,13 +242,22 @@ def read_vinca_yaml(filepath):
 
     vinca_conf["trigger_new_versions"] = vinca_conf.get("trigger_new_versions", False)
 
-    if (Path(filepath).parent / "pkg_additional_info.yaml").exists():
+    config_dir = Path(filepath).parent
+    pkg_additional_info_path = config_dir / "pkg_additional_info.yaml"
+    if pkg_additional_info_path.exists():
         vinca_conf["_pkg_additional_info"] = evaluate_selectors(
-            yaml.load(open(Path(filepath).parent / "pkg_additional_info.yaml")),
+            yaml.load(open(pkg_additional_info_path)),
             target_platform=get_conda_subdir(),
         )
     else:
         vinca_conf["_pkg_additional_info"] = {}
+
+    variant_config_path = config_dir / "conda_build_config.yaml"
+    if variant_config_path.exists():
+        # Keep legacy comment selectors intact for rattler-build to evaluate.
+        vinca_conf["_variant_config"] = yaml.load(open(variant_config_path)) or {}
+    else:
+        vinca_conf["_variant_config"] = {}
 
     # snapshot contains both rosdistro_snapshot.yaml and
     # rosdistro_additional_recipes.yaml
