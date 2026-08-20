@@ -4,9 +4,9 @@ from unittest.mock import Mock, patch
 import pytest
 
 from vinca.utils import (
+    CyclicTestRequirement,
     add_test_requirements,
     build_requirement_graph,
-    CyclicTestRequirement,
     extract_dependency_names,
     get_repodata,
 )
