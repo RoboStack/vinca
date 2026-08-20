@@ -1,5 +1,6 @@
 import os
 from urllib.request import urlopen
+
 from vinca import config
 from vinca.naming import get_package_name
 

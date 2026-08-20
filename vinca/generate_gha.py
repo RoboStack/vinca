@@ -1,41 +1,39 @@
+import argparse
+import glob
+import os
+import sys
+from distutils.dir_util import copy_tree
+from importlib import resources
+
 import networkx as nx
 import yaml
-import re
-import glob
-import sys
-import os
-import argparse
-from importlib import resources
-from distutils.dir_util import copy_tree
-
 from rich import print
 
-from vinca.utils import extract_dependency_names, get_repodata, NoAliasDumper
-from vinca.utils import literal_unicode as lu
+from vinca import config
 from vinca.distro import Distro
 from vinca.main import (
-    get_selected_packages,
     generate_outputs,
-    read_vinca_yaml,
     get_conda_subdir,
+    get_selected_packages,
+    read_vinca_yaml,
 )
-from vinca import config
+from vinca.pipeline import batch_stages, get_all_ancestors, get_skip_existing
+from vinca.utils import NoAliasDumper, extract_dependency_names
+from vinca.utils import literal_unicode as lu
 
 
-def read_azure_script(fn):
-    return (resources.files("vinca") / "azure_templates" / fn).read_text(
-        encoding="utf-8"
-    )
+def read_ci_script(fn):
+    return (resources.files("vinca") / "ci_templates" / fn).read_text(encoding="utf-8")
 
 
-azure_unix_script = lu(read_azure_script("unix.sh"))
-azure_win_preconfig_script = lu(read_azure_script("win_preconfig.bat"))
-azure_win_script = lu(read_azure_script("win_build.bat"))
+unix_build_script = lu(read_ci_script("unix.sh"))
+windows_preconfig_script = lu(read_ci_script("windows_preconfig.bat"))
+windows_build_script = lu(read_ci_script("windows_build.bat"))
 
 
 def parse_command_line(argv):
     parser = argparse.ArgumentParser(
-        description="Conda recipe Azure pipeline generator for ROS packages"
+        description="GitHub Actions workflow generator for ROS package recipes"
     )
 
     default_dir = "./recipes"
@@ -48,7 +46,10 @@ def parse_command_line(argv):
     )
 
     parser.add_argument(
-        "-t", "--trigger-branch", dest="trigger_branch", help="Trigger branch for Azure"
+        "-t",
+        "--trigger-branch",
+        dest="trigger_branch",
+        help="Branch that triggers the generated workflow",
     )
 
     parser.add_argument(
@@ -78,94 +79,6 @@ def parse_command_line(argv):
     arguments = parser.parse_args(argv[1:])
     config.parsed_args = arguments
     return arguments
-
-
-def normalize_name(s):
-    s = s.replace("-", "_")
-    return re.sub("[^a-zA-Z0-9_]+", "", s)
-
-
-def batch_stages(stages, max_batch_size=5):
-    with open("vinca.yaml", "r") as vinca_yaml:
-        vinca_conf = yaml.safe_load(vinca_yaml)
-
-    # this reduces the number of individual builds to try to save some time
-    stage_lengths = [len(s) for s in stages]
-    merged_stages = []
-    curr_stage = []
-    build_individually = vinca_conf.get("build_in_own_azure_stage", [])
-
-    def chunks(lst, n):
-        """Yield successive n-sized chunks from lst."""
-        for i in range(0, len(lst), n):
-            yield lst[i : i + n]
-
-    i = 0
-    while i < len(stages):
-        for build_individually_pkg in build_individually:
-            if build_individually_pkg in stages[i]:
-                merged_stages.append([[build_individually_pkg]])
-                stages[i].remove(build_individually_pkg)
-
-        if (
-            stage_lengths[i] < max_batch_size
-            and len(curr_stage) + stage_lengths[i] < max_batch_size
-        ):
-            # merge with previous stage
-            curr_stage += stages[i]
-        else:
-            if len(curr_stage):
-                merged_stages.append([curr_stage])
-                curr_stage = []
-            if stage_lengths[i] < max_batch_size:
-                curr_stage += stages[i]
-            else:
-                # split this stage into multiple
-                merged_stages.append(list(chunks(stages[i], max_batch_size)))
-        i += 1
-    if len(curr_stage):
-        merged_stages.append([curr_stage])
-    return merged_stages
-
-
-def get_skip_existing(vinca_conf, platform):
-    fn = vinca_conf.get("skip_existing")
-    repodatas = []
-    if fn is not None:
-        fns = list(fn)
-    else:
-        fns = []
-
-    for fn in fns:
-        print(f"Fetching repodata: {fn}")
-        repodata = get_repodata(fn, platform)
-        repodatas.append(repodata)
-
-    return repodatas
-
-
-def get_all_ancestors(graph, node):
-    ancestors = set()
-    visited = set()
-    current_node = node
-
-    while True:
-        a = {
-            a
-            for a in graph.get(node, [])
-            if a.startswith("ros-") or a.startswith("ros2")
-        }
-        if not graph.get(node):
-            print(f"[yellow]{node} not found")
-
-        ancestors |= a
-        visited.add(current_node)
-
-        if len(ancestors - visited) == 0:
-            print(f"Returning all ancestors for {node} : {ancestors}")
-            return ancestors
-        else:
-            current_node = list(ancestors - visited)[0]
 
 
 def add_additional_recipes(args):
@@ -244,8 +157,8 @@ def get_stage_name(batch):
 def build_unix_pipeline(
     stages,
     trigger_branch,
-    script=azure_unix_script,
-    azure_template=None,
+    script=unix_build_script,
+    workflow=None,
     runs_on="ubuntu-latest",
     outfile="linux.yml",
     pipeline_name="build_unix",
@@ -253,8 +166,8 @@ def build_unix_pipeline(
 ):
     blurb = {"jobs": {}, "name": pipeline_name}
 
-    if azure_template is None:
-        azure_template = blurb
+    if workflow is None:
+        workflow = blurb
 
     prev_batch_keys = []
 
@@ -262,7 +175,7 @@ def build_unix_pipeline(
         stage_name = f"stage_{i}"
         batch_keys = []
         for batch in s:
-            batch_key = f"{stage_name}_job_{len(azure_template['jobs'])}"
+            batch_key = f"{stage_name}_job_{len(workflow['jobs'])}"
             batch_keys.append(batch_key)
 
             pretty_stage_name = get_stage_name(batch)
@@ -298,23 +211,23 @@ def build_unix_pipeline(
                 "attestations": "write",
             }
 
-            azure_template["jobs"][batch_key] = job
+            workflow["jobs"][batch_key] = job
 
         prev_batch_keys = batch_keys
 
-    if len(azure_template.get("jobs", [])) == 0:
+    if len(workflow.get("jobs", [])) == 0:
         return
 
-    azure_template["on"] = {"push": {"branches": [trigger_branch]}}
+    workflow["on"] = {"push": {"branches": [trigger_branch]}}
 
-    dump_for_gha(azure_template, outfile)
+    dump_for_gha(workflow, outfile)
 
 
 def build_linux_pipeline(
     stages,
     trigger_branch,
-    script=azure_unix_script,
-    azure_template=None,
+    script=unix_build_script,
+    workflow=None,
     runs_on="ubuntu-latest",
     outfile="linux.yml",
     pipeline_name="build_linux",
@@ -323,7 +236,7 @@ def build_linux_pipeline(
         stages,
         trigger_branch,
         script=script,
-        azure_template=azure_template,
+        workflow=workflow,
         runs_on=runs_on,
         outfile=outfile,
         pipeline_name=pipeline_name,
@@ -336,8 +249,8 @@ def build_osx_pipeline(
     trigger_branch,
     vm_imagename="macos-15-intel",
     outfile="osx.yml",
-    azure_template=None,
-    script=azure_unix_script,
+    workflow=None,
+    script=unix_build_script,
     target="osx-64",
     pipeline_name="build_osx64",
 ):
@@ -345,7 +258,7 @@ def build_osx_pipeline(
         stages,
         trigger_branch,
         script=script,
-        azure_template=azure_template,
+        workflow=workflow,
         runs_on=vm_imagename,
         outfile=outfile,
         target=target,
@@ -353,15 +266,15 @@ def build_osx_pipeline(
     )
 
 
-def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template=None):
+def build_win_pipeline(stages, trigger_branch, outfile="win.yml", workflow=None):
     vm_imagename = "windows-2022"
     # Build Win pipeline
     blurb = {"jobs": {}, "name": "build_win"}
 
-    if azure_template is None:
-        azure_template = blurb
+    if workflow is None:
+        workflow = blurb
 
-    script = azure_win_script
+    script = windows_build_script
 
     # overwrite with what we're finding in the repo!
     if os.path.exists(".scripts/build_win.bat"):
@@ -373,7 +286,7 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
         stage_name = f"stage_{i}"
         batch_keys = []
         for batch in s:
-            batch_key = f"{stage_name}_job_{len(azure_template['jobs'])}"
+            batch_key = f"{stage_name}_job_{len(workflow['jobs'])}"
             batch_keys.append(batch_key)
 
             pretty_stage_name = get_stage_name(batch)
@@ -402,7 +315,7 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                 },
                 {
                     "shell": "cmd",
-                    "run": azure_win_preconfig_script,
+                    "run": windows_preconfig_script,
                     "name": "conda-forge build setup",
                 },
                 {
@@ -430,16 +343,16 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                 "attestations": "write",
             }
 
-            azure_template["jobs"][batch_key] = job
+            workflow["jobs"][batch_key] = job
 
         prev_batch_keys = batch_keys
 
-    if len(azure_template.get("jobs", [])) == 0:
+    if len(workflow.get("jobs", [])) == 0:
         return
 
-    azure_template["on"] = {"push": {"branches": [trigger_branch]}}
+    workflow["on"] = {"push": {"branches": [trigger_branch]}}
 
-    dump_for_gha(azure_template, outfile)
+    dump_for_gha(workflow, outfile)
 
 
 def get_full_tree():
@@ -589,7 +502,7 @@ def main():
             args.trigger_branch,
             vm_imagename="macos-15",
             outfile="osx_arm64.yml",
-            script=azure_unix_script,
+            script=unix_build_script,
             target=platform,
             pipeline_name="build_osx_arm64",
         )

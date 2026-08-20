@@ -1,9 +1,10 @@
-import yaml
 import hashlib
+import json
 import os
 import time
-import json
+
 import requests
+import yaml
 
 
 class folded_unicode(str):
