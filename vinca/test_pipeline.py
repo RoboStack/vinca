@@ -1,10 +1,9 @@
-from vinca import generate_azure, generate_gha
+from vinca import generate_gha
 from vinca.pipeline import batch_stages, get_all_ancestors
 
 
-def test_ci_generators_load_packaged_build_scripts():
-    assert "build_unix.sh" in generate_azure.azure_unix_script
-    assert "build_unix.sh" in generate_gha.azure_unix_script
+def test_github_generator_loads_packaged_build_scripts():
+    assert "build_unix.sh" in generate_gha.unix_build_script
 
 
 def test_get_all_ancestors_follows_transitive_dependencies_and_cycles():
@@ -50,7 +49,7 @@ def test_get_all_ancestors_stops_at_non_ros_dependencies():
 
 def test_batch_stages_does_not_mutate_input(tmp_path):
     config = tmp_path / "vinca.yaml"
-    config.write_text("build_in_own_azure_stage: [ros-special]\n")
+    config.write_text("build_in_own_stage: [ros-special]\n")
     stages = [["ros-a", "ros-special"], ["ros-b", "ros-c"], ["ros-d", "ros-e"]]
     original = [stage.copy() for stage in stages]
 

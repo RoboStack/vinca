@@ -1,14 +1,14 @@
 import argparse
 import glob
 import os
+import re
 import sys
 from distutils.dir_util import copy_tree
 from importlib import resources
+from typing import Any
 
 import networkx as nx
 import yaml
-import re
-from typing import Any
 from rich import print
 
 from vinca import config
@@ -28,26 +28,23 @@ from vinca.utils import (
 )
 from vinca.utils import literal_unicode as lu
 
-
 # Use the v0 version of setup-pixi by default, which should give you the last major release
 DEFAULT_SETUP_PIXI_VERSION = "v0"
 DEFAULT_PIXI_VERSION = "latest"
 
 
-def read_azure_script(fn):
-    return (resources.files("vinca") / "azure_templates" / fn).read_text(
-        encoding="utf-8"
-    )
+def read_ci_script(fn):
+    return (resources.files("vinca") / "ci_templates" / fn).read_text(encoding="utf-8")
 
 
-azure_unix_script = lu(read_azure_script("unix.sh"))
-azure_win_preconfig_script = lu(read_azure_script("win_preconfig.bat"))
-azure_win_script = lu(read_azure_script("win_build.bat"))
+unix_build_script = lu(read_ci_script("unix.sh"))
+windows_preconfig_script = lu(read_ci_script("windows_preconfig.bat"))
+windows_build_script = lu(read_ci_script("windows_build.bat"))
 
 
 def parse_command_line(argv):
     parser = argparse.ArgumentParser(
-        description="Conda recipe Azure pipeline generator for ROS packages"
+        description="GitHub Actions workflow generator for ROS package recipes"
     )
 
     default_dir = "./recipes"
@@ -60,7 +57,10 @@ def parse_command_line(argv):
     )
 
     parser.add_argument(
-        "-t", "--trigger-branch", dest="trigger_branch", help="Trigger branch for Azure"
+        "-t",
+        "--trigger-branch",
+        dest="trigger_branch",
+        help="Branch that triggers the generated workflow",
     )
 
     parser.add_argument(
@@ -213,8 +213,8 @@ def get_setup_pixi_step(
 def build_unix_pipeline(
     stages,
     trigger_branch,
-    script=azure_unix_script,
-    azure_template=None,
+    script=unix_build_script,
+    workflow=None,
     runs_on="ubuntu-latest",
     outfile="linux.yml",
     pipeline_name="build_unix",
@@ -224,8 +224,8 @@ def build_unix_pipeline(
 ):
     blurb = {"jobs": {}, "name": pipeline_name}
 
-    if azure_template is None:
-        azure_template = blurb
+    if workflow is None:
+        workflow = blurb
 
     prev_batch_keys = []
 
@@ -233,7 +233,7 @@ def build_unix_pipeline(
         stage_name = f"stage_{i}"
         batch_keys = []
         for batch in s:
-            batch_key = f"{stage_name}_job_{len(azure_template['jobs'])}"
+            batch_key = f"{stage_name}_job_{len(workflow['jobs'])}"
             batch_keys.append(batch_key)
 
             pretty_stage_name = get_stage_name(batch)
@@ -270,23 +270,23 @@ def build_unix_pipeline(
                 "attestations": "write",
             }
 
-            azure_template["jobs"][batch_key] = job
+            workflow["jobs"][batch_key] = job
 
         prev_batch_keys = batch_keys
 
-    if len(azure_template.get("jobs", [])) == 0:
+    if len(workflow.get("jobs", [])) == 0:
         return
 
-    azure_template["on"] = {"push": {"branches": [trigger_branch]}}
+    workflow["on"] = {"push": {"branches": [trigger_branch]}}
 
-    dump_for_gha(azure_template, outfile)
+    dump_for_gha(workflow, outfile)
 
 
 def build_linux_pipeline(
     stages,
     trigger_branch,
-    script=azure_unix_script,
-    azure_template=None,
+    script=unix_build_script,
+    workflow=None,
     runs_on="ubuntu-latest",
     outfile="linux.yml",
     pipeline_name="build_linux",
@@ -297,7 +297,7 @@ def build_linux_pipeline(
         stages,
         trigger_branch,
         script=script,
-        azure_template=azure_template,
+        workflow=workflow,
         runs_on=runs_on,
         outfile=outfile,
         pipeline_name=pipeline_name,
@@ -312,8 +312,8 @@ def build_osx_pipeline(
     trigger_branch,
     vm_imagename="macos-15-intel",
     outfile="osx.yml",
-    azure_template=None,
-    script=azure_unix_script,
+    workflow=None,
+    script=unix_build_script,
     target="osx-64",
     pipeline_name="build_osx64",
     setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
@@ -323,7 +323,7 @@ def build_osx_pipeline(
         stages,
         trigger_branch,
         script=script,
-        azure_template=azure_template,
+        workflow=workflow,
         runs_on=vm_imagename,
         outfile=outfile,
         target=target,
@@ -337,7 +337,7 @@ def build_win_pipeline(
     stages,
     trigger_branch,
     outfile="win.yml",
-    azure_template=None,
+    workflow=None,
     setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
     pixi_version: str = DEFAULT_PIXI_VERSION,
 ):
@@ -345,10 +345,10 @@ def build_win_pipeline(
     # Build Win pipeline
     blurb = {"jobs": {}, "name": "build_win"}
 
-    if azure_template is None:
-        azure_template = blurb
+    if workflow is None:
+        workflow = blurb
 
-    script = azure_win_script
+    script = windows_build_script
 
     # overwrite with what we're finding in the repo!
     if os.path.exists(".scripts/build_win.bat"):
@@ -360,7 +360,7 @@ def build_win_pipeline(
         stage_name = f"stage_{i}"
         batch_keys = []
         for batch in s:
-            batch_key = f"{stage_name}_job_{len(azure_template['jobs'])}"
+            batch_key = f"{stage_name}_job_{len(workflow['jobs'])}"
             batch_keys.append(batch_key)
 
             pretty_stage_name = get_stage_name(batch)
@@ -382,7 +382,7 @@ def build_win_pipeline(
                 },
                 {
                     "shell": "cmd",
-                    "run": azure_win_preconfig_script,
+                    "run": windows_preconfig_script,
                     "name": "conda-forge build setup",
                 },
                 {
@@ -410,16 +410,16 @@ def build_win_pipeline(
                 "attestations": "write",
             }
 
-            azure_template["jobs"][batch_key] = job
+            workflow["jobs"][batch_key] = job
 
         prev_batch_keys = batch_keys
 
-    if len(azure_template.get("jobs", [])) == 0:
+    if len(workflow.get("jobs", [])) == 0:
         return
 
-    azure_template["on"] = {"push": {"branches": [trigger_branch]}}
+    workflow["on"] = {"push": {"branches": [trigger_branch]}}
 
-    dump_for_gha(azure_template, outfile)
+    dump_for_gha(workflow, outfile)
 
 
 def get_full_tree():
@@ -572,7 +572,7 @@ def main():
             args.trigger_branch,
             vm_imagename="macos-15",
             outfile="osx_arm64.yml",
-            script=azure_unix_script,
+            script=unix_build_script,
             target=platform,
             pipeline_name="build_osx_arm64",
             setup_pixi_version=setup_pixi_version,
