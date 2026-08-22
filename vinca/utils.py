@@ -3,6 +3,7 @@ import hashlib
 import os
 import time
 import json
+import networkx as nx
 import requests
 
 
@@ -122,6 +123,71 @@ def extract_dependency_names(requirements):
 
     visit(requirements)
     return list(dict.fromkeys(names))
+
+
+def add_test_requirements(requirements, metas):
+    """Fold the test-only requirements into the per-package requirement lists.
+
+    A requirement that only appears under ``tests`` still has to be installable
+    when the test environment is solved, so it has to be built before the
+    package that tests against it. The requirements are read from the generated
+    recipes because those already have the legacy compatibility outputs (which
+    never carry tests) filtered out.
+
+    Returns the test-only requirements per package, so that the caller can treat
+    them differently from the real dependencies when building the graph.
+    """
+    test_requirements = {}
+    for pkg in metas:
+        pkg_name = pkg["package"]["name"]
+        if pkg_name not in requirements:
+            continue
+        test_reqs = []
+        for test in pkg.get("tests") or []:
+            if not isinstance(test, dict):
+                continue
+            test_section = test.get("requirements") or {}
+            test_reqs += test_section.get("run", []) + test_section.get("build", [])
+        test_reqs = [
+            r
+            for r in extract_dependency_names(test_reqs)
+            if r not in requirements[pkg_name]
+        ]
+        if test_reqs:
+            test_requirements[pkg_name] = test_reqs
+            requirements[pkg_name] = requirements[pkg_name] + test_reqs
+    return test_requirements
+
+
+def build_requirement_graph(requirements, test_requirements):
+    """Build the dependency graph the build stages are derived from.
+
+    The test-only edges are added last and are dropped again when they would
+    close a cycle, so that a test requirement can never reorder a real
+    dependency.
+    """
+    G = nx.DiGraph()
+    for pkg, reqs in requirements.items():
+        G.add_node(pkg)
+        for r in reqs:
+            if r in test_requirements.get(pkg, ()):
+                continue
+            if r.startswith("ros-") or r.startswith("ros2-"):
+                G.add_edge(pkg, r)
+
+    for pkg, test_reqs in test_requirements.items():
+        for r in test_reqs:
+            if not (r.startswith("ros-") or r.startswith("ros2-")):
+                continue
+            G.add_edge(pkg, r)
+            if not nx.is_directed_acyclic_graph(G):
+                G.remove_edge(pkg, r)
+                requirements[pkg] = [x for x in requirements[pkg] if x != r]
+                print(
+                    f"Ignoring test requirement {r} of {pkg} for the build order "
+                    "because it would introduce a cycle."
+                )
+    return G
 
 
 def add_package_name_variants(entries, ros_distro):

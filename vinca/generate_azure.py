@@ -10,7 +10,12 @@ from distutils.dir_util import copy_tree
 
 from rich import print
 
-from vinca.utils import extract_dependency_names, get_repodata
+from vinca.utils import (
+    add_test_requirements,
+    build_requirement_graph,
+    extract_dependency_names,
+    get_repodata,
+)
 from vinca.utils import literal_unicode as lu
 from vinca.distro import Distro
 from vinca.main import (
@@ -456,12 +461,9 @@ def main():
         for pkg_name, reqs in requirements.items():
             requirements[pkg_name] = extract_dependency_names(reqs)
 
-        G = nx.DiGraph()
-        for pkg, reqs in requirements.items():
-            G.add_node(pkg)
-            for r in reqs:
-                if r.startswith("ros-") or r.startswith("ros2-"):
-                    G.add_edge(pkg, r)
+        test_requirements = add_test_requirements(requirements, metas)
+
+        G = build_requirement_graph(requirements, test_requirements)
 
         # print(requirements)
         # import matplotlib.pyplot as plt
