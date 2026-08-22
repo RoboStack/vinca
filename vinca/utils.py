@@ -3,6 +3,7 @@ import hashlib
 import os
 import time
 import json
+import networkx as nx
 import requests
 
 
@@ -122,6 +123,83 @@ def extract_dependency_names(requirements):
 
     visit(requirements)
     return list(dict.fromkeys(names))
+
+
+def add_test_requirements(requirements, metas):
+    """Fold the test-only requirements into the per-package requirement lists.
+
+    A requirement that only appears under ``tests`` still has to be installable
+    when the test environment is solved, so it has to be built before the
+    package that tests against it. The requirements are read from the generated
+    recipes because those already have the legacy compatibility outputs (which
+    never carry tests) filtered out.
+
+    Returns the test-only requirements per package, so that the caller can treat
+    them differently from the real dependencies when building the graph.
+    """
+    test_requirements = {}
+    for pkg in metas:
+        pkg_name = pkg["package"]["name"]
+        if pkg_name not in requirements:
+            continue
+        test_reqs = []
+        for test in pkg.get("tests") or []:
+            if not isinstance(test, dict):
+                continue
+            test_section = test.get("requirements") or {}
+            test_reqs += test_section.get("run", []) + test_section.get("build", [])
+        test_reqs = [
+            r
+            for r in extract_dependency_names(test_reqs)
+            if r not in requirements[pkg_name]
+        ]
+        if test_reqs:
+            test_requirements[pkg_name] = test_reqs
+            requirements[pkg_name] = requirements[pkg_name] + test_reqs
+    return test_requirements
+
+
+class CyclicTestRequirement(Exception):
+    """A test requirement cannot be built before the package that tests it."""
+
+
+def build_requirement_graph(requirements, test_requirements):
+    """Build the dependency graph the build stages are derived from.
+
+    The real dependency edges are added first, so that a test requirement can
+    never reorder a real dependency. The test-only edges are added afterwards
+    and a cycle is reported as an error: the build and the test of a package
+    happen in the same job, so a package that is only built after the package
+    testing against it can never be installed into that test environment. There
+    is nothing this function could silently drop to make such a pipeline work --
+    the recipe declares the requirement either way -- so the recipe has to be
+    fixed instead.
+    """
+    G = nx.DiGraph()
+    for pkg, reqs in requirements.items():
+        G.add_node(pkg)
+        for r in reqs:
+            if r in test_requirements.get(pkg, ()):
+                continue
+            if r.startswith("ros-") or r.startswith("ros2-"):
+                G.add_edge(pkg, r)
+
+    for pkg, test_reqs in test_requirements.items():
+        for r in test_reqs:
+            if not (r.startswith("ros-") or r.startswith("ros2-")):
+                continue
+            G.add_edge(pkg, r)
+            if not nx.is_directed_acyclic_graph(G):
+                cycle = nx.find_cycle(G, source=pkg)
+                path = " -> ".join([edge[0] for edge in cycle] + [cycle[-1][1]])
+                raise CyclicTestRequirement(
+                    f"The test requirement {r} of {pkg} closes the dependency "
+                    f"cycle {path}, so {r} can only be built after {pkg} has "
+                    f"already been built and tested. Either make {r} a real "
+                    f"dependency of {pkg}, or move the test to a package that "
+                    f"is built after both of them."
+                )
+    return G
 
 
 def add_package_name_variants(entries, ros_distro):

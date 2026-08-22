@@ -1,7 +1,15 @@
 import json
 from unittest.mock import Mock, patch
 
-from vinca.utils import extract_dependency_names, get_repodata
+import pytest
+
+from vinca.utils import (
+    add_test_requirements,
+    build_requirement_graph,
+    CyclicTestRequirement,
+    extract_dependency_names,
+    get_repodata,
+)
 
 EMPTY_REPODATA = {"packages": {}, "packages.conda": {}}
 
@@ -21,6 +29,59 @@ def test_extract_dependency_names_handles_conditional_requirements():
         "ros2-rmw-wasm-cpp",
         "fmt",
     ]
+
+
+def _meta(name, tests):
+    return {"package": {"name": name}, "tests": tests}
+
+
+def test_add_test_requirements_collects_test_only_requirements():
+    requirements = {"ros2-pcl-conversions": ["ros2-rclcpp"], "ros2-ros2pkg": []}
+    metas = [
+        _meta(
+            "ros2-pcl-conversions",
+            [
+                {
+                    "script": ["ros2 pkg prefix pcl_conversions"],
+                    "requirements": {"run": ["ros2-ros2pkg", "ros2-rclcpp"]},
+                }
+            ],
+        )
+    ]
+
+    test_requirements = add_test_requirements(requirements, metas)
+
+    # ros2-rclcpp is already a real dependency, so it is not reported again.
+    assert test_requirements == {"ros2-pcl-conversions": ["ros2-ros2pkg"]}
+    assert requirements["ros2-pcl-conversions"] == ["ros2-rclcpp", "ros2-ros2pkg"]
+
+
+def test_add_test_requirements_ignores_recipes_without_tests():
+    requirements = {"ros2-rclcpp": []}
+    metas = [_meta("ros2-rclcpp", None), _meta("ros2-not-built", [])]
+
+    assert add_test_requirements(requirements, metas) == {}
+    assert requirements == {"ros2-rclcpp": []}
+
+
+def test_build_requirement_graph_orders_test_requirements():
+    requirements = {"ros2-pcl-conversions": ["ros2-ros2pkg"], "ros2-ros2pkg": []}
+    test_requirements = {"ros2-pcl-conversions": ["ros2-ros2pkg"]}
+
+    graph = build_requirement_graph(requirements, test_requirements)
+
+    assert graph.has_edge("ros2-pcl-conversions", "ros2-ros2pkg")
+
+
+def test_build_requirement_graph_rejects_cyclic_test_requirements():
+    requirements = {"ros2-a": ["ros2-b"], "ros2-b": ["ros2-a"]}
+    test_requirements = {"ros2-b": ["ros2-a"]}
+
+    with pytest.raises(CyclicTestRequirement) as excinfo:
+        build_requirement_graph(requirements, test_requirements)
+
+    assert "ros2-a" in str(excinfo.value)
+    assert "ros2-b" in str(excinfo.value)
 
 
 def test_get_repodata_returns_empty_for_missing_local_repodata(tmp_path):
