@@ -159,12 +159,21 @@ def add_test_requirements(requirements, metas):
     return test_requirements
 
 
+class CyclicTestRequirement(Exception):
+    """A test requirement cannot be built before the package that tests it."""
+
+
 def build_requirement_graph(requirements, test_requirements):
     """Build the dependency graph the build stages are derived from.
 
-    The test-only edges are added last and are dropped again when they would
-    close a cycle, so that a test requirement can never reorder a real
-    dependency.
+    The real dependency edges are added first, so that a test requirement can
+    never reorder a real dependency. The test-only edges are added afterwards
+    and a cycle is reported as an error: the build and the test of a package
+    happen in the same job, so a package that is only built after the package
+    testing against it can never be installed into that test environment. There
+    is nothing this function could silently drop to make such a pipeline work --
+    the recipe declares the requirement either way -- so the recipe has to be
+    fixed instead.
     """
     G = nx.DiGraph()
     for pkg, reqs in requirements.items():
@@ -181,11 +190,14 @@ def build_requirement_graph(requirements, test_requirements):
                 continue
             G.add_edge(pkg, r)
             if not nx.is_directed_acyclic_graph(G):
-                G.remove_edge(pkg, r)
-                requirements[pkg] = [x for x in requirements[pkg] if x != r]
-                print(
-                    f"Ignoring test requirement {r} of {pkg} for the build order "
-                    "because it would introduce a cycle."
+                cycle = nx.find_cycle(G, source=pkg)
+                path = " -> ".join([edge[0] for edge in cycle] + [cycle[-1][1]])
+                raise CyclicTestRequirement(
+                    f"The test requirement {r} of {pkg} closes the dependency "
+                    f"cycle {path}, so {r} can only be built after {pkg} has "
+                    f"already been built and tested. Either make {r} a real "
+                    f"dependency of {pkg}, or move the test to a package that "
+                    f"is built after both of them."
                 )
     return G
 

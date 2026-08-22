@@ -1,9 +1,12 @@
 import json
 from unittest.mock import Mock, patch
 
+import pytest
+
 from vinca.utils import (
     add_test_requirements,
     build_requirement_graph,
+    CyclicTestRequirement,
     extract_dependency_names,
     get_repodata,
 )
@@ -70,15 +73,15 @@ def test_build_requirement_graph_orders_test_requirements():
     assert graph.has_edge("ros2-pcl-conversions", "ros2-ros2pkg")
 
 
-def test_build_requirement_graph_drops_cyclic_test_requirements():
+def test_build_requirement_graph_rejects_cyclic_test_requirements():
     requirements = {"ros2-a": ["ros2-b"], "ros2-b": ["ros2-a"]}
     test_requirements = {"ros2-b": ["ros2-a"]}
 
-    graph = build_requirement_graph(requirements, test_requirements)
+    with pytest.raises(CyclicTestRequirement) as excinfo:
+        build_requirement_graph(requirements, test_requirements)
 
-    assert graph.has_edge("ros2-a", "ros2-b")
-    assert not graph.has_edge("ros2-b", "ros2-a")
-    assert requirements["ros2-b"] == []
+    assert "ros2-a" in str(excinfo.value)
+    assert "ros2-b" in str(excinfo.value)
 
 
 def test_get_repodata_returns_empty_for_missing_local_repodata(tmp_path):
