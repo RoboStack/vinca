@@ -38,6 +38,8 @@ dependencies = [
   "rich >=10",
   "jinja2 >=3.0.0",
   "license-expression >=30.0.0",
+  "packaging >=23.0",
+  "zstandard >=0.19.0",
 ]
 
 [project.urls]
@@ -53,6 +55,8 @@ vinca-migrate = "vinca.migrate:main"
 vinca-snapshot = "vinca.snapshot:main"
 vinca-sort-vinca-lists = "vinca.sort_vinca_lists:main"
 vinca-sort-yaml-keys = "vinca.sort_yaml_keys:main"
+vinca-pinning-render = "vinca.pinning:render_main"
+vinca-pinning-update = "vinca.pinning:update_main"
 
 [tool.hatch.version]
 path = "vinca/__init__.py"
@@ -88,6 +92,8 @@ networkx = ">=2.5"
 rich = ">=10"
 jinja2 = ">=3.0.0"
 license-expression = ">=30.0.0"
+packaging = ">=23.0"
+zstandard = ">=0.19.0"
 pytest = "*"
 ruff = "*"
 
