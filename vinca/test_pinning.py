@@ -18,7 +18,7 @@ from vinca.pinning import (
     select_completed_migrations,
     update_pinning,
 )
-from vinca.variant_algebra import variant_add
+from vinca.variant_algebra import _selector_platforms, variant_add
 
 
 BASE_CONFIG = b"""\
@@ -208,6 +208,32 @@ def test_cfep9_merges_pin_run_as_build_and_zip_keys():
     assert merged["zip_keys"] == [["is_python_min", "numpy", "python"]]
 
 
+def test_cfep9_duplicate_primary_values_keep_zip_key_columns_aligned():
+    merged = variant_add(
+        {
+            "python": ["3.13"],
+            "numpy": ["1.0"],
+            "zip_keys": [["python", "numpy"]],
+        },
+        {
+            "__migrator": {"primary_key": "python"},
+            "python": ["3.13"],
+            "numpy": ["2.0"],
+        },
+    )
+
+    assert len(merged["python"]) == len(merged["numpy"])
+
+
+def test_cfep9_negated_platform_selector_keeps_non_negated_platforms():
+    assert _selector_platforms("not win") == {
+        "linux-64",
+        "linux-aarch64",
+        "osx-64",
+        "osx-arm64",
+    }
+
+
 def test_cfep9_scoped_migration_only_replaces_matching_platform_values():
     yaml = ruamel.yaml.YAML()
     base = yaml.load(
@@ -261,6 +287,43 @@ requirements:
         "libcamera",
         "python",
     }
+
+
+def test_dependencies_from_vinca_restores_global_platform_configuration(tmp_path, monkeypatch):
+    from vinca import config
+
+    distro = type(
+        "FakeDistro",
+        (),
+        {
+            "name": "rolling",
+            "snapshot": {},
+            "additional_packages_snapshot": {},
+            "prefetch_additional_package_xml": lambda self: None,
+        },
+    )()
+    original_args = object()
+    monkeypatch.setattr(config, "selected_platform", "osx-64")
+    monkeypatch.setattr(config, "parsed_args", original_args)
+
+    with (
+        patch("vinca.distro.Distro", return_value=distro),
+        patch(
+            "vinca.main.read_vinca_yaml",
+            return_value={
+                "ros_distro": "rolling",
+                "_snapshot": {},
+                "_additional_packages_snapshot": {},
+            },
+        ),
+        patch("vinca.main.get_group_dependency_packages", return_value=[]),
+        patch("vinca.main.get_selected_packages", return_value=[]),
+        patch("vinca.main.generate_dependency_requirements", return_value=[]),
+    ):
+        dependencies_from_vinca(tmp_path, platforms=("linux-64",))
+
+    assert config.selected_platform == "osx-64"
+    assert config.parsed_args is original_args
 
 
 def test_dependencies_from_vinca_reuses_distro_and_group_packages(tmp_path):

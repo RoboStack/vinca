@@ -53,6 +53,18 @@ def test_dependency_walk_honors_ignored_packages():
     assert distro.get_depends("app", ignore_pkgs={"ignored"}) == {"included"}
 
 
+def test_dependency_walk_excludes_root_in_cycles():
+    graph = {"a": {"b"}, "b": {"a"}}
+    distro = Distro.__new__(Distro)
+    distro._depends_cache = {}
+    distro._direct_depends_cache = {}
+    distro.additional_packages_snapshot = None
+    distro.check_package = lambda name: name in graph
+    distro._get_direct_depends = lambda name: graph[name]
+
+    assert distro.get_depends("a") == {"b"}
+
+
 def test_prefetch_additional_manifests_skips_archives():
     distro = Distro.__new__(Distro)
     distro.additional_packages_snapshot = {
