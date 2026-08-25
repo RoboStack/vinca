@@ -33,3 +33,51 @@ package_name_mode: both
 ```
 
 Once users and downstream projects have migrated, switch to `new` to stop generating the compatibility packages. New ROS 1 package names use the `ros-` prefix; new ROS 2 package names use `ros2-`.
+
+## Managing conda-forge pinning
+
+RoboStack repositories can keep their global pins reproducible without copying and
+manually editing conda-forge's full pinning file. Add a `vinca_pinning.yaml` file:
+
+```yaml
+conda_forge_pinning_version: 2026.08.20.20.38.26
+migrations:
+  - libboost190
+pinning_overrides:
+  python:
+    - 3.14.* *_cp314
+  # Override every member of a zip_keys group together.
+  is_python_min:
+    - false
+  python_impl:
+    - cpython
+```
+
+Render the build-tool input with:
+
+```shell
+vinca-pinning-render
+```
+
+The renderer downloads that exact `conda-forge-pinning` package and starts with its
+`conda_build_config.yaml`. It sorts the named migrations by `migrator_ts`, just as
+`conda-smithy` does, and combines each one using the [CFEP-9 variant algebra](https://github.com/conda-forge/cfep/blob/main/cfep-09.md).
+
+For a full rebuild, update the base and eligible migrations with:
+
+```shell
+vinca-pinning-update --render
+```
+
+The updater updates the base `conda_forge_pinning_version` to the latest one, but keeps `pinning_overrides` unchanged. It uses existing generated recipes
+when available; otherwise it collects the would-be recipe dependencies for Linux,
+macOS, and Windows without fully generating the recipes. The ROS distro model and
+parsed group dependencies are reused across platforms. For each active, non-paused
+conda-forge migration, it checks the public
+conda-forge migration status and applies it only after all feedstocks producing the
+external dependencies of the selected ROS recipes are marked done. Previously
+applied migrations remain selected while they are active; migrations incorporated
+into a newer base disappear from the list automatically.
+
+Use repeatable `--platform` options to limit dependency discovery, and use `-d` when
+the RoboStack repository is not the current directory.

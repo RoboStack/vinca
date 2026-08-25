@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 
+from __future__ import annotations
+
 import argparse
 import catkin_pkg
 import sys
 import os
 import glob
 import platform
+from typing import Any, Optional
+
 import ruamel.yaml
 from pathlib import Path
 
@@ -307,7 +311,15 @@ def append_output_with_compatibility(
             outputs.append(candidate)
 
 
-def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
+def generate_output(
+    pkg_shortname: str,
+    vinca_conf: dict[str, Any],
+    distro: Distro,
+    version: str,
+    all_pkgs: Optional[list[Any]] = None,
+    *,
+    dependencies_only: bool = False,
+) -> Optional[dict[str, Any]]:
     if not all_pkgs:
         all_pkgs = []
 
@@ -631,6 +643,9 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         ]
         output["requirements"][dep_type] = tmp_nonduplicate
 
+    if dependencies_only:
+        return output["requirements"]
+
     # Add "about" section with license and package metadata
     output["about"] = {}
 
@@ -654,6 +669,48 @@ def generate_output(pkg_shortname, vinca_conf, distro, version, all_pkgs=None):
         output["about"]["summary"] = pkg.description
 
     return output
+
+
+def get_group_dependency_packages(distro: Distro) -> list[Any]:
+    """Parse the packages needed to expand package.xml group dependencies."""
+
+    packages = []
+    for package_name in distro.get_depends("ros_base"):
+        xml = distro.get_release_package_xml(package_name)
+        if not xml:
+            continue
+        package = catkin_pkg.package.parse_package_string(xml)
+        package.evaluate_conditions(os.environ)
+        packages.append(package)
+    return packages
+
+
+def generate_dependency_requirements(
+    distro: Distro, vinca_conf: dict[str, Any], all_pkgs: list[Any]
+) -> list[dict[str, Any]]:
+    """Collect requirement mappings without generating complete recipe outputs."""
+
+    requirements = []
+    for pkg_shortname in vinca_conf["_selected_pkgs"]:
+        if not distro.check_package(pkg_shortname):
+            continue
+        requirement = generate_output(
+            pkg_shortname,
+            vinca_conf,
+            distro,
+            distro.get_version(pkg_shortname),
+            all_pkgs,
+            dependencies_only=True,
+        )
+        if requirement is not None:
+            requirements.append(requirement)
+
+    mutex_config = parse_mutex_package_config(vinca_conf)
+    if mutex_config is not None:
+        requirements.append(
+            {"run_constraints": mutex_config.get("run_constraints", [])}
+        )
+    return requirements
 
 
 def generate_outputs(distro, vinca_conf):

@@ -4,6 +4,8 @@ import posixpath
 import tarfile
 import urllib.parse
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
+from typing import Iterable, Optional
 
 import requests
 from rosdistro import get_cached_distribution, get_index, get_index_url
@@ -130,6 +132,7 @@ class Distro(object):
         self._additional_xml_cache = {}
         self._last_archive = None
         self._depends_cache = {}
+        self._direct_depends_cache = {}
 
         os.environ["ROS_VERSION"] = "1" if self.check_ros1() else "2"
 
@@ -140,16 +143,43 @@ class Distro(object):
     def add_packages(self, packages):
         self.build_packages = set(packages)
 
-    def get_depends(self, pkg, ignore_pkgs=None):
-        dependencies = set()
-
+    def get_depends(
+        self, pkg: str, ignore_pkgs: Optional[Iterable[str]] = None
+    ) -> set[str]:
         cache_key = (pkg, tuple(sorted(ignore_pkgs)) if ignore_pkgs else None)
         if cache_key in self._depends_cache:
             return set(self._depends_cache[cache_key])
 
         if not self.check_package(pkg):
             print(f"{pkg} not in available packages anymore")
-            return dependencies
+            return set()
+
+        ignore_pkgs = set(ignore_pkgs or ())
+        dependencies = set()
+        visited = {pkg}
+        packages_to_check = {pkg}
+        while packages_to_check:
+            current = packages_to_check.pop()
+            if current in ignore_pkgs:
+                continue
+            direct = self._get_direct_depends(current) - ignore_pkgs
+            new_dependencies = direct - visited
+            visited.update(new_dependencies)
+            dependencies.update(new_dependencies)
+            packages_to_check.update(
+                dependency
+                for dependency in new_dependencies
+                if self.check_package(dependency)
+            )
+
+        self._depends_cache[cache_key] = set(dependencies)
+        return dependencies
+
+    def _get_direct_depends(self, pkg: str) -> set[str]:
+        """Return direct dependencies, caching package metadata across root walks."""
+
+        if pkg in self._direct_depends_cache:
+            return set(self._direct_depends_cache[pkg])
 
         # if pkg comes from additional_packages_snapshot, extract from its package.xml
         if (
@@ -179,33 +209,26 @@ class Distro(object):
                     if elem.text:
                         name = elem.text.strip()
                         direct.add(name)
-            # add direct deps
-            dependencies |= direct
-            # recursively collect dependencies
-            for dep in direct:
-                if ignore_pkgs and dep in ignore_pkgs:
-                    continue
-                dependencies |= self.get_depends(dep, ignore_pkgs=ignore_pkgs)
-            self._depends_cache[cache_key] = set(dependencies)
-            return dependencies
+            self._direct_depends_cache[pkg] = set(direct)
+            return direct
 
-        # If the package is from upstream rosdistro, use the walker to get dependencies
-        dependencies |= self._walker.get_recursive_depends(
-            pkg,
-            [
-                "buildtool",
-                "buildtool_export",
-                "build",
-                "build_export",
-                "run",
-                "test",
-                "exec",
-            ],
-            ros_packages_only=True,
-            ignore_pkgs=ignore_pkgs,
-        )
-        self._depends_cache[cache_key] = set(dependencies)
-        return dependencies
+        # Cache the union before walking the graph. DependencyWalker otherwise
+        # recomputes and deep-copies these fields for every configured root package.
+        direct = set()
+        for dependency_type in (
+            "buildtool",
+            "buildtool_export",
+            "build",
+            "build_export",
+            "run",
+            "test",
+            "exec",
+        ):
+            direct.update(
+                self._walker.get_depends(pkg, dependency_type, ros_packages_only=True)
+            )
+        self._direct_depends_cache[pkg] = set(direct)
+        return direct
 
     def get_released_repo(self, pkg_name):
         if self.snapshot and pkg_name in self.snapshot:
@@ -308,6 +331,19 @@ class Distro(object):
             raw_url = self._construct_raw_url_gitlab(pkg_info)
             return self._download_raw_pkg_xml_or_cached(url=raw_url)
         raise RuntimeError(f"Cannot handle unknown repository hoster: {raw_url_base}")
+
+    def prefetch_additional_package_xml(self, max_workers: int = 12) -> None:
+        """Fetch immutable raw manifests concurrently for dependency discovery."""
+
+        package_infos = [
+            package_info
+            for package_info in (self.additional_packages_snapshot or {}).values()
+            if not is_archive_url(package_info.get("url"))
+        ]
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            list(
+                executor.map(self.get_package_xml_for_additional_package, package_infos)
+            )
 
     def _get_auth_headers(self, url):
         """Token header for the hosters vinca knows, empty otherwise.
