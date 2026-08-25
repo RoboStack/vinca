@@ -5,6 +5,7 @@ import tarfile
 import urllib.parse
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from typing import Iterable, Optional
 
 import requests
 from rosdistro import get_cached_distribution, get_index, get_index_url
@@ -142,7 +143,9 @@ class Distro(object):
     def add_packages(self, packages):
         self.build_packages = set(packages)
 
-    def get_depends(self, pkg, ignore_pkgs=None):
+    def get_depends(
+        self, pkg: str, ignore_pkgs: Optional[Iterable[str]] = None
+    ) -> set[str]:
         cache_key = (pkg, tuple(sorted(ignore_pkgs)) if ignore_pkgs else None)
         if cache_key in self._depends_cache:
             return set(self._depends_cache[cache_key])
@@ -172,7 +175,7 @@ class Distro(object):
         self._depends_cache[cache_key] = set(dependencies)
         return dependencies
 
-    def _get_direct_depends(self, pkg):
+    def _get_direct_depends(self, pkg: str) -> set[str]:
         """Return direct dependencies, caching package metadata across root walks."""
 
         if pkg in self._direct_depends_cache:
@@ -329,7 +332,7 @@ class Distro(object):
             return self._download_raw_pkg_xml_or_cached(url=raw_url)
         raise RuntimeError(f"Cannot handle unknown repository hoster: {raw_url_base}")
 
-    def prefetch_additional_package_xml(self, max_workers=12):
+    def prefetch_additional_package_xml(self, max_workers: int = 12) -> None:
         """Fetch immutable raw manifests concurrently for dependency discovery."""
 
         package_infos = [

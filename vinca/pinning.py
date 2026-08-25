@@ -8,6 +8,8 @@ on top of it, and local overrides.  This module turns that small file into the
 
 from __future__ import annotations
 
+from typing import Any, Iterator, Mapping, Optional, Sequence, Union
+
 import argparse
 import io
 import json
@@ -59,14 +61,14 @@ class PinningError(RuntimeError):
     """A pinning file could not be downloaded, interpreted, or updated."""
 
 
-def _yaml():
+def _yaml() -> Any:
     yaml = ruamel.yaml.YAML()
     yaml.width = 4096
     yaml.indent(mapping=2, sequence=4, offset=2)
     return yaml
 
 
-def _request(url, *, timeout=120):
+def _request(url: str, *, timeout: int = 120) -> Any:
     try:
         response = requests.get(url, timeout=timeout)
         response.raise_for_status()
@@ -75,7 +77,7 @@ def _request(url, *, timeout=120):
     return response
 
 
-def _load_zstd_json(payload):
+def _load_zstd_json(payload: bytes) -> Any:
     try:
         decompressed = zstandard.ZstdDecompressor().decompress(payload)
     except zstandard.ZstdError as exc:
@@ -83,7 +85,7 @@ def _load_zstd_json(payload):
     return json.loads(decompressed)
 
 
-def get_latest_pinning_distribution():
+def get_latest_pinning_distribution() -> tuple[str, str]:
     """Return the newest conda-forge-pinning version and artifact URL."""
     repodata = _load_zstd_json(_request(CURRENT_REPODATA_URL).content)
     records = []
@@ -100,7 +102,7 @@ def get_latest_pinning_distribution():
     return str(record["version"]), url
 
 
-def get_pinning_distribution(version):
+def get_pinning_distribution(version: str) -> str:
     """Return the artifact URL for an exact conda-forge-pinning version."""
     release = _request(ANACONDA_RELEASE_URL.format(version=quote(str(version)))).json()
     distributions = [
@@ -127,7 +129,7 @@ def get_pinning_distribution(version):
     return url
 
 
-def _read_tar_members(fileobj, *, mode):
+def _read_tar_members(fileobj: Any, *, mode: str) -> dict[str, bytes]:
     files = {}
     with tarfile.open(fileobj=fileobj, mode=mode) as archive:
         for member in archive:
@@ -144,7 +146,7 @@ def _read_tar_members(fileobj, *, mode):
     return files
 
 
-def _read_pinning_package(payload):
+def _read_pinning_package(payload: bytes) -> tuple[bytes, dict[str, bytes]]:
     """Read the base config and migrations from a .conda or .tar.bz2 payload."""
     stream = io.BytesIO(payload)
     if zipfile.is_zipfile(stream):
@@ -177,12 +179,16 @@ def _read_pinning_package(payload):
     return base, migrations
 
 
-def download_pinning_package(version, *, artifact_url=None):
+def download_pinning_package(
+    version: str, *, artifact_url: Optional[str] = None
+) -> tuple[bytes, dict[str, bytes]]:
     url = artifact_url or get_pinning_distribution(version)
     return _read_pinning_package(_request(url).content)
 
 
-def _pinning_spec_fields(data):
+def _pinning_spec_fields(
+    data: Mapping[str, Any],
+) -> tuple[str, list[str], Mapping[str, Any]]:
     version = data.get("conda_forge_pinning_version")
     migrations = data.get("migrations", [])
     overrides = data.get("pinning_overrides")
@@ -199,26 +205,26 @@ def _pinning_spec_fields(data):
     return str(version), migrations, overrides
 
 
-def _migration_name(name):
+def _migration_name(name: str) -> str:
     name = name.removesuffix(".yaml")
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
         raise PinningError(f"Invalid migration name: {name!r}")
     return name
 
 
-def _overlay(target, source):
+def _overlay(target: Any, source: Any) -> None:
     for key, value in source.items():
         if key == "migrator_ts" or str(key).startswith("__"):
             continue
         target[key] = value
 
 
-def _migration_timestamp(payload):
+def _migration_timestamp(payload: bytes) -> float:
     data = _yaml().load(payload.decode("utf-8")) or {}
     return float(data.get("migrator_ts", -1.0))
 
 
-def _validate_zipped_overrides(rendered, overrides):
+def _validate_zipped_overrides(rendered: Any, overrides: Any) -> None:
     override_keys = set(overrides)
     for group in rendered.get("zip_keys", []):
         group = set(group)
@@ -232,7 +238,7 @@ def _validate_zipped_overrides(rendered, overrides):
             )
 
 
-def _format_rendered_yaml(payload):
+def _format_rendered_yaml(payload: str) -> str:
     """Normalize emitted YAML while preserving selectors on empty list items."""
 
     lines = payload.splitlines()
@@ -254,7 +260,12 @@ def _format_rendered_yaml(payload):
     return "\n".join(formatted) + "\n"
 
 
-def render_pinning(config_path, output_path, *, package=None):
+def render_pinning(
+    config_path: Union[str, Path],
+    output_path: Union[str, Path],
+    *,
+    package: Optional[tuple[bytes, Mapping[str, bytes]]] = None,
+) -> Any:
     """Render vinca_pinning.yaml into conda_build_config.yaml."""
     yaml = _yaml()
     config_path = Path(config_path)
@@ -301,7 +312,7 @@ def render_pinning(config_path, output_path, *, package=None):
     return rendered
 
 
-def _dependency_name(requirement):
+def _dependency_name(requirement: Any) -> Optional[str]:
     if not isinstance(requirement, str) or requirement.startswith("${{"):
         return None
     name = requirement.split()[0]
@@ -310,7 +321,7 @@ def _dependency_name(requirement):
     return name
 
 
-def _walk_requirements(value):
+def _walk_requirements(value: Any) -> Iterator[str]:
     if isinstance(value, str):
         yield value
     elif isinstance(value, list):
@@ -325,7 +336,7 @@ def _walk_requirements(value):
             yield from _walk_requirements(item)
 
 
-def dependencies_from_recipes(recipe_dir):
+def dependencies_from_recipes(recipe_dir: Union[str, Path]) -> set[str]:
     """Collect non-ROS conda dependency names from generated recipe files."""
     yaml = _yaml()
     dependencies = set()
@@ -339,7 +350,7 @@ def dependencies_from_recipes(recipe_dir):
 
 
 @contextmanager
-def _working_directory(path):
+def _working_directory(path: Any) -> Iterator[None]:
     previous = Path.cwd()
     os.chdir(path)
     try:
@@ -348,7 +359,9 @@ def _working_directory(path):
         os.chdir(previous)
 
 
-def dependencies_from_vinca(base_dir, platforms=DEFAULT_PLATFORMS):
+def dependencies_from_vinca(
+    base_dir: Union[str, Path], platforms: Sequence[str] = DEFAULT_PLATFORMS
+) -> set[str]:
     """Collect would-be recipe dependencies while reusing one distro model."""
     from vinca import config
     from vinca.distro import Distro
@@ -405,11 +418,11 @@ def dependencies_from_vinca(base_dir, platforms=DEFAULT_PLATFORMS):
     return dependencies
 
 
-def _normalized(name):
+def _normalized(name: str) -> str:
     return name.lower().replace("_", "-")
 
 
-def _feedstock_output_url(package):
+def _feedstock_output_url(package: str) -> str:
     prefix = (package.lower() + "zzz")[:3]
     shards = "/".join(prefix)
     return FEEDSTOCK_OUTPUT_URL.format(
@@ -417,7 +430,7 @@ def _feedstock_output_url(package):
     )
 
 
-def package_feedstocks(package):
+def package_feedstocks(package: str) -> set[str]:
     """Return feedstocks producing a conda package, with a conservative fallback."""
     url = _feedstock_output_url(package)
     try:
@@ -431,7 +444,7 @@ def package_feedstocks(package):
     return set(feedstocks) or {package}
 
 
-def get_migration_status(migration):
+def get_migration_status(migration: str) -> Optional[dict[str, Any]]:
     url = MIGRATION_STATUS_URL.format(migration=quote(migration.lower(), safe=""))
     try:
         response = requests.get(url, timeout=60)
@@ -445,7 +458,7 @@ def get_migration_status(migration):
         ) from exc
 
 
-def _migration_pin_keys(payload):
+def _migration_pin_keys(payload: bytes) -> set[str]:
     data = _yaml().load(payload.decode("utf-8")) or {}
     return {
         _normalized(str(key))
@@ -454,19 +467,19 @@ def _migration_pin_keys(payload):
     }
 
 
-def _is_paused_migration(payload):
+def _is_paused_migration(payload: bytes) -> bool:
     data = _yaml().load(payload.decode("utf-8")) or {}
     return bool((data.get("__migrator") or {}).get("paused", False))
 
 
-def _comment_selector(comment):
+def _comment_selector(comment: Any) -> Optional[str]:
     if comment is None:
         return None
     match = re.search(r"#\s*\[(.+)]", comment.value)
     return match.group(1) if match else None
 
 
-def _migration_selectors(data):
+def _migration_selectors(data: Any) -> Iterator[Optional[str]]:
     """Yield selector expressions for each top-level variant value."""
     for key, value in data.items():
         if key == "migrator_ts" or str(key).startswith("__"):
@@ -485,7 +498,7 @@ def _migration_selectors(data):
             yield key_selector
 
 
-def _migration_applies_to_platforms(payload, platforms):
+def _migration_applies_to_platforms(payload: bytes, platforms: Sequence[str]) -> bool:
     data = _yaml().load(payload.decode("utf-8")) or {}
     migrator = data.get("__migrator") or {}
     allowlist = set(migrator.get("platform_allowlist", []))
@@ -501,7 +514,7 @@ def _migration_applies_to_platforms(payload, platforms):
     )
 
 
-def _status_sets(status):
+def _status_sets(status: Any) -> tuple[set[str], set[str]]:
     values = {
         category: {_normalized(name) for name in status.get(category, [])}
         for category in STATUS_CATEGORIES
@@ -511,8 +524,11 @@ def _status_sets(status):
 
 
 def select_completed_migrations(
-    migration_payloads, dependencies, existing_migrations=(), platforms=None
-):
+    migration_payloads: Mapping[str, bytes],
+    dependencies: set[str],
+    existing_migrations: Sequence[str] = (),
+    platforms: Optional[Sequence[str]] = None,
+) -> tuple[list[str], list[tuple[str, str]]]:
     """Select active migrations completed for all relevant dependency feedstocks."""
     existing = {_migration_name(name) for name in existing_migrations}
     candidates = {
@@ -586,13 +602,13 @@ def select_completed_migrations(
 
 
 def update_pinning(
-    config_path,
+    config_path: Union[str, Path],
     *,
-    base_dir=None,
-    platforms=DEFAULT_PLATFORMS,
-    dependencies=None,
-    latest_distribution=None,
-):
+    base_dir: Optional[Union[str, Path]] = None,
+    platforms: Sequence[str] = DEFAULT_PLATFORMS,
+    dependencies: Optional[set[str]] = None,
+    latest_distribution: Optional[tuple[str, str]] = None,
+) -> tuple[str, list[str], list[tuple[str, str]]]:
     """Update the base version and completed active migrations in a pinning spec."""
     config_path = Path(config_path)
     base_dir = Path(base_dir or config_path.parent)
@@ -634,7 +650,7 @@ def update_pinning(
     return version, migrations, reports
 
 
-def _common_parser(description):
+def _common_parser(description: str) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         "-d", "--dir", default=".", help="RoboStack repository directory"
@@ -647,7 +663,7 @@ def _common_parser(description):
     return parser
 
 
-def render_main(argv=None):
+def render_main(argv: Optional[Sequence[str]] = None) -> None:
     parser = _common_parser("Render conda_build_config.yaml from vinca pinning")
     parser.add_argument(
         "-o",
@@ -664,7 +680,7 @@ def render_main(argv=None):
     print(f"Rendered {base_dir / args.output}")
 
 
-def update_main(argv=None):
+def update_main(argv: Optional[Sequence[str]] = None) -> None:
     parser = _common_parser("Update vinca pinning from conda-forge migration status")
     parser.add_argument(
         "--platform",
