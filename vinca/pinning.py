@@ -363,37 +363,45 @@ def dependencies_from_vinca(base_dir, platforms=DEFAULT_PLATFORMS):
     dependencies = set()
     distro = None
     group_packages = None
-    with _working_directory(base_dir):
-        for platform in platforms:
-            config.selected_platform = platform
-            config.parsed_args = argparse.Namespace(platform=platform)
-            vinca_config = read_vinca_yaml(base_dir / "vinca.yaml")
-            vinca_config["skip_built_packages"] = []
-            if distro is None:
-                distro = Distro(
-                    vinca_config["ros_distro"],
-                    vinca_config.get("python_version"),
-                    vinca_config["_snapshot"],
-                    vinca_config["_additional_packages_snapshot"],
+    previous_platform = config.selected_platform
+    previous_args = config.parsed_args
+    try:
+        with _working_directory(base_dir):
+            for platform in platforms:
+                config.selected_platform = platform
+                config.parsed_args = argparse.Namespace(platform=platform)
+                vinca_config = read_vinca_yaml(base_dir / "vinca.yaml")
+                vinca_config["skip_built_packages"] = []
+                if distro is None:
+                    distro = Distro(
+                        vinca_config["ros_distro"],
+                        vinca_config.get("python_version"),
+                        vinca_config["_snapshot"],
+                        vinca_config["_additional_packages_snapshot"],
+                    )
+                    distro.prefetch_additional_package_xml()
+                    group_packages = get_group_dependency_packages(distro)
+                elif (
+                    distro.name != vinca_config["ros_distro"]
+                    or distro.snapshot != vinca_config["_snapshot"]
+                    or distro.additional_packages_snapshot
+                    != vinca_config["_additional_packages_snapshot"]
+                ):
+                    raise PinningError(
+                        "Platform selectors must not change the ROS distro snapshots"
+                    )
+                vinca_config["_selected_pkgs"] = get_selected_packages(
+                    distro, vinca_config
                 )
-                distro.prefetch_additional_package_xml()
-                group_packages = get_group_dependency_packages(distro)
-            elif (
-                distro.name != vinca_config["ros_distro"]
-                or distro.snapshot != vinca_config["_snapshot"]
-                or distro.additional_packages_snapshot
-                != vinca_config["_additional_packages_snapshot"]
-            ):
-                raise PinningError(
-                    "Platform selectors must not change the ROS distro snapshots"
-                )
-            vinca_config["_selected_pkgs"] = get_selected_packages(distro, vinca_config)
-            for requirement_group in generate_dependency_requirements(
-                distro, vinca_config, group_packages
-            ):
-                for requirement in _walk_requirements(requirement_group):
-                    if name := _dependency_name(requirement):
-                        dependencies.add(name)
+                for requirement_group in generate_dependency_requirements(
+                    distro, vinca_config, group_packages
+                ):
+                    for requirement in _walk_requirements(requirement_group):
+                        if name := _dependency_name(requirement):
+                            dependencies.add(name)
+    finally:
+        config.selected_platform = previous_platform
+        config.parsed_args = previous_args
     return dependencies
 
 

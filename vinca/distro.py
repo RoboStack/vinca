@@ -153,13 +153,15 @@ class Distro(object):
 
         ignore_pkgs = set(ignore_pkgs or ())
         dependencies = set()
+        visited = {pkg}
         packages_to_check = {pkg}
         while packages_to_check:
             current = packages_to_check.pop()
             if current in ignore_pkgs:
                 continue
             direct = self._get_direct_depends(current) - ignore_pkgs
-            new_dependencies = direct - dependencies
+            new_dependencies = direct - visited
+            visited.update(new_dependencies)
             dependencies.update(new_dependencies)
             packages_to_check.update(
                 dependency

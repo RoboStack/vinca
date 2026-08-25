@@ -92,11 +92,16 @@ def _selector_platforms(selector):
     if "unix" in tokens:
         platforms &= {item for item in _PLATFORMS if not item.startswith("win-")}
     os_scopes = []
-    if "linux" in tokens or "linux64" in tokens:
+    def is_positive_os(*names):
+        return any(name in tokens for name in names) and not any(
+            re.search(rf"\bnot\s+{name}\b", selector) for name in names
+        )
+
+    if is_positive_os("linux", "linux64"):
         os_scopes.append({item for item in _PLATFORMS if item.startswith("linux-")})
-    if "osx" in tokens:
+    if is_positive_os("osx"):
         os_scopes.append({item for item in _PLATFORMS if item.startswith("osx-")})
-    if "win" in tokens or "win64" in tokens:
+    if is_positive_os("win", "win64"):
         os_scopes.append({item for item in _PLATFORMS if item.startswith("win-")})
     if os_scopes:
         platforms &= set().union(*os_scopes)
@@ -364,11 +369,16 @@ def variant_add(left, right):
         group = next((group for group in zip_groups if primary_key in group), [])
         if not group:
             continue
-        chosen = [
-            index
-            for index, value in enumerate(primary_left + primary_right)
-            if value in merged
-        ]
+        source_primary = primary_left + primary_right
+        chosen = []
+        for value in merged:
+            chosen.append(
+                next(
+                    index
+                    for index, candidate in enumerate(source_primary)
+                    if candidate == value and index not in chosen
+                )
+            )
         for key in set(group) - {primary_key}:
             values = _ensure_list(left[key]) + _ensure_list(right[key])
             selected = [value for index, value in enumerate(values) if index in chosen]
