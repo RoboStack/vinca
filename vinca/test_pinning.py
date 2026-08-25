@@ -234,6 +234,38 @@ def test_cfep9_negated_platform_selector_keeps_non_negated_platforms():
     }
 
 
+@pytest.mark.parametrize(
+    ("selector", "platforms"),
+    [
+        ("not linux", {"osx-64", "osx-arm64", "win-64"}),
+        ("not osx", {"linux-64", "linux-aarch64", "win-64"}),
+        ("not win", {"linux-64", "linux-aarch64", "osx-64", "osx-arm64"}),
+        ("unix and not osx", {"linux-64", "linux-aarch64"}),
+        ("not win and x86_64", {"linux-64", "osx-64"}),
+    ],
+)
+def test_cfep9_negated_selectors_keep_the_remaining_platforms(selector, platforms):
+    assert _selector_platforms(selector) == platforms
+
+
+def test_cfep9_repeated_complete_zip_row_keeps_one_aligned_row():
+    merged = variant_add(
+        {
+            "python": ["3.13"],
+            "numpy": ["1.0"],
+            "zip_keys": [["python", "numpy"]],
+        },
+        {
+            "__migrator": {"primary_key": "python"},
+            "python": ["3.13"],
+            "numpy": ["1.0"],
+        },
+    )
+
+    assert merged["python"] == ["3.13"]
+    assert merged["numpy"] == ["1.0"]
+
+
 def test_cfep9_scoped_migration_only_replaces_matching_platform_values():
     yaml = ruamel.yaml.YAML()
     base = yaml.load(
@@ -319,6 +351,33 @@ def test_dependencies_from_vinca_restores_global_platform_configuration(tmp_path
         patch("vinca.main.get_group_dependency_packages", return_value=[]),
         patch("vinca.main.get_selected_packages", return_value=[]),
         patch("vinca.main.generate_dependency_requirements", return_value=[]),
+    ):
+        dependencies_from_vinca(tmp_path, platforms=("linux-64",))
+
+    assert config.selected_platform == "osx-64"
+    assert config.parsed_args is original_args
+
+
+def test_dependencies_from_vinca_restores_global_configuration_on_error(
+    tmp_path, monkeypatch
+):
+    from vinca import config
+
+    original_args = object()
+    monkeypatch.setattr(config, "selected_platform", "osx-64")
+    monkeypatch.setattr(config, "parsed_args", original_args)
+
+    with (
+        patch(
+            "vinca.main.read_vinca_yaml",
+            return_value={
+                "ros_distro": "rolling",
+                "_snapshot": {},
+                "_additional_packages_snapshot": {},
+            },
+        ),
+        patch("vinca.distro.Distro", side_effect=RuntimeError("network failure")),
+        pytest.raises(RuntimeError, match="network failure"),
     ):
         dependencies_from_vinca(tmp_path, platforms=("linux-64",))
 
