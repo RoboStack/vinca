@@ -8,6 +8,8 @@ normal migrations, zip keys, pin_run_as_build, key_add, and key_remove.
 
 from __future__ import annotations
 
+from typing import Any, MutableMapping, Optional
+
 from copy import deepcopy
 import re
 
@@ -25,13 +27,13 @@ _PLATFORMS = {
 }
 
 
-def _ensure_list(value):
+def _ensure_list(value: Any) -> list[Any]:
     if isinstance(value, list):
         return value
     return [value]
 
 
-def _version_order(value, ordering=None):
+def _version_order(value: Any, ordering: Any = None) -> tuple[int, Any]:
     if ordering is not None:
         return (2, ordering.index(value))
     normalized = str(value).replace(" ", ".").replace("*", "1")
@@ -41,7 +43,7 @@ def _version_order(value, ordering=None):
         return (0, normalized)
 
 
-def _copy_sequence_comments(values, *sources):
+def _copy_sequence_comments(values: Any, *sources: Any) -> CommentedSeq:
     """Build a round-trip sequence, retaining selector comments where possible."""
     result = CommentedSeq(deepcopy(list(values)))
     used = [set() for _ in sources]
@@ -64,14 +66,14 @@ def _copy_sequence_comments(values, *sources):
     return result
 
 
-def _comment_selector(comment):
+def _comment_selector(comment: Any) -> Optional[str]:
     if comment is None:
         return None
     match = _SELECTOR_RE.search(comment.value)
     return match.group(1) if match else None
 
 
-def _sequence_selector(mapping, key, index):
+def _sequence_selector(mapping: Any, key: str, index: int) -> Optional[str]:
     key_comment = mapping.ca.items.get(key, [None, None, None])[2]
     key_selector = _comment_selector(key_comment)
     value = mapping[key]
@@ -84,7 +86,7 @@ def _sequence_selector(mapping, key, index):
     return key_selector or item_selector
 
 
-def _selector_platforms(selector):
+def _selector_platforms(selector: Optional[str]) -> set[str]:
     if selector is None:
         return set(_PLATFORMS)
     platforms = set(_PLATFORMS)
@@ -92,11 +94,17 @@ def _selector_platforms(selector):
     if "unix" in tokens:
         platforms &= {item for item in _PLATFORMS if not item.startswith("win-")}
     os_scopes = []
-    if "linux" in tokens or "linux64" in tokens:
+
+    def is_positive_os(*names: Any) -> Any:
+        return any(name in tokens for name in names) and not any(
+            re.search(rf"\bnot\s+{name}\b", selector) for name in names
+        )
+
+    if is_positive_os("linux", "linux64"):
         os_scopes.append({item for item in _PLATFORMS if item.startswith("linux-")})
-    if "osx" in tokens:
+    if is_positive_os("osx"):
         os_scopes.append({item for item in _PLATFORMS if item.startswith("osx-")})
-    if "win" in tokens or "win64" in tokens:
+    if is_positive_os("win", "win64"):
         os_scopes.append({item for item in _PLATFORMS if item.startswith("win-")})
     if os_scopes:
         platforms &= set().union(*os_scopes)
@@ -113,7 +121,7 @@ def _selector_platforms(selector):
     return platforms
 
 
-def _platform_selector(platforms):
+def _platform_selector(platforms: Any) -> str:
     if platforms == {"linux-64", "linux-aarch64"}:
         return "linux"
     if platforms == {"osx-64", "osx-arm64"}:
@@ -130,7 +138,9 @@ def _platform_selector(platforms):
     return " or ".join(expressions[item] for item in sorted(platforms))
 
 
-def _selector_aware_replace(left_mapping, right_mapping, key):
+def _selector_aware_replace(
+    left_mapping: Any, right_mapping: Any, key: str
+) -> CommentedSeq:
     """Replace only selector scopes present in the migration's sequence."""
     left = left_mapping[key]
     right = right_mapping[key]
@@ -172,7 +182,7 @@ def _selector_aware_replace(left_mapping, right_mapping, key):
     return result
 
 
-def _has_sequence_selectors(mapping, key):
+def _has_sequence_selectors(mapping: Any, key: str) -> bool:
     value = mapping[key]
     return isinstance(value, CommentedSeq) and any(
         _sequence_selector(mapping, key, index) is not None
@@ -180,7 +190,7 @@ def _has_sequence_selectors(mapping, key):
     )
 
 
-def _key_add(left, right, ordering=None):
+def _key_add(left: Any, right: Any, ordering: Any = None) -> CommentedSeq:
     output = []
     common_length = min(len(left), len(right))
     if ordering is None:
@@ -208,12 +218,14 @@ def _key_add(left, right, ordering=None):
     return _copy_sequence_comments(output, left, right)
 
 
-def _set_union(left, right, ordering=None):
+def _set_union(left: Any, right: Any, ordering: Any = None) -> list[Any]:
     values = set(left) | set(right)
     return sorted(values, key=lambda value: _version_order(value, ordering))
 
 
-def _key_add_operation(left, right):
+def _key_add_operation(
+    left: MutableMapping[str, Any], right: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
     primary_key = right["__migrator"]["primary_key"]
     additional_zip_keys = right["__migrator"].get("additional_zip_keys", [])
     ordering = right["__migrator"].get("ordering", {})
@@ -279,7 +291,9 @@ def _key_add_operation(left, right):
     return result
 
 
-def _key_remove_operation(left, right):
+def _key_remove_operation(
+    left: MutableMapping[str, Any], right: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
     primary_key = right["__migrator"]["primary_key"]
     ordering = right["__migrator"].get("ordering", {})
     if primary_key not in right or primary_key not in left:
@@ -304,7 +318,7 @@ def _key_remove_operation(left, right):
     return result
 
 
-def _merge_zip_keys(left, right):
+def _merge_zip_keys(left: Any, right: Any) -> CommentedSeq:
     output = []
     left_sets = {frozenset(chunk) for chunk in left}
     right_sets = {frozenset(chunk) for chunk in right}
@@ -324,7 +338,9 @@ def _merge_zip_keys(left, right):
     )
 
 
-def variant_add(left, right):
+def variant_add(
+    left: MutableMapping[str, Any], right: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
     """Combine two variant mappings with conda-forge's CFEP-9 semantics."""
     operation = (right.get("__migrator") or {}).get("operation")
     if operation == "key_add":
@@ -364,11 +380,16 @@ def variant_add(left, right):
         group = next((group for group in zip_groups if primary_key in group), [])
         if not group:
             continue
-        chosen = [
-            index
-            for index, value in enumerate(primary_left + primary_right)
-            if value in merged
-        ]
+        source_primary = primary_left + primary_right
+        chosen = []
+        for value in merged:
+            chosen.append(
+                next(
+                    index
+                    for index, candidate in enumerate(source_primary)
+                    if candidate == value and index not in chosen
+                )
+            )
         for key in set(group) - {primary_key}:
             values = _ensure_list(left[key]) + _ensure_list(right[key])
             selected = [value for index, value in enumerate(values) if index in chosen]
