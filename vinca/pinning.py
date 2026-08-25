@@ -130,6 +130,7 @@ def get_pinning_distribution(version: str) -> str:
 
 
 def _read_tar_members(fileobj: Any, *, mode: str) -> dict[str, bytes]:
+    """Extract only the base config and migration YAML files from a package tarball."""
     files = {}
     with tarfile.open(fileobj=fileobj, mode=mode) as archive:
         for member in archive:
@@ -147,7 +148,10 @@ def _read_tar_members(fileobj: Any, *, mode: str) -> dict[str, bytes]:
 
 
 def _read_pinning_package(payload: bytes) -> tuple[bytes, dict[str, bytes]]:
-    """Read the base config and migrations from a .conda or .tar.bz2 payload."""
+    """Parse supported pinning artifacts into base-config bytes and named migrations.
+
+    Raises ``PinningError`` when the artifact lacks the required package members.
+    """
     stream = io.BytesIO(payload)
     if zipfile.is_zipfile(stream):
         with zipfile.ZipFile(stream) as archive:
@@ -182,6 +186,7 @@ def _read_pinning_package(payload: bytes) -> tuple[bytes, dict[str, bytes]]:
 def download_pinning_package(
     version: str, *, artifact_url: Optional[str] = None
 ) -> tuple[bytes, dict[str, bytes]]:
+    """Download and parse a versioned pinning artifact, or the supplied artifact URL."""
     url = artifact_url or get_pinning_distribution(version)
     return _read_pinning_package(_request(url).content)
 
@@ -189,6 +194,7 @@ def download_pinning_package(
 def _pinning_spec_fields(
     data: Mapping[str, Any],
 ) -> tuple[str, list[str], Mapping[str, Any]]:
+    """Validate and normalize version, migration, and override fields from a pinning spec."""
     version = data.get("conda_forge_pinning_version")
     migrations = data.get("migrations", [])
     overrides = data.get("pinning_overrides")
@@ -206,6 +212,7 @@ def _pinning_spec_fields(
 
 
 def _migration_name(name: str) -> str:
+    """Return a safe migration stem, rejecting path-like or malformed names."""
     name = name.removesuffix(".yaml")
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
         raise PinningError(f"Invalid migration name: {name!r}")
@@ -225,6 +232,7 @@ def _migration_timestamp(payload: bytes) -> float:
 
 
 def _validate_zipped_overrides(rendered: Any, overrides: Any) -> None:
+    """Reject partial overrides of zip-key groups that would break value alignment."""
     override_keys = set(overrides)
     for group in rendered.get("zip_keys", []):
         group = set(group)
@@ -266,7 +274,10 @@ def render_pinning(
     *,
     package: Optional[tuple[bytes, Mapping[str, bytes]]] = None,
 ) -> Any:
-    """Render vinca_pinning.yaml into conda_build_config.yaml."""
+    """Render a pinning spec by applying ordered migrations and local overrides.
+
+    Raises ``PinningError`` for invalid inputs, unavailable selected migrations, or failed merges.
+    """
     yaml = _yaml()
     config_path = Path(config_path)
     output_path = Path(output_path)
@@ -322,6 +333,7 @@ def _dependency_name(requirement: Any) -> Optional[str]:
 
 
 def _walk_requirements(value: Any) -> Iterator[str]:
+    """Yield requirement strings recursively, following both conditional branches."""
     if isinstance(value, str):
         yield value
     elif isinstance(value, list):
@@ -337,7 +349,7 @@ def _walk_requirements(value: Any) -> Iterator[str]:
 
 
 def dependencies_from_recipes(recipe_dir: Union[str, Path]) -> set[str]:
-    """Collect non-ROS conda dependency names from generated recipe files."""
+    """Collect non-ROS conda dependency names from every generated recipe."""
     yaml = _yaml()
     dependencies = set()
     for recipe_path in Path(recipe_dir).glob("**/recipe.yaml"):
@@ -362,7 +374,10 @@ def _working_directory(path: Any) -> Iterator[None]:
 def dependencies_from_vinca(
     base_dir: Union[str, Path], platforms: Sequence[str] = DEFAULT_PLATFORMS
 ) -> set[str]:
-    """Collect would-be recipe dependencies while reusing one distro model."""
+    """Generate non-ROS dependencies for each platform while preserving global config state.
+
+    Raises ``PinningError`` if platform selection changes the configured ROS snapshots.
+    """
     from vinca import config
     from vinca.distro import Distro
     from vinca.main import (
@@ -431,7 +446,7 @@ def _feedstock_output_url(package: str) -> str:
 
 
 def package_feedstocks(package: str) -> set[str]:
-    """Return feedstocks producing a conda package, with a conservative fallback."""
+    """Look up package-producing feedstocks, falling back to the package name on lookup failure."""
     url = _feedstock_output_url(package)
     try:
         response = requests.get(url, timeout=30)
@@ -445,6 +460,7 @@ def package_feedstocks(package: str) -> set[str]:
 
 
 def get_migration_status(migration: str) -> Optional[dict[str, Any]]:
+    """Fetch migration status, returning ``None`` only when no status record exists."""
     url = MIGRATION_STATUS_URL.format(migration=quote(migration.lower(), safe=""))
     try:
         response = requests.get(url, timeout=60)
@@ -499,6 +515,7 @@ def _migration_selectors(data: Any) -> Iterator[Optional[str]]:
 
 
 def _migration_applies_to_platforms(payload: bytes, platforms: Sequence[str]) -> bool:
+    """Return whether migration allowlists or selectors affect any requested platform."""
     data = _yaml().load(payload.decode("utf-8")) or {}
     migrator = data.get("__migrator") or {}
     allowlist = set(migrator.get("platform_allowlist", []))
@@ -529,7 +546,10 @@ def select_completed_migrations(
     existing_migrations: Sequence[str] = (),
     platforms: Optional[Sequence[str]] = None,
 ) -> tuple[list[str], list[tuple[str, str]]]:
-    """Select active migrations completed for all relevant dependency feedstocks."""
+    """Select applicable active migrations complete for relevant dependency feedstocks.
+
+    Already-applied migrations remain selected, including paused or platform-inapplicable ones.
+    """
     existing = {_migration_name(name) for name in existing_migrations}
     candidates = {
         name: payload
@@ -609,7 +629,10 @@ def update_pinning(
     dependencies: Optional[set[str]] = None,
     latest_distribution: Optional[tuple[str, str]] = None,
 ) -> tuple[str, list[str], list[tuple[str, str]]]:
-    """Update the base version and completed active migrations in a pinning spec."""
+    """Update a pinning spec to the latest base package and selected migrations.
+
+    Dependency discovery uses existing recipes when available, otherwise generates them from Vinca.
+    """
     config_path = Path(config_path)
     base_dir = Path(base_dir or config_path.parent)
     yaml = _yaml()

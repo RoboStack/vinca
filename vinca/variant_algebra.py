@@ -74,6 +74,7 @@ def _comment_selector(comment: Any) -> Optional[str]:
 
 
 def _sequence_selector(mapping: Any, key: str, index: int) -> Optional[str]:
+    """Return the combined key- and item-level selector for a sequence entry."""
     key_comment = mapping.ca.items.get(key, [None, None, None])[2]
     key_selector = _comment_selector(key_comment)
     value = mapping[key]
@@ -87,6 +88,7 @@ def _sequence_selector(mapping: Any, key: str, index: int) -> Optional[str]:
 
 
 def _selector_platforms(selector: Optional[str]) -> set[str]:
+    """Conservatively map a selector expression to its affected build platforms."""
     if selector is None:
         return set(_PLATFORMS)
     platforms = set(_PLATFORMS)
@@ -122,6 +124,7 @@ def _selector_platforms(selector: Optional[str]) -> set[str]:
 
 
 def _platform_selector(platforms: Any) -> str:
+    """Render a selector covering exactly the supported platforms in ``platforms``."""
     if platforms == {"linux-64", "linux-aarch64"}:
         return "linux"
     if platforms == {"osx-64", "osx-arm64"}:
@@ -141,7 +144,7 @@ def _platform_selector(platforms: Any) -> str:
 def _selector_aware_replace(
     left_mapping: Any, right_mapping: Any, key: str
 ) -> CommentedSeq:
-    """Replace only selector scopes present in the migration's sequence."""
+    """Replace left entries only where migration selector scopes overlap, preserving remainders."""
     left = left_mapping[key]
     right = right_mapping[key]
     right_selectors = [
@@ -226,6 +229,10 @@ def _set_union(left: Any, right: Any, ordering: Any = None) -> list[Any]:
 def _key_add_operation(
     left: MutableMapping[str, Any], right: MutableMapping[str, Any]
 ) -> MutableMapping[str, Any]:
+    """Apply CFEP-9 ``key_add``, preserving aligned zip-key value tuples.
+
+    Raises when the declared primary or required zip keys cannot be merged safely.
+    """
     primary_key = right["__migrator"]["primary_key"]
     additional_zip_keys = right["__migrator"].get("additional_zip_keys", [])
     ordering = right["__migrator"].get("ordering", {})
@@ -294,6 +301,10 @@ def _key_add_operation(
 def _key_remove_operation(
     left: MutableMapping[str, Any], right: MutableMapping[str, Any]
 ) -> MutableMapping[str, Any]:
+    """Apply CFEP-9 ``key_remove`` and remove corresponding zipped values.
+
+    Raises if the migration supplies anything other than one primary value.
+    """
     primary_key = right["__migrator"]["primary_key"]
     ordering = right["__migrator"].get("ordering", {})
     if primary_key not in right or primary_key not in left:
@@ -319,6 +330,7 @@ def _key_remove_operation(
 
 
 def _merge_zip_keys(left: Any, right: Any) -> CommentedSeq:
+    """Merge zip-key groups, letting a migration's superset replace an old subset."""
     output = []
     left_sets = {frozenset(chunk) for chunk in left}
     right_sets = {frozenset(chunk) for chunk in right}
@@ -341,7 +353,7 @@ def _merge_zip_keys(left: Any, right: Any) -> CommentedSeq:
 def variant_add(
     left: MutableMapping[str, Any], right: MutableMapping[str, Any]
 ) -> MutableMapping[str, Any]:
-    """Combine two variant mappings with conda-forge's CFEP-9 semantics."""
+    """Combine variants using CFEP-9 operations, zip alignment, ordering, and selectors."""
     operation = (right.get("__migrator") or {}).get("operation")
     if operation == "key_add":
         return _key_add_operation(left, right)
