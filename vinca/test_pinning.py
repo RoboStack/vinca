@@ -321,7 +321,9 @@ requirements:
     }
 
 
-def test_dependencies_from_vinca_restores_global_platform_configuration(tmp_path, monkeypatch):
+def test_dependencies_from_vinca_restores_global_platform_configuration(
+    tmp_path, monkeypatch
+):
     from vinca import config
 
     distro = type(
