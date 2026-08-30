@@ -7,6 +7,7 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from typing import Iterable, Optional
 
+import catkin_pkg.package
 import requests
 from rosdistro import get_cached_distribution, get_index, get_index_url
 from rosdistro.dependency_walker import DependencyWalker
@@ -181,6 +182,11 @@ class Distro(object):
         if pkg in self._direct_depends_cache:
             return set(self._direct_depends_cache[pkg])
 
+        if self.snapshot:
+            dependencies = self._get_snapshot_recursive_depends(pkg, ignore_pkgs)
+            self._depends_cache[cache_key] = set(dependencies)
+            return dependencies
+
         # if pkg comes from additional_packages_snapshot, extract from its package.xml
         if (
             self.additional_packages_snapshot
@@ -230,25 +236,74 @@ class Distro(object):
         self._direct_depends_cache[pkg] = set(direct)
         return direct
 
+    def _get_snapshot_recursive_depends(self, pkg, ignore_pkgs=None):
+        """Return ROS dependencies using only package manifests pinned by the snapshot."""
+        dependencies = set()
+        ignored = set(ignore_pkgs or [])
+        packages_to_check = {pkg}
+        checked_packages = set()
+        dependency_attributes = (
+            "buildtool_depends",
+            "buildtool_export_depends",
+            "build_depends",
+            "build_export_depends",
+            "run_depends",
+            "test_depends",
+            "exec_depends",
+        )
+
+        while packages_to_check:
+            package_name = sorted(packages_to_check)[0]
+            packages_to_check.remove(package_name)
+            if package_name in ignored or package_name in checked_packages:
+                continue
+            checked_packages.add(package_name)
+
+            package_xml = self.get_release_package_xml(package_name)
+            package = catkin_pkg.package.parse_package_string(package_xml)
+            package.evaluate_conditions(os.environ)
+            direct_dependencies = {
+                dependency.name
+                for attribute in dependency_attributes
+                for dependency in getattr(package, attribute)
+                if dependency.evaluated_condition is not False
+                and dependency.name not in ignored
+                and self.check_package(dependency.name)
+            }
+            new_dependencies = direct_dependencies - dependencies
+            dependencies |= new_dependencies
+            packages_to_check |= new_dependencies - checked_packages
+
+        return dependencies
+
+    def _get_snapshot_package_info(self, pkg_name):
+        if not self.snapshot:
+            return None
+        for name in (pkg_name, pkg_name.replace("_", "-")):
+            if name in self.snapshot:
+                return self.snapshot[name]
+        return None
+
     def get_released_repo(self, pkg_name):
-        if self.snapshot and pkg_name in self.snapshot:
+        pkg_info = self._get_snapshot_package_info(pkg_name)
+        if pkg_info is not None:
             # In the case of snapshot, for rosdistro_additional_recipes
             # we also support a 'rev' field, so depending on what is available
             # we return either the tag or the rev, and the third argument is either 'rev' or 'tag'
-            url = self.snapshot[pkg_name].get("url", None)
+            url = pkg_info.get("url", None)
             # An archive URL is not a git repository: the reference is its sha256 checksum.
             if is_archive_url(url):
-                sha256 = self.snapshot[pkg_name].get("sha256", None)
+                sha256 = pkg_info.get("sha256", None)
                 if not sha256:
                     raise RuntimeError(
                         f"The archive source of '{pkg_name}' has no sha256 checksum: {url}"
                     )
                 return url, sha256, "sha256"
-            if "tag" in self.snapshot[pkg_name].keys():
-                tag_or_rev = self.snapshot[pkg_name].get("tag", None)
+            if "tag" in pkg_info:
+                tag_or_rev = pkg_info.get("tag", None)
                 ref_type = "tag"
             else:
-                tag_or_rev = self.snapshot[pkg_name].get("rev", None)
+                tag_or_rev = pkg_info.get("rev", None)
                 ref_type = "rev"
 
             return url, tag_or_rev, ref_type
@@ -267,23 +322,27 @@ class Distro(object):
             and pkg_name in self.additional_packages_snapshot
         ):
             return True
-        # the .replace('_', '-') is needed for packages like 'hpp-fcl' that have hypen and not underscore
+        if self.snapshot:
+            return (
+                self._get_snapshot_package_info(pkg_name) is not None
+                or pkg_name in self.build_packages
+            )
+        # the .replace('_', '-') is needed for packages like 'hpp-fcl' that have a hyphen and not underscore
         # in the rosdistro metadata
         if (
             pkg_name in self._distro.release_packages
             or pkg_name.replace("_", "-") in self._distro.release_packages
         ):
-            return self.snapshot is None or (
-                pkg_name in self.snapshot or pkg_name.replace("_", "-") in self.snapshot
-            )
+            return True
         elif pkg_name in self.build_packages:
             return True
         else:
             return False
 
     def get_version(self, pkg_name):
-        if self.snapshot and pkg_name in self.snapshot:
-            return self.snapshot[pkg_name].get("version", None)
+        pkg_info = self._get_snapshot_package_info(pkg_name)
+        if pkg_info is not None:
+            return pkg_info.get("version", None)
 
         pkg = self._distro.release_packages[pkg_name]
         repo = self._distro.repositories[pkg.repository_name].release_repository
@@ -295,6 +354,9 @@ class Distro(object):
             and pkg_name in self.additional_packages_snapshot
         ):
             pkg_info = self.additional_packages_snapshot[pkg_name]
+            return self.get_package_xml_for_additional_package(pkg_info)
+        pkg_info = self._get_snapshot_package_info(pkg_name)
+        if pkg_info is not None:
             return self.get_package_xml_for_additional_package(pkg_info)
         return self._distro.get_release_package_xml(pkg_name)
 
@@ -317,6 +379,8 @@ class Distro(object):
         return self._python_version
 
     def get_package_names(self):
+        if self.snapshot:
+            return self.snapshot.keys()
         return self._distro.release_packages.keys()
 
     def get_package_xml_for_additional_package(self, pkg_info):
