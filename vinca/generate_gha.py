@@ -238,10 +238,11 @@ def dump_for_gha(doc, f):
 
 
 def get_stage_name(batch):
+    legacy_prefix = f"ros-{config.ros_distro}-"
     stage_name = []
     for pkg in batch:
-        if len(pkg.split("-")) > 2:
-            stage_name.append("-".join(pkg.split("-")[2:]))
+        if pkg.startswith(legacy_prefix):
+            stage_name.append(pkg[len(legacy_prefix) :])
         else:
             stage_name.append(pkg)
     return " ".join(stage_name)
