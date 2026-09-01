@@ -49,6 +49,7 @@ def make_snapshot_distro(monkeypatch):
     distro._distribution_type = "ros2"
     distro._additional_xml_cache = {}
     distro._depends_cache = {}
+    distro._direct_depends_cache = {}
     distro._distro = Mock()
     distro._distro.get_release_package_xml.return_value = LIVE_PACKAGE_XML
     distro._walker = Mock()
@@ -145,11 +146,16 @@ def test_empty_snapshot_keeps_live_rosdistro_behavior():
     distro.additional_packages_snapshot = None
     distro.build_packages = set()
     distro._depends_cache = {}
+    distro._direct_depends_cache = {}
     distro._distro = Mock()
     distro._distro.release_packages = {"live_package": Mock()}
     distro._distro.get_release_package_xml.return_value = LIVE_PACKAGE_XML
     distro._walker = Mock()
-    distro._walker.get_recursive_depends.return_value = {"live_dependency"}
+    distro._walker.get_depends.side_effect = (
+        lambda package, dependency_type, ros_packages_only: (
+            {"live_dependency"} if dependency_type == "run" else set()
+        )
+    )
 
     assert distro.check_package("live_package")
     assert distro.get_release_package_xml("live_package") == LIVE_PACKAGE_XML
