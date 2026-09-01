@@ -349,15 +349,42 @@ class Distro(object):
         repo = self._distro.repositories[pkg.repository_name].release_repository
         return repo.version.split("-")[0]
 
+    def live_cache_matches_snapshot(self, pkg_name, snapshot_entry):
+        """Return whether rosdistro's cached manifest is the pinned snapshot source.
+
+        A snapshot pins the release repository URL, the package-specific release
+        tag, and the release version.  Only an exact match may reuse rosdistro's
+        local ``DistributionCache``; otherwise the manifest must be read from the
+        immutable snapshot source.
+        """
+
+        for live_name in (pkg_name, pkg_name.replace("_", "-")):
+            try:
+                package = self._distro.release_packages[live_name]
+                repository = self._distro.repositories[package.repository_name]
+                release_repository = repository.release_repository
+                return (
+                    release_repository.url == snapshot_entry.get("url")
+                    and get_release_tag(release_repository, live_name)
+                    == snapshot_entry.get("tag")
+                    and release_repository.version.split("-")[0]
+                    == snapshot_entry.get("version")
+                )
+            except (AttributeError, KeyError, TypeError):
+                continue
+        return False
+
     def get_release_package_xml(self, pkg_name):
+        pkg_info = self._get_snapshot_package_info(pkg_name)
         if (
-            self.additional_packages_snapshot
+            pkg_info is None
+            and self.additional_packages_snapshot
             and pkg_name in self.additional_packages_snapshot
         ):
             pkg_info = self.additional_packages_snapshot[pkg_name]
-            return self.get_package_xml_for_additional_package(pkg_info)
-        pkg_info = self._get_snapshot_package_info(pkg_name)
         if pkg_info is not None:
+            if self.live_cache_matches_snapshot(pkg_name, pkg_info):
+                return self._distro.get_release_package_xml(pkg_name)
             return self.get_package_xml_for_additional_package(pkg_info)
         return self._distro.get_release_package_xml(pkg_name)
 

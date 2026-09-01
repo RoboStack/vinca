@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import vinca.main as main
 from vinca.distro import Distro
@@ -89,6 +89,54 @@ def test_snapshot_package_xml_and_dependencies_do_not_follow_live_rosdistro(
     assert distro.get_depends("snapshot_package") == {"snapshot_dependency"}
     distro._distro.get_release_package_xml.assert_not_called()
     distro._walker.get_recursive_depends.assert_not_called()
+
+
+def test_snapshot_package_xml_uses_matching_live_distribution_cache(monkeypatch):
+    distro = make_snapshot_distro(monkeypatch)
+    release_repository = Mock(
+        url="https://github.com/example/snapshot-package-release.git",
+        version="1.0.0-1",
+    )
+    distro._distro.release_packages = {
+        "snapshot_package": Mock(repository_name="snapshot-package")
+    }
+    distro._distro.repositories = {
+        "snapshot-package": Mock(release_repository=release_repository)
+    }
+
+    with patch(
+        "vinca.distro.get_release_tag",
+        return_value="release/rolling/snapshot_package/1.0.0-1",
+    ):
+        package_xml_content = distro.get_release_package_xml("snapshot_package")
+
+    assert package_xml_content == LIVE_PACKAGE_XML
+    distro._distro.get_release_package_xml.assert_called_once_with("snapshot_package")
+
+
+def test_snapshot_package_xml_does_not_use_live_cache_after_snapshot_change(
+    monkeypatch,
+):
+    distro = make_snapshot_distro(monkeypatch)
+    release_repository = Mock(
+        url="https://github.com/example/snapshot-package-release.git",
+        version="2.0.0-1",
+    )
+    distro._distro.release_packages = {
+        "snapshot_package": Mock(repository_name="snapshot-package")
+    }
+    distro._distro.repositories = {
+        "snapshot-package": Mock(release_repository=release_repository)
+    }
+
+    with patch(
+        "vinca.distro.get_release_tag",
+        return_value="release/rolling/snapshot_package/2.0.0-1",
+    ):
+        package_xml_content = distro.get_release_package_xml("snapshot_package")
+
+    assert package_xml_content == SNAPSHOT_PACKAGE_XML
+    distro._distro.get_release_package_xml.assert_not_called()
 
 
 def test_snapshot_metadata_generates_dependency_required_by_pinned_source(
