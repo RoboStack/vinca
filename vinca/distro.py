@@ -28,6 +28,15 @@ ARCHIVE_SUFFIXES = (
     ".tar.xz",
     ".txz",
 )
+DEPENDENCY_ATTRIBUTES = (
+    "buildtool_depends",
+    "buildtool_export_depends",
+    "build_depends",
+    "build_export_depends",
+    "run_depends",
+    "test_depends",
+    "exec_depends",
+)
 
 
 def is_archive_url(url):
@@ -183,45 +192,20 @@ class Distro(object):
             return set(self._direct_depends_cache[pkg])
 
         if self.snapshot:
-            dependencies = self._get_snapshot_recursive_depends(pkg, ignore_pkgs)
-            self._depends_cache[cache_key] = set(dependencies)
-            return dependencies
+            direct = self._get_direct_depends_from_package_xml(pkg)
+            self._direct_depends_cache[pkg] = set(direct)
+            return direct
 
         # if pkg comes from additional_packages_snapshot, extract from its package.xml
         if (
             self.additional_packages_snapshot
             and pkg in self.additional_packages_snapshot
         ):
-            pkg_info = self.additional_packages_snapshot[pkg]
-            xml_str = self.get_package_xml_for_additional_package(pkg_info)
-            # parse XML
-            import xml.etree.ElementTree as ET
-
-            root = ET.fromstring(xml_str)
-            # collect direct dependencies tags from package.xml
-            dep_tags = [
-                "depend",
-                "build_depend",
-                "buildtool_depend",
-                "buildtool_export_depend",
-                "exec_depend",
-                "run_depend",
-                "test_depend",
-                "build_export_depend",
-            ]
-            direct = set()
-            for tag in dep_tags:
-                for elem in root.findall(f".//{tag}"):
-                    if elem.text:
-                        name = elem.text.strip()
-                        direct.add(name)
+            direct = self._get_direct_depends_from_package_xml(pkg)
             self._direct_depends_cache[pkg] = set(direct)
             return direct
 
-        # Cache the union before walking the graph. DependencyWalker otherwise
-        # recomputes and deep-copies these fields for every configured root package.
-        direct = set()
-        for dependency_type in (
+        dependency_types = (
             "buildtool",
             "buildtool_export",
             "build",
@@ -229,12 +213,29 @@ class Distro(object):
             "run",
             "test",
             "exec",
-        ):
+        )
+
+        # Cache the union before walking the graph. DependencyWalker otherwise
+        # recomputes and deep-copies these fields for every configured root package.
+        direct = set()
+        for dependency_type in dependency_types:
             direct.update(
                 self._walker.get_depends(pkg, dependency_type, ros_packages_only=True)
             )
         self._direct_depends_cache[pkg] = set(direct)
         return direct
+
+    def _get_direct_depends_from_package_xml(self, pkg: str) -> set[str]:
+        package_xml = self.get_release_package_xml(pkg)
+        package = catkin_pkg.package.parse_package_string(package_xml)
+        package.evaluate_conditions(os.environ)
+        return {
+            dependency.name
+            for attribute in DEPENDENCY_ATTRIBUTES
+            for dependency in getattr(package, attribute)
+            if dependency.evaluated_condition is not False
+            and self.check_package(dependency.name)
+        }
 
     def _get_snapshot_recursive_depends(self, pkg, ignore_pkgs=None):
         """Return ROS dependencies using only package manifests pinned by the snapshot."""
@@ -242,15 +243,6 @@ class Distro(object):
         ignored = set(ignore_pkgs or [])
         packages_to_check = {pkg}
         checked_packages = set()
-        dependency_attributes = (
-            "buildtool_depends",
-            "buildtool_export_depends",
-            "build_depends",
-            "build_export_depends",
-            "run_depends",
-            "test_depends",
-            "exec_depends",
-        )
 
         while packages_to_check:
             package_name = sorted(packages_to_check)[0]
@@ -264,7 +256,7 @@ class Distro(object):
             package.evaluate_conditions(os.environ)
             direct_dependencies = {
                 dependency.name
-                for attribute in dependency_attributes
+                for attribute in DEPENDENCY_ATTRIBUTES
                 for dependency in getattr(package, attribute)
                 if dependency.evaluated_condition is not False
                 and dependency.name not in ignored
