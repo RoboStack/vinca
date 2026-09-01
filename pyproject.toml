@@ -65,3 +65,7 @@ include = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["vinca"]
+
+[tool.pyrefly]
+preset = "basic"
+project-includes = ["vinca"]
