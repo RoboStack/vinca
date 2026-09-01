@@ -14,6 +14,7 @@ def test_dependency_walk_reuses_direct_dependencies_across_roots():
     distro = Distro.__new__(Distro)
     distro._depends_cache = {}
     distro._direct_depends_cache = {}
+    distro.snapshot = None
     distro.additional_packages_snapshot = None
     distro.check_package = lambda name: name in graph
     distro._walker = Mock()
@@ -41,6 +42,7 @@ def test_dependency_walk_honors_ignored_packages():
     distro = Distro.__new__(Distro)
     distro._depends_cache = {}
     distro._direct_depends_cache = {}
+    distro.snapshot = None
     distro.additional_packages_snapshot = None
     distro.check_package = lambda name: name in graph
     distro._walker = Mock()
@@ -58,6 +60,7 @@ def test_dependency_walk_excludes_root_in_cycles():
     distro = Distro.__new__(Distro)
     distro._depends_cache = {}
     distro._direct_depends_cache = {}
+    distro.snapshot = None
     distro.additional_packages_snapshot = None
     distro.check_package = lambda name: name in graph
     distro._get_direct_depends = lambda name: graph[name]
@@ -69,6 +72,7 @@ def test_dependency_walk_excludes_root_from_self_dependency():
     distro = Distro.__new__(Distro)
     distro._depends_cache = {}
     distro._direct_depends_cache = {}
+    distro.snapshot = None
     distro.additional_packages_snapshot = None
     distro.check_package = lambda name: name == "a"
     distro._get_direct_depends = lambda name: {"a"}
@@ -81,6 +85,7 @@ def test_dependency_walk_excludes_root_from_longer_cycle():
     distro = Distro.__new__(Distro)
     distro._depends_cache = {}
     distro._direct_depends_cache = {}
+    distro.snapshot = None
     distro.additional_packages_snapshot = None
     distro.check_package = lambda name: name in graph
     distro._get_direct_depends = lambda name: graph[name]

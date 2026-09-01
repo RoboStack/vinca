@@ -156,6 +156,12 @@ class Distro(object):
             return set()
 
         ignore_pkgs = set(ignore_pkgs or ())
+
+        if self.snapshot:
+            dependencies = self._get_snapshot_recursive_depends(pkg, ignore_pkgs)
+            self._depends_cache[cache_key] = set(dependencies)
+            return dependencies
+
         dependencies = set()
         visited = {pkg}
         packages_to_check = {pkg}
@@ -181,11 +187,6 @@ class Distro(object):
 
         if pkg in self._direct_depends_cache:
             return set(self._direct_depends_cache[pkg])
-
-        if self.snapshot:
-            dependencies = self._get_snapshot_recursive_depends(pkg, ignore_pkgs)
-            self._depends_cache[cache_key] = set(dependencies)
-            return dependencies
 
         # if pkg comes from additional_packages_snapshot, extract from its package.xml
         if (
