@@ -7,6 +7,7 @@ import os
 import argparse
 from importlib import resources
 from distutils.dir_util import copy_tree
+from typing import Any
 
 from rich import print
 
@@ -26,6 +27,11 @@ from vinca.main import (
     get_conda_subdir,
 )
 from vinca import config
+
+
+# Use the v0 version of setup-pixi by default, which should give you the last major release
+DEFAULT_SETUP_PIXI_VERSION = "v0"
+DEFAULT_PIXI_VERSION = "latest"
 
 
 def read_azure_script(fn):
@@ -230,11 +236,22 @@ def add_additional_recipes(args):
 #       - '*.yaml'
 
 
+MAX_WORKFLOW_SIZE_BYTES = 500 * 1024
+
+
 def dump_for_gha(doc, f):
     s = yaml.dump(doc, sort_keys=False, Dumper=NoAliasDumper)
     s = s.replace("'on':", "on:")
     with open(f, "w") as fo:
         fo.write(s)
+
+    workflow_size = os.path.getsize(f)
+    if workflow_size > MAX_WORKFLOW_SIZE_BYTES:
+        raise RuntimeError(
+            f"Generated workflow {f} is {workflow_size / 1024:.1f} KiB, exceeding "
+            f"the {MAX_WORKFLOW_SIZE_BYTES / 1024:.0f} KiB limit. Increase "
+            "--batch_size to reduce the number of generated jobs."
+        )
 
 
 def get_stage_name(batch):
@@ -248,6 +265,39 @@ def get_stage_name(batch):
     return " ".join(stage_name)
 
 
+def normalize_version(version: str) -> str:
+    """Normalize a release while leaving action refs such as commit SHAs intact."""
+    version = str(version).strip()
+    if not version:
+        raise ValueError("Version values must not be empty")
+
+    # Full GitHub Action commit hashes and symbolic refs such as ``latest`` must
+    # be passed through verbatim. Only a bare semantic version gets a v prefix.
+    if re.fullmatch(r"[0-9a-fA-F]{40}", version):
+        return version
+    if re.fullmatch(r"v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?", version):
+        return version
+    if re.fullmatch(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?", version):
+        return f"v{version}"
+    return version
+
+
+def get_setup_pixi_step(
+    setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
+    pixi_version: str = DEFAULT_PIXI_VERSION,
+) -> dict[str, Any]:
+    return {
+        "name": "Setup pixi",
+        "uses": f"prefix-dev/setup-pixi@{normalize_version(setup_pixi_version)}",
+        "with": {
+            "pixi-version": normalize_version(pixi_version),
+            "cache": "true",
+            "log-level": "v",
+            "frozen": "true",
+        },
+    }
+
+
 def build_unix_pipeline(
     stages,
     trigger_branch,
@@ -257,6 +307,8 @@ def build_unix_pipeline(
     outfile="linux.yml",
     pipeline_name="build_unix",
     target="",
+    setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
+    pixi_version: str = DEFAULT_PIXI_VERSION,
 ):
     blurb = {"jobs": {}, "name": pipeline_name}
 
@@ -285,6 +337,7 @@ def build_unix_pipeline(
                     "name": "Checkout code",
                     "uses": "actions/checkout@v7",
                 },
+                get_setup_pixi_step(setup_pixi_version, pixi_version),
                 {
                     "name": f"Build {' '.join([pkg for pkg in batch])}",
                     "env": build_env,
@@ -325,6 +378,8 @@ def build_linux_pipeline(
     runs_on="ubuntu-latest",
     outfile="linux.yml",
     pipeline_name="build_linux",
+    setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
+    pixi_version: str = DEFAULT_PIXI_VERSION,
 ):
     build_unix_pipeline(
         stages,
@@ -335,6 +390,8 @@ def build_linux_pipeline(
         outfile=outfile,
         pipeline_name=pipeline_name,
         target="linux-64",
+        setup_pixi_version=setup_pixi_version,
+        pixi_version=pixi_version,
     )
 
 
@@ -347,6 +404,8 @@ def build_osx_pipeline(
     script=azure_unix_script,
     target="osx-64",
     pipeline_name="build_osx64",
+    setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
+    pixi_version: str = DEFAULT_PIXI_VERSION,
 ):
     build_unix_pipeline(
         stages,
@@ -357,10 +416,19 @@ def build_osx_pipeline(
         outfile=outfile,
         target=target,
         pipeline_name=pipeline_name,
+        setup_pixi_version=setup_pixi_version,
+        pixi_version=pixi_version,
     )
 
 
-def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template=None):
+def build_win_pipeline(
+    stages,
+    trigger_branch,
+    outfile="win.yml",
+    azure_template=None,
+    setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
+    pixi_version: str = DEFAULT_PIXI_VERSION,
+):
     vm_imagename = "windows-2022"
     # Build Win pipeline
     blurb = {"jobs": {}, "name": "build_win"}
@@ -393,18 +461,7 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
 
             steps = [
                 {"name": "Checkout code", "uses": "actions/checkout@v7"},
-                {
-                    "name": "Setup pixi",
-                    "uses": "prefix-dev/setup-pixi@v0.10.2",
-                    "with": {
-                        "pixi-version": "v0.78.0",
-                        "cache": "true",
-                        # Use the verbose level to get hints why an installation might fail.
-                        "log-level": "v",
-                        # Use frozen to avoid lockfile satisfiablity issues between the pixi versions used.
-                        "frozen": "true",
-                    },
-                },
+                get_setup_pixi_step(setup_pixi_version, pixi_version),
                 {
                     "uses": "egor-tensin/cleanup-path@v5",
                     "with": {
@@ -482,6 +539,8 @@ def main():
     args = parse_command_line(sys.argv)
 
     full_tree = get_full_tree()
+    setup_pixi_version = config.setup_pixi_version or DEFAULT_SETUP_PIXI_VERSION
+    pixi_version = config.pixi_version or DEFAULT_PIXI_VERSION
 
     metas = []
 
@@ -583,12 +642,16 @@ def main():
             args.trigger_branch,
             outfile="linux.yml",
             pipeline_name="build_linux64",
+            setup_pixi_version=setup_pixi_version,
+            pixi_version=pixi_version,
         )
 
     if args.platform == "osx-64":
         build_osx_pipeline(
             stages,
             args.trigger_branch,
+            setup_pixi_version=setup_pixi_version,
+            pixi_version=pixi_version,
         )
 
     if args.platform == "osx-arm64":
@@ -600,6 +663,8 @@ def main():
             script=azure_unix_script,
             target=platform,
             pipeline_name="build_osx_arm64",
+            setup_pixi_version=setup_pixi_version,
+            pixi_version=pixi_version,
         )
 
     if args.platform == "linux-aarch64":
@@ -611,11 +676,19 @@ def main():
             outfile="linux_aarch64.yml",
             target=platform,
             pipeline_name="build_linux_aarch64",
+            setup_pixi_version=setup_pixi_version,
+            pixi_version=pixi_version,
         )
 
     # windows
     if args.platform == "win-64":
-        build_win_pipeline(stages, args.trigger_branch, outfile="win.yml")
+        build_win_pipeline(
+            stages,
+            args.trigger_branch,
+            outfile="win.yml",
+            setup_pixi_version=setup_pixi_version,
+            pixi_version=pixi_version,
+        )
 
     if args.platform == "emscripten-wasm32":
         build_unix_pipeline(
@@ -624,4 +697,6 @@ def main():
             outfile="emscripten_wasm32.yml",
             pipeline_name="build_emscripten_wasm32",
             target="emscripten-wasm32",
+            setup_pixi_version=setup_pixi_version,
+            pixi_version=pixi_version,
         )
