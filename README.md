@@ -34,6 +34,24 @@ package_name_mode: both
 
 Once users and downstream projects have migrated, switch to `new` to stop generating the compatibility packages. New ROS 1 package names use the `ros-` prefix; new ROS 2 package names use `ros2-`.
 
+## Configuring setup-pixi in generated workflows
+
+Generated GitHub Actions workflows use `prefix-dev/setup-pixi@v0` by default. Override the action version in `vinca.yaml` when needed:
+
+```yaml
+setup_pixi_version: latest
+pixi_version: latest
+```
+
+`setup_pixi_version` selects the `prefix-dev/setup-pixi` action release and defaults to `v0`. `pixi_version` selects the Pixi binary installed by that action and defaults to `latest`. Semantic versions may be written with or without the `v` prefix; Vinca adds exactly one `v` when needed. Symbolic references such as `latest` and GitHub Action commit hashes are passed through unchanged, so a pinned action is also supported:
+
+```yaml
+setup_pixi_version: 0123456789abcdef0123456789abcdef01234567
+pixi_version: v0.78.0
+```
+
+Pinning a release or full action commit hash is recommended for reproducible workflows.
+
 ## Managing conda-forge pinning
 
 RoboStack repositories can keep their global pins reproducible without copying and

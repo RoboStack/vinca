@@ -239,6 +239,8 @@ def read_vinca_yaml(filepath):
 
     config.ros_distro = vinca_conf["ros_distro"]
     config.skip_testing = vinca_conf.get("skip_testing", True)
+    config.setup_pixi_version = vinca_conf.get("setup_pixi_version")
+    config.pixi_version = vinca_conf.get("pixi_version")
 
     vinca_conf["_conda_indexes"] = get_conda_index(
         vinca_conf, os.path.dirname(filepath)
