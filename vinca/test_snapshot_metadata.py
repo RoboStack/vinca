@@ -1,5 +1,7 @@
 from unittest.mock import Mock, patch
 
+import pytest
+
 import vinca.main as main
 from vinca.distro import Distro
 
@@ -34,11 +36,13 @@ def make_snapshot_distro(monkeypatch):
             "url": "https://github.com/example/snapshot-package-release.git",
             "version": "1.0.0",
             "tag": "release/rolling/snapshot_package/1.0.0-1",
+            "dependencies": ["snapshot_dependency"],
         },
         "snapshot_dependency": {
             "url": "https://github.com/example/snapshot-dependency-release.git",
             "version": "1.0.0",
             "tag": "release/rolling/snapshot_dependency/1.0.0-1",
+            "dependencies": [],
         },
     }
     distro = Distro.__new__(Distro)
@@ -51,9 +55,6 @@ def make_snapshot_distro(monkeypatch):
     distro._depends_cache = {}
     distro._direct_depends_cache = {}
     distro._distro = Mock()
-    distro._distro.get_release_package_xml.return_value = LIVE_PACKAGE_XML
-    distro._walker = Mock()
-
     snapshot_xml_by_url = {
         "https://raw.githubusercontent.com/example/snapshot-package-release/"
         "release/rolling/snapshot_package/1.0.0-1/package.xml": (SNAPSHOT_PACKAGE_XML),
@@ -67,6 +68,7 @@ def make_snapshot_distro(monkeypatch):
         "_download_raw_pkg_xml_or_cached",
         lambda url: snapshot_xml_by_url[url],
     )
+    distro._walker = Mock()
     return distro
 
 
@@ -88,7 +90,7 @@ def test_snapshot_package_xml_and_dependencies_do_not_follow_live_rosdistro(
     assert "live_dependency" not in package_xml_content
     assert distro.get_depends("snapshot_package") == {"snapshot_dependency"}
     distro._distro.get_release_package_xml.assert_not_called()
-    distro._walker.get_recursive_depends.assert_not_called()
+    distro._walker.get_depends.assert_not_called()
 
 
 def test_snapshot_package_xml_uses_matching_live_distribution_cache(monkeypatch):
@@ -103,6 +105,7 @@ def test_snapshot_package_xml_uses_matching_live_distribution_cache(monkeypatch)
     distro._distro.repositories = {
         "snapshot-package": Mock(release_repository=release_repository)
     }
+    distro._distro.get_release_package_xml.return_value = LIVE_PACKAGE_XML
 
     with patch(
         "vinca.distro.get_release_tag",
@@ -137,6 +140,14 @@ def test_snapshot_package_xml_does_not_use_live_cache_after_snapshot_change(
 
     assert package_xml_content == SNAPSHOT_PACKAGE_XML
     distro._distro.get_release_package_xml.assert_not_called()
+
+
+def test_snapshot_without_dependencies_requires_regeneration(monkeypatch):
+    distro = make_snapshot_distro(monkeypatch)
+    del distro.snapshot["snapshot_package"]["dependencies"]
+
+    with pytest.raises(RuntimeError, match="regenerate the rosdistro snapshot"):
+        distro.get_depends("snapshot_package")
 
 
 def test_snapshot_metadata_generates_dependency_required_by_pinned_source(
@@ -209,3 +220,31 @@ def test_empty_snapshot_keeps_live_rosdistro_behavior():
     assert distro.get_release_package_xml("live_package") == LIVE_PACKAGE_XML
     assert distro.get_depends("live_package") == {"live_dependency"}
     assert set(distro.get_package_names()) == {"live_package"}
+
+
+def test_read_snapshot_merges_additional_packages(tmp_path, monkeypatch):
+    snapshot_path = tmp_path / "rosdistro_snapshot.yaml"
+    additional_path = tmp_path / "rosdistro_additional_recipes.yaml"
+    snapshot_path.write_text(
+        """\
+snapshot_package:
+  version: 1.0.0
+"""
+    )
+    additional_path.write_text(
+        """\
+additional_package:
+  version: 2.0.0
+"""
+    )
+    monkeypatch.chdir(tmp_path)
+
+    snapshot, additional = main.read_snapshot(
+        {
+            "rosdistro_snapshot": snapshot_path.name,
+            "rosdistro_additional_recipes": additional_path.name,
+        }
+    )
+
+    assert set(snapshot) == {"snapshot_package", "additional_package"}
+    assert additional == {"additional_package": {"version": "2.0.0"}}

@@ -1,6 +1,14 @@
 import argparse
-import yaml
 import datetime
+
+import yaml
+from rosdistro import (
+    DistributionCache,
+    get_distribution_cache_string,
+    get_index,
+    get_index_url,
+)
+
 from .distro import Distro
 
 
@@ -48,9 +56,14 @@ def main():
     # Get the current UTC time
     utc_time = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # Note: we intentionally do not pass any kind of additional packages snapshot
-    # here, as it would pollute the snapshot with additional packages
-    distro = Distro(args.distro)
+    # Fetch the cache once and use that exact data for both the package pins and
+    # the dependency metadata stored in the snapshot.
+    # TODO: Consider referencing immutable cache release assets instead if they
+    # become available through https://github.com/ros/rosdistro/pull/50112.
+    index = get_index(get_index_url())
+    cache_yaml = get_distribution_cache_string(index, args.distro)
+    cache = DistributionCache(args.distro, yaml.safe_load(cache_yaml))
+    distro = Distro(args.distro, distribution_cache=cache)
 
     if args.package is None:
         deps = distro.get_package_names()
@@ -64,7 +77,7 @@ def main():
 
     output = {}
 
-    for dep in deps:
+    for dep in sorted(deps):
         try:
             url, tag, _ = distro.get_released_repo(dep)
             version = distro.get_version(dep)
@@ -76,7 +89,12 @@ def main():
             )
             continue
 
-        output[dep] = {"url": url, "version": version, "tag": tag}
+        output[dep] = {
+            "url": url,
+            "version": version,
+            "tag": tag,
+            "dependencies": sorted(distro.get_direct_depends(dep)),
+        }
 
         if not args.quiet:
             print("{0:{2}} {1}".format(dep, version, max_len + 2))
