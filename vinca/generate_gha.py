@@ -399,6 +399,7 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                     "with": {
                         "pixi-version": "v0.78.0",
                         "cache": "true",
+                        "log-level": "v",
                     },
                 },
                 {
