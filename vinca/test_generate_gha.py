@@ -5,6 +5,7 @@ import pytest
 from vinca import config
 from vinca.generate_gha import (
     build_unix_pipeline,
+    build_win_pipeline,
     get_setup_pixi_step,
     get_stage_name,
 )
@@ -36,6 +37,43 @@ def test_get_stage_name_strips_only_the_legacy_prefix(package, expected):
 def test_get_stage_name_joins_a_batch():
     batch = ["ros-rolling-rclcpp", "ros2-ament-package"]
     assert get_stage_name(batch) == "rclcpp ros2-ament-package"
+
+
+@pytest.mark.parametrize("builder", [build_unix_pipeline, build_win_pipeline])
+def test_pipeline_uses_exact_batch_dependencies(builder, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    outfile = tmp_path / "workflow.yml"
+
+    builder(
+        [
+            [["ros-rolling-foundation"]],
+            [["ros-rolling-independent"]],
+            [["ros-rolling-consumer"]],
+        ],
+        "buildbranch",
+        outfile=outfile,
+        batch_dependencies=((), (), (0,)),
+    )
+
+    workflow = pytest.importorskip("yaml").safe_load(outfile.read_text())
+    assert workflow["jobs"]["stage_0_job_0"]["needs"] == []
+    assert workflow["jobs"]["stage_1_job_1"]["needs"] == []
+    assert workflow["jobs"]["stage_2_job_2"]["needs"] == ["stage_0_job_0"]
+
+
+@pytest.mark.parametrize("builder", [build_unix_pipeline, build_win_pipeline])
+def test_pipeline_rejects_dependencies_on_unemitted_jobs(
+    builder, tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(ValueError, match="dependencies must refer to earlier batches"):
+        builder(
+            [[["ros-rolling-package"]]],
+            "buildbranch",
+            outfile=tmp_path / "workflow.yml",
+            batch_dependencies=((1,),),
+        )
 
 
 def test_unix_pipeline_sets_up_pixi(tmp_path):

@@ -7,7 +7,7 @@ import os
 import argparse
 from importlib import resources
 from distutils.dir_util import copy_tree
-from typing import Any
+from typing import Any, Sequence
 
 from rich import print
 
@@ -27,6 +27,11 @@ from vinca.main import (
     get_conda_subdir,
 )
 from vinca import config
+from vinca.workflow_batching import (
+    estimate_recipe_weights,
+    parse_workflow_batching_config,
+    plan_workflow_batches,
+)
 
 
 # Use the v0 version of setup-pixi by default, which should give you the last major release
@@ -99,7 +104,7 @@ def normalize_name(s):
 
 def batch_stages(stages, max_batch_size=5):
     with open("vinca.yaml", "r") as vinca_yaml:
-        vinca_conf = yaml.safe_load(vinca_yaml)
+        vinca_conf = yaml.safe_load(vinca_yaml) or {}
 
     # this reduces the number of individual builds to try to save some time
     stage_lengths = [len(s) for s in stages]
@@ -254,6 +259,28 @@ def dump_for_gha(doc, f):
         )
 
 
+def _resolve_batch_needs(
+    batch_dependencies: Sequence[Sequence[int]],
+    batch_index: int,
+    emitted_batch_keys: Sequence[str],
+) -> list[str]:
+    dependencies = batch_dependencies[batch_index]
+    needs = []
+    for dependency in dependencies:
+        if (
+            not isinstance(dependency, int)
+            or isinstance(dependency, bool)
+            or dependency < 0
+            or dependency >= batch_index
+        ):
+            raise ValueError(
+                f"Batch {batch_index} has invalid dependency index {dependency!r}; "
+                "dependencies must refer to earlier batches"
+            )
+        needs.append(emitted_batch_keys[dependency])
+    return needs
+
+
 def get_stage_name(batch):
     legacy_prefix = f"ros-{config.ros_distro}-"
     stage_name = []
@@ -309,13 +336,24 @@ def build_unix_pipeline(
     target="",
     setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
     pixi_version: str = DEFAULT_PIXI_VERSION,
+    batch_dependencies=None,
 ):
+    """Render a Unix workflow from package batches and optional exact dependencies."""
     blurb = {"jobs": {}, "name": pipeline_name}
 
     if azure_template is None:
         azure_template = blurb
 
+    expected_batch_count = sum(len(stage) for stage in stages)
+    if (
+        batch_dependencies is not None
+        and len(batch_dependencies) != expected_batch_count
+    ):
+        raise ValueError("batch_dependencies must contain one entry per generated job")
+
     prev_batch_keys = []
+    emitted_batch_keys = []
+    batch_index = 0
 
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
@@ -345,11 +383,18 @@ def build_unix_pipeline(
                 },
             ]
 
+            if batch_dependencies is None:
+                needs = prev_batch_keys
+            else:
+                needs = _resolve_batch_needs(
+                    batch_dependencies, batch_index, emitted_batch_keys
+                )
+
             job = {
                 "name": pretty_stage_name,
                 "runs-on": runs_on,
                 "strategy": {"fail-fast": False},
-                "needs": prev_batch_keys,
+                "needs": needs,
                 "steps": steps,
             }
 
@@ -359,6 +404,8 @@ def build_unix_pipeline(
             }
 
             azure_template["jobs"][batch_key] = job
+            emitted_batch_keys.append(batch_key)
+            batch_index += 1
 
         prev_batch_keys = batch_keys
 
@@ -380,7 +427,9 @@ def build_linux_pipeline(
     pipeline_name="build_linux",
     setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
     pixi_version: str = DEFAULT_PIXI_VERSION,
+    batch_dependencies=None,
 ):
+    """Render the Linux workflow with optional exact batch dependencies."""
     build_unix_pipeline(
         stages,
         trigger_branch,
@@ -392,6 +441,7 @@ def build_linux_pipeline(
         target="linux-64",
         setup_pixi_version=setup_pixi_version,
         pixi_version=pixi_version,
+        batch_dependencies=batch_dependencies,
     )
 
 
@@ -406,7 +456,9 @@ def build_osx_pipeline(
     pipeline_name="build_osx64",
     setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
     pixi_version: str = DEFAULT_PIXI_VERSION,
+    batch_dependencies=None,
 ):
+    """Render the macOS workflow with optional exact batch dependencies."""
     build_unix_pipeline(
         stages,
         trigger_branch,
@@ -418,6 +470,7 @@ def build_osx_pipeline(
         pipeline_name=pipeline_name,
         setup_pixi_version=setup_pixi_version,
         pixi_version=pixi_version,
+        batch_dependencies=batch_dependencies,
     )
 
 
@@ -428,7 +481,9 @@ def build_win_pipeline(
     azure_template=None,
     setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
     pixi_version: str = DEFAULT_PIXI_VERSION,
+    batch_dependencies=None,
 ):
+    """Render a Windows workflow from package batches and optional dependencies."""
     vm_imagename = "windows-2022"
     # Build Win pipeline
     blurb = {"jobs": {}, "name": "build_win"}
@@ -443,7 +498,16 @@ def build_win_pipeline(
         with open(".scripts/build_win.bat", "r") as fi:
             script = lu(fi.read())
 
+    expected_batch_count = sum(len(stage) for stage in stages)
+    if (
+        batch_dependencies is not None
+        and len(batch_dependencies) != expected_batch_count
+    ):
+        raise ValueError("batch_dependencies must contain one entry per generated job")
+
     prev_batch_keys = []
+    emitted_batch_keys = []
+    batch_index = 0
     for i, s in enumerate(stages):
         stage_name = f"stage_{i}"
         batch_keys = []
@@ -481,11 +545,18 @@ def build_win_pipeline(
                 },
             ]
 
+            if batch_dependencies is None:
+                needs = prev_batch_keys
+            else:
+                needs = _resolve_batch_needs(
+                    batch_dependencies, batch_index, emitted_batch_keys
+                )
+
             job = {
                 "name": pretty_stage_name,
                 "runs-on": vm_imagename,
                 "strategy": {"fail-fast": False},
-                "needs": prev_batch_keys,
+                "needs": needs,
                 "env": {
                     "CONDA_BLD_PATH": "C:\\\\bld\\\\",
                     "VINCA_CUSTOM_CMAKE_BUILD_DIR": "C:\\\\x\\\\",
@@ -499,6 +570,8 @@ def build_win_pipeline(
             }
 
             azure_template["jobs"][batch_key] = job
+            emitted_batch_keys.append(batch_key)
+            batch_index += 1
 
         prev_batch_keys = batch_keys
 
@@ -624,7 +697,34 @@ def main():
         if len(filtered):
             filtered_stages.append(filtered)
 
-    stages = batch_stages(filtered_stages, args.batch_size)
+    with open("vinca.yaml", "r") as vinca_yaml:
+        vinca_conf = yaml.safe_load(vinca_yaml)
+    batching_config = parse_workflow_batching_config(vinca_conf)
+    batch_dependencies = None
+    if batching_config.strategy == "legacy":
+        stages = batch_stages(filtered_stages, args.batch_size)
+    else:
+        names_to_build = {package for stage in filtered_stages for package in stage}
+        dependency_graph = nx.DiGraph()
+        dependency_graph.add_nodes_from(sorted(names_to_build))
+        for consumer in sorted(names_to_build):
+            for dependency in requirements.get(consumer, ()):
+                if dependency in names_to_build:
+                    dependency_graph.add_edge(dependency, consumer)
+        batch_plan = plan_workflow_batches(
+            filtered_stages,
+            dependency_graph,
+            estimate_recipe_weights(
+                metas,
+                batching_config.build_backend_weights,
+                batching_config.package_weights,
+            ),
+            vinca_conf.get("build_in_own_azure_stage", []),
+            args.batch_size,
+            batching_config,
+        )
+        stages = batch_plan.as_stages()
+        batch_dependencies = batch_plan.dependencies
     print(stages)
 
     with open("buildorder.txt", "w") as fo:
@@ -644,6 +744,7 @@ def main():
             pipeline_name="build_linux64",
             setup_pixi_version=setup_pixi_version,
             pixi_version=pixi_version,
+            batch_dependencies=batch_dependencies,
         )
 
     if args.platform == "osx-64":
@@ -652,6 +753,7 @@ def main():
             args.trigger_branch,
             setup_pixi_version=setup_pixi_version,
             pixi_version=pixi_version,
+            batch_dependencies=batch_dependencies,
         )
 
     if args.platform == "osx-arm64":
@@ -665,6 +767,7 @@ def main():
             pipeline_name="build_osx_arm64",
             setup_pixi_version=setup_pixi_version,
             pixi_version=pixi_version,
+            batch_dependencies=batch_dependencies,
         )
 
     if args.platform == "linux-aarch64":
@@ -678,6 +781,7 @@ def main():
             pipeline_name="build_linux_aarch64",
             setup_pixi_version=setup_pixi_version,
             pixi_version=pixi_version,
+            batch_dependencies=batch_dependencies,
         )
 
     # windows
@@ -688,6 +792,7 @@ def main():
             outfile="win.yml",
             setup_pixi_version=setup_pixi_version,
             pixi_version=pixi_version,
+            batch_dependencies=batch_dependencies,
         )
 
     if args.platform == "emscripten-wasm32":
@@ -699,4 +804,5 @@ def main():
             target="emscripten-wasm32",
             setup_pixi_version=setup_pixi_version,
             pixi_version=pixi_version,
+            batch_dependencies=batch_dependencies,
         )

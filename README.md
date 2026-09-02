@@ -52,6 +52,56 @@ pixi_version: v0.78.0
 
 Pinning a release or full action commit hash is recommended for reproducible workflows.
 
+## Configuring GitHub Actions batching
+
+GitHub Actions workflow generation keeps the existing stage-based batching behavior by default. To test dependency-aware batching, configure a strategy in `vinca.yaml`:
+
+```yaml
+github_actions:
+  batching:
+    strategy: schedule-and-isolation
+    max_jobs: 120
+    runner_count: 8
+    job_overhead: 5.0
+    maximum_batch_size: 30
+    schedule_tolerance: 0.01
+    failure_isolation_weight: 1.0
+    build_backend_weights:
+      empty: 0.1
+      ament_python: 1.0
+      other: 2.0
+      cmake: 3.0
+      catkin: 4.0
+      ament_cmake: 4.0
+    package_weights:
+      ros2-rclcpp: 12.0
+```
+
+The available strategies are:
+
+- `legacy` (default): preserves stage barriers and uses `vinca-gha --batch_size` as the maximum number of packages per batch.
+- `schedule-and-isolation`: contracts the package dependency DAG to at most `max_jobs`, evaluates candidate contractions against `runner_count`, and penalizes artificial failure propagation. Generated jobs use the transitive reduction of the batch DAG for exact `needs` dependencies instead of stage-wide barriers.
+
+`maximum_batch_size` is optional. Vinca reports an error when the requested job limit cannot be reached without exceeding it or merging a package listed in `build_in_own_azure_stage`. `job_overhead` is an estimated fixed cost per job. `schedule_tolerance` groups scheduling estimates that differ by less than the configured fraction so failure isolation can decide between them. `failure_isolation_weight` controls that secondary preference.
+
+The default cost model treats empty compatibility recipes as cheapest, followed by `ament_python`, generic builds, CMake, and then `catkin`/`ament_cmake`. Requirement count, patches, and vendor packages adjust that base cost. `build_backend_weights` can calibrate the backend ratios, while `package_weights` takes precedence for packages with measured CI durations.
+
+Recipe-derived weights are only relative estimates. Compare generated workflows and measured CI timings before making the experimental strategy the default. New strategies can be added with `register_batching_strategy` from `vinca.workflow_batching`.
+
+Historical GitHub Actions timings can be converted into calibrated package weights from a generated distribution repository:
+
+```bash
+vinca-gha-timings \
+  --repository RoboStack/ros-jazzy \
+  --workflow linux.yml \
+  --branch buildbranch_linux \
+  --runs 30 \
+  --recipes recipes \
+  --output workflow-weights.yaml
+```
+
+The helper reads GitHub's job and step timestamps, excludes failed or incomplete build steps, measures job overhead outside the generated build step, and fits positive additive package durations in minutes. Fixed setup and upload work inside that step is distributed across the package estimates. Multi-package jobs do not expose individual package timings, so the fit is regularized toward the recipe backend estimates. The resulting `github_actions.batching` section can be copied into `vinca.yaml`; `workflow_timing_metadata` records the source and sample counts.
+
 ## Managing conda-forge pinning
 
 RoboStack repositories can keep their global pins reproducible without copying and
