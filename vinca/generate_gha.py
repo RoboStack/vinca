@@ -283,7 +283,7 @@ def build_unix_pipeline(
             steps = [
                 {
                     "name": "Checkout code",
-                    "uses": "actions/checkout@v6",
+                    "uses": "actions/checkout@v7",
                 },
                 {
                     "name": f"Build {' '.join([pkg for pkg in batch])}",
@@ -392,13 +392,17 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
             }
 
             steps = [
-                {"name": "Checkout code", "uses": "actions/checkout@v6"},
+                {"name": "Checkout code", "uses": "actions/checkout@v7"},
                 {
                     "name": "Setup pixi",
-                    "uses": "prefix-dev/setup-pixi@v0.9.5",
+                    "uses": "prefix-dev/setup-pixi@v0.10.2",
                     "with": {
-                        "pixi-version": "v0.74.0",
+                        "pixi-version": "v0.78.0",
                         "cache": "true",
+                        # Use the verbose level to get hints why an installation might fail.
+                        "log-level": "v",
+                        # Use frozen to avoid lockfile satisfiablity issues between the pixi versions used.
+                        "frozen": "true",
                     },
                 },
                 {
