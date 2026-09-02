@@ -399,7 +399,10 @@ def build_win_pipeline(stages, trigger_branch, outfile="win.yml", azure_template
                     "with": {
                         "pixi-version": "v0.78.0",
                         "cache": "true",
+                        # Use the verbose level to get hints why an installation might fail.
                         "log-level": "v",
+                        # Use frozen to avoid lockfile satisfiablity issues between the pixi versions used.
+                        "frozen": "true"
                     },
                 },
                 {
