@@ -263,6 +263,8 @@ def generate_outputs(distro, vinca_conf):
             print(f"Could not generate output for {pkg_shortname}")
             continue
 
+        output: dict[str, Any] | None = None
+
         try:
             output = generate_output(
                 pkg_shortname,
@@ -692,7 +694,7 @@ def main():
             ):
                 with open(add_rec) as fi:
                     add_rec_y = yaml.load(fi)
-                if config.parsed_args.platform == "emscripten-wasm32":
+                if arguments.platform == "emscripten-wasm32":
                     additional_recipe_names.add(add_rec_y["package"]["name"])
                 else:
                     if add_rec_y["package"]["name"] not in [

@@ -1,5 +1,7 @@
 """Tests for the ROS package naming scheme."""
 
+from typing import Any
+
 import pytest
 
 from vinca.distro import Distro
@@ -134,7 +136,7 @@ def test_package_name_mode_defaults_to_legacy():
     ],
 )
 def test_dependency_resolution_uses_selected_name_mode(mode, expected_name):
-    distro = make_distro()
+    distro: Any = make_distro()
     distro.check_package = lambda _name: True
     vinca_conf = {"_conda_indexes": [], "package_name_mode": mode}
 

@@ -89,7 +89,7 @@ def generate_source(
 
         url, ref, ref_type = distro.get_released_repo(shortname)
         package_name = package_names[0]
-        entry = source_reference(url=url, ref=ref, ref_type=ref_type)
+        entry: dict[str, Any] = source_reference(url=url, ref=ref, ref_type=ref_type)
         entry["target_directory"] = f"{package_name}/src/work"
 
         patches = _package_patches(package_name, vinca_conf, platform)
@@ -127,7 +127,7 @@ def generate_source_version(
 
         url, ref, ref_type = distro.get_released_repo(shortname)
         package_name = package_names[0]
-        entry = source_reference(url=url, ref=ref, ref_type=ref_type)
+        entry: dict[str, Any] = source_reference(url=url, ref=ref, ref_type=ref_type)
         entry["target_directory"] = f"{package_name}/src/work"
         if patches := _package_patches(package_name, vinca_conf, platform):
             entry["patches"] = patches
@@ -150,7 +150,7 @@ def generate_fat_source(
             continue
         url, ref, ref_type = distro.get_released_repo(shortname)
         package_name = package_names[0]
-        entry = source_reference(url=url, ref=ref, ref_type=ref_type)
+        entry: dict[str, Any] = source_reference(url=url, ref=ref, ref_type=ref_type)
         entry["target_directory"] = f"src/{package_name}"
 
         patch_path = Path(vinca_conf["_patch_dir"]) / f"{package_name}.patch"

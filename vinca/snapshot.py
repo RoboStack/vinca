@@ -60,8 +60,10 @@ def main():
         deps = distro.get_depends(args.package)
         deps.add(args.package)
 
+    max_len = 0
+
     if not args.quiet:
-        max_len = max([len(dep) for dep in deps])
+        max_len = max(len(dep) for dep in deps)
         print("\033[1m{0:{2}} {1}\033[0m".format("Package", "Version", max_len + 2))
 
     output = {}

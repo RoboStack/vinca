@@ -59,6 +59,8 @@ def get_mutex_package_dependency(
         raise ValueError(
             f"Error parsing mutex_package configuration: {error}"
         ) from error
+    if mutex_config is None:
+        return None
 
     version_parts = mutex_config["version"].split(".")
     pin_depth = len(mutex_config["upper_bound"].split("."))
