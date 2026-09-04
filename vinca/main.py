@@ -479,14 +479,12 @@ def parse_package(pkg, distro, vinca_conf, path):
         recipe["about"]["maintainers"].append(name)
 
     for u in pkg["urls"]:
-        # if u.type == 'repository' :
-        #     recipe['source']['git'] = u.url
-        #     recipe['source']['tag'] = recipe['package']['version']
         if u.type == "website":
             recipe["about"]["homepage"] = u.url
 
-        # if u.type == 'bugtracker' :
-        #    recipe['about']['url_issues'] = u.url
+    repository = distro.get_repository_url(pkg.name, pkg["urls"])
+    if repository:
+        recipe["about"]["repository"] = repository
 
     if not recipe["source"].get("git", None):
         aux = path.split("/")

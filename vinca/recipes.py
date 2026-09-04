@@ -286,14 +286,17 @@ def _requirement_sort_key(requirement):
     )
 
 
-def _add_metadata(output: dict[str, Any], package: Any, shortname: str) -> None:
-    """Populate ``about`` from the package.xml URLs, license and description."""
+def _add_metadata(
+    output: dict[str, Any], package: Any, shortname: str, distro: Distro
+) -> None:
+    """Populate ``about`` from package.xml and rosdistro metadata."""
     about = output["about"] = {}
     for url in package.urls:
         if url.type == "website":
             about["homepage"] = url.url
-        elif url.type == "repository":
-            about["repository"] = url.url
+    repository = distro.get_repository_url(shortname, package.urls)
+    if repository:
+        about["repository"] = repository
     if package.licenses:
         license_expression = convert_to_spdx_license(
             [str(license) for license in package.licenses], package_name=shortname
@@ -459,5 +462,5 @@ def generate_output(
     _adjust_requirements(output["requirements"], package_prefix)
     if dependencies_only:
         return output["requirements"]
-    _add_metadata(output, package, shortname)
+    _add_metadata(output, package, shortname, distro)
     return output
