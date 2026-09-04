@@ -7,7 +7,6 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from typing import Iterable, Optional
 
-import catkin_pkg.package
 import requests
 from rosdistro import get_cached_distribution, get_index, get_index_url
 from rosdistro.dependency_walker import DependencyWalker
@@ -116,9 +115,12 @@ class Distro(object):
         python_version=None,
         snapshot=None,
         additional_packages_snapshot=None,
+        distribution_cache=None,
     ):
         index = get_index(get_index_url())
-        self._distro = get_cached_distribution(index, distro_name)
+        self._distro = get_cached_distribution(
+            index, distro_name, cache=distribution_cache
+        )
         self.distro_name = distro_name
         self.snapshot = snapshot
         self.additional_packages_snapshot = additional_packages_snapshot
@@ -169,11 +171,6 @@ class Distro(object):
 
         ignore_pkgs = set(ignore_pkgs or ())
 
-        if self.snapshot:
-            dependencies = self._get_snapshot_recursive_depends(pkg, ignore_pkgs)
-            self._depends_cache[cache_key] = set(dependencies)
-            return dependencies
-
         dependencies = set()
         visited = {pkg}
         packages_to_check = {pkg}
@@ -194,18 +191,32 @@ class Distro(object):
         self._depends_cache[cache_key] = set(dependencies)
         return dependencies
 
+    def get_direct_depends(self, pkg: str) -> set[str]:
+        """Return the direct ROS dependencies of a package."""
+        return self._get_direct_depends(pkg)
+
     def _get_direct_depends(self, pkg: str) -> set[str]:
         """Return direct dependencies, caching package metadata across root walks."""
 
         if pkg in self._direct_depends_cache:
             return set(self._direct_depends_cache[pkg])
 
+        snapshot_info = self._get_snapshot_package_info(pkg)
+        additional_packages_snapshot = self.additional_packages_snapshot or {}
+        is_additional_package = pkg in additional_packages_snapshot
+        if snapshot_info is not None and not is_additional_package:
+            if "dependencies" not in snapshot_info:
+                raise RuntimeError(
+                    f"Snapshot metadata for '{pkg}' has no dependencies; "
+                    "regenerate the rosdistro snapshot"
+                )
+            direct = set(snapshot_info["dependencies"] or [])
+            self._direct_depends_cache[pkg] = set(direct)
+            return direct
+
         # if pkg comes from additional_packages_snapshot, extract from its package.xml
-        if (
-            self.additional_packages_snapshot
-            and pkg in self.additional_packages_snapshot
-        ):
-            pkg_info = self.additional_packages_snapshot[pkg]
+        if is_additional_package:
+            pkg_info = additional_packages_snapshot[pkg]
             xml_str = self.get_package_xml_for_additional_package(pkg_info)
             # parse XML
             import xml.etree.ElementTree as ET
@@ -248,48 +259,6 @@ class Distro(object):
             )
         self._direct_depends_cache[pkg] = set(direct)
         return direct
-
-    def _get_snapshot_recursive_depends(
-        self, pkg: str, ignore_pkgs: Optional[Iterable[str]] = None
-    ) -> set[str]:
-        """Return ROS dependencies using only package manifests pinned by the snapshot."""
-        dependencies: set[str] = set()
-        ignored = set(ignore_pkgs or [])
-        packages_to_check = {pkg}
-        checked_packages = set()
-        dependency_attributes = (
-            "buildtool_depends",
-            "buildtool_export_depends",
-            "build_depends",
-            "build_export_depends",
-            "run_depends",
-            "test_depends",
-            "exec_depends",
-        )
-
-        while packages_to_check:
-            package_name = sorted(packages_to_check)[0]
-            packages_to_check.remove(package_name)
-            if package_name in ignored or package_name in checked_packages:
-                continue
-            checked_packages.add(package_name)
-
-            package_xml = self.get_release_package_xml(package_name)
-            package = catkin_pkg.package.parse_package_string(package_xml)
-            package.evaluate_conditions(os.environ)
-            direct_dependencies: set[str] = {
-                dependency.name
-                for attribute in dependency_attributes
-                for dependency in getattr(package, attribute)
-                if dependency.evaluated_condition is not False
-                and dependency.name not in ignored
-                and self.check_package(dependency.name)
-            }
-            new_dependencies = direct_dependencies - dependencies
-            dependencies |= new_dependencies
-            packages_to_check |= new_dependencies - checked_packages
-
-        return dependencies
 
     def _get_snapshot_package_info(self, pkg_name):
         if not self.snapshot:
@@ -396,13 +365,7 @@ class Distro(object):
         return repo.version.split("-")[0]
 
     def live_cache_matches_snapshot(self, pkg_name, snapshot_entry):
-        """Return whether rosdistro's cached manifest is the pinned snapshot source.
-
-        A snapshot pins the release repository URL, the package-specific release
-        tag, and the release version.  Only an exact match may reuse rosdistro's
-        local ``DistributionCache``; otherwise the manifest must be read from the
-        immutable snapshot source.
-        """
+        """Return whether rosdistro's cached manifest is the pinned snapshot source."""
 
         for live_name in (pkg_name, pkg_name.replace("_", "-")):
             try:
