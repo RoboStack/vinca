@@ -249,9 +249,11 @@ class Distro(object):
         self._direct_depends_cache[pkg] = set(direct)
         return direct
 
-    def _get_snapshot_recursive_depends(self, pkg, ignore_pkgs=None):
+    def _get_snapshot_recursive_depends(
+        self, pkg: str, ignore_pkgs: Optional[Iterable[str]] = None
+    ) -> set[str]:
         """Return ROS dependencies using only package manifests pinned by the snapshot."""
-        dependencies = set()
+        dependencies: set[str] = set()
         ignored = set(ignore_pkgs or [])
         packages_to_check = {pkg}
         checked_packages = set()
@@ -275,7 +277,7 @@ class Distro(object):
             package_xml = self.get_release_package_xml(package_name)
             package = catkin_pkg.package.parse_package_string(package_xml)
             package.evaluate_conditions(os.environ)
-            direct_dependencies = {
+            direct_dependencies: set[str] = {
                 dependency.name
                 for attribute in dependency_attributes
                 for dependency in getattr(package, attribute)

@@ -97,10 +97,8 @@ def add_additional_recipes(args):
         os.path.join(args.dir, "..", "additional_recipes")
     )
 
-    print("Searching additional recipes in ", additional_recipes_path)
-
     if not os.path.exists(additional_recipes_path):
-        return
+        return []
 
     with open("vinca.yaml", "r") as vinca_yaml:
         vinca_conf = yaml.safe_load(vinca_yaml)
@@ -222,7 +220,7 @@ def build_unix_pipeline(
     setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
     pixi_version: str = DEFAULT_PIXI_VERSION,
 ):
-    blurb = {"jobs": {}, "name": pipeline_name}
+    blurb: dict[str, Any] = {"jobs": {}, "name": pipeline_name}
 
     if workflow is None:
         workflow = blurb
@@ -343,7 +341,7 @@ def build_win_pipeline(
 ):
     vm_imagename = "windows-2022"
     # Build Win pipeline
-    blurb = {"jobs": {}, "name": "build_win"}
+    blurb: dict[str, Any] = {"jobs": {}, "name": "build_win"}
 
     if workflow is None:
         workflow = blurb
@@ -423,7 +421,10 @@ def build_win_pipeline(
 
 
 def get_full_tree():
-    recipes_dir = config.parsed_args.dir
+    parsed_args = config.parsed_args
+    if parsed_args is None:
+        raise RuntimeError("Pipeline arguments must be parsed before generating a tree")
+    recipes_dir = parsed_args.dir
 
     vinca_yaml = os.path.join(os.path.dirname(recipes_dir), "vinca.yaml")
 
@@ -499,7 +500,11 @@ def main():
 
         names_to_build = {pkg["package"]["name"] for pkg in metas}
         print("Names to build: ", names_to_build)
-        tg_slimmed = [el for el in tg if el in names_to_build]
+        tg_slimmed = [
+            element
+            for element in tg
+            if isinstance(element, str) and element in names_to_build
+        ]
 
         stages = []
         current_stage = []

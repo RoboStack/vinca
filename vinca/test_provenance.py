@@ -4,6 +4,8 @@ These cover *why* a recipe gets generated: whether a package was requested
 directly by the config and which already-selected packages depend on it.
 """
 
+from typing import Any
+
 import vinca.main as m
 
 
@@ -32,7 +34,10 @@ def test_provenance_requested_and_required_by():
         {"app": {"libA", "libB"}, "libA": {"libcommon"}, "libB": {"libcommon"}},
         ros1=True,  # keep ROS2 auto-injection out of this assertion
     )
-    conf = {"packages_select_by_deps": ["app", "libA"], "packages_skip_by_deps": None}
+    conf: dict[str, Any] = {
+        "packages_select_by_deps": ["app", "libA"],
+        "packages_skip_by_deps": None,
+    }
 
     selected = m.get_selected_packages(distro, conf)
 
@@ -52,7 +57,7 @@ def test_provenance_requested_and_required_by():
 
 def test_provenance_skip_by_deps_excludes_package():
     distro = FakeDistro({"app": {"libA", "skipme"}}, ros1=True)
-    conf = {
+    conf: dict[str, Any] = {
         "packages_select_by_deps": ["app"],
         "packages_skip_by_deps": ["skipme"],
     }
@@ -65,7 +70,10 @@ def test_provenance_skip_by_deps_excludes_package():
 
 def test_ros2_workspace_auto_injected_with_reason():
     distro = FakeDistro({"app": set()}, ros1=False)
-    conf = {"packages_select_by_deps": ["app"], "packages_skip_by_deps": None}
+    conf: dict[str, Any] = {
+        "packages_select_by_deps": ["app"],
+        "packages_skip_by_deps": None,
+    }
 
     selected = m.get_selected_packages(distro, conf)
 
@@ -80,7 +88,10 @@ def test_generation_summary_output(monkeypatch, capsys):
         {"app": {"libA", "libB"}, "libA": {"libcommon"}, "libB": {"libcommon"}},
         ros1=True,
     )
-    conf = {"packages_select_by_deps": ["app", "libA"], "packages_skip_by_deps": None}
+    conf: dict[str, Any] = {
+        "packages_select_by_deps": ["app", "libA"],
+        "packages_skip_by_deps": None,
+    }
     conf["_selected_pkgs"] = m.get_selected_packages(distro, conf)
 
     monkeypatch.setattr(

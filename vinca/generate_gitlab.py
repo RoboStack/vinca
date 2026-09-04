@@ -1,6 +1,7 @@
 import glob
 import os
 import sys
+from typing import Any
 
 import networkx as nx
 import yaml
@@ -79,7 +80,7 @@ def main():
 
     print(stages)
 
-    gitlab_template = {"image": "condaforge/linux-anvil-cos7-x86_64"}
+    gitlab_template: dict[str, Any] = {"image": "condaforge/linux-anvil-cos7-x86_64"}
 
     stage_names = []
     for i, s in enumerate(stages):

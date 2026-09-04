@@ -67,5 +67,6 @@ include = [
 packages = ["vinca"]
 
 [tool.pyrefly]
-preset = "basic"
+preset = "default"
 project-includes = ["vinca"]
+project-excludes = ["vinca/test_*.py"]
