@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 import vinca.main as main
+import vinca.recipes as recipes
 from vinca.distro import Distro
 
 
@@ -150,7 +151,7 @@ def test_snapshot_metadata_generates_dependency_required_by_pinned_source(
         "snapshot_dependency": "ros2-snapshot-dependency",
     }
     monkeypatch.setattr(
-        main,
+        recipes,
         "resolve_pkgname",
         lambda name, *_args, **_kwargs: [dependency_names[name]],
     )
