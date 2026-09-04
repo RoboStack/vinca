@@ -95,6 +95,8 @@ def main():
             "tag": tag,
             "dependencies": sorted(distro.get_direct_depends(dep)),
         }
+        if repository := distro.get_repository_url(dep):
+            output[dep]["repository"] = repository
 
         if not args.quiet:
             print("{0:{2}} {1}".format(dep, version, max_len + 2))

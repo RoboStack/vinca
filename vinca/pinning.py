@@ -8,8 +8,6 @@ on top of it, and local overrides.  This module turns that small file into the
 
 from __future__ import annotations
 
-from typing import Any, Iterator, Mapping, Optional, Sequence, Union
-
 import argparse
 import io
 import json
@@ -21,15 +19,15 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any, Iterator, Mapping, Optional, Sequence, Union
 from urllib.parse import quote
 
 import requests
 import ruamel.yaml
 import zstandard
 
-from vinca.variant_algebra import variant_add
 from vinca.v1_selectors import _eval_condition, _platform_flags
-
+from vinca.variant_algebra import variant_add
 
 PINNING_PACKAGE = "conda-forge-pinning"
 ANACONDA_RELEASE_URL = (
@@ -382,8 +380,8 @@ def dependencies_from_vinca(
     from vinca.distro import Distro
     from vinca.main import (
         generate_dependency_requirements,
-        get_selected_packages,
         get_group_dependency_packages,
+        get_selected_packages,
         read_vinca_yaml,
     )
 

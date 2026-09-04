@@ -3,40 +3,54 @@
 from __future__ import annotations
 
 import argparse
-import catkin_pkg
-import sys
-import os
 import glob
-import platform
+import os
+import sys
 from typing import Any, Optional
 
+import catkin_pkg
 import ruamel.yaml
-from pathlib import Path
 
-from vinca import __version__
-from .resolve import get_conda_index
-from .resolve import resolve_pkgname
-from .template import write_recipe, write_recipe_package
+from vinca import __version__, config
+from vinca.utils import get_pkg_build_number, get_repodata
+
+from .configuration import read_snapshot as read_snapshot
+from .configuration import read_vinca_yaml as load_vinca_yaml
 from .distro import Distro
+from .mutex import (
+    generate_mutex_package_recipe as generate_mutex_package_recipe,
+)
+from .mutex import (
+    get_mutex_package_dependency as get_mutex_package_dependency,
+)
+from .mutex import (
+    parse_mutex_package_config as parse_mutex_package_config,
+)
+from .mutex import (
+    should_skip_mutex_package as should_skip_mutex_package,
+)
 from .naming import (
     generate_legacy_compatibility_output,
     get_package_name,
-    get_package_name_mode,
-    get_package_prefix,
     is_legacy_compatibility_output,
-    normalize_package_dependency,
 )
-from .v1_selectors import evaluate_selectors
-
-from vinca import config
-from vinca.utils import (
-    add_package_name_variants,
-    get_repodata,
-    get_pkg_build_number,
-    get_pkg_additional_info,
-    is_dummy_metapackage,
+from .platforms import get_conda_subdir as detect_conda_subdir
+from .recipes import generate_output as build_output
+from .recipes import get_depmods as get_depmods
+from .resolve import resolve_pkgname
+from .sources import (
+    generate_fat_source as build_fat_source,
 )
-from vinca.license_utils import convert_to_spdx_license
+from .sources import (
+    generate_source as build_source,
+)
+from .sources import (
+    generate_source_version as build_source_version,
+)
+from .sources import (
+    source_reference,
+)
+from .template import write_recipe, write_recipe_package
 
 unsatisfied_deps = set()
 distro = None
@@ -50,25 +64,9 @@ def ensure_list(obj):
 
 
 def get_conda_subdir():
-    if config.parsed_args.platform:
-        return config.parsed_args.platform
-
-    sys_platform = sys.platform
-    machine = platform.machine()
-    if sys_platform.startswith("linux"):
-        if machine == "aarch64":
-            return "linux-aarch64"
-        elif machine == "x86_64":
-            return "linux-64"
-        else:
-            raise RuntimeError("Unknown machine!")
-    elif sys_platform == "darwin":
-        if machine == "arm64":
-            return "osx-arm64"
-        else:
-            return "osx-64"
-    elif sys_platform == "win32":
-        return "win-64"
+    """Return the configured target platform, or detect the host platform."""
+    selected = getattr(config.parsed_args, "platform", None)
+    return detect_conda_subdir(selected)
 
 
 def parse_command_line(argv):
@@ -147,140 +145,14 @@ def parse_command_line(argv):
         help="The conda platform to check existing recipes for.",
     )
     arguments = parser.parse_args(argv[1:])
-    global selected_platform
     config.parsed_args = arguments
     config.selected_platform = get_conda_subdir()
     return arguments
 
 
-def get_depmods(vinca_conf, pkg_name, distro):
-    depmods = vinca_conf["depmods"].get(pkg_name, {})
-    rm_deps, add_deps = (
-        {"build": [], "host": [], "run": []},
-        {"build": [], "host": [], "run": []},
-    )
-
-    for dep_type in ["build", "host", "run"]:
-        for dependency in depmods.get("remove_" + dep_type, []):
-            rm_deps[dep_type].append(
-                normalize_package_dependency(dependency, distro, vinca_conf)
-            )
-
-        for dependency in depmods.get("add_" + dep_type, []):
-            add_deps[dep_type].append(
-                normalize_package_dependency(dependency, distro, vinca_conf)
-            )
-
-    return rm_deps, add_deps
-
-
 def read_vinca_yaml(filepath):
-    yaml = ruamel.yaml.YAML()
-    vinca_conf = evaluate_selectors(
-        yaml.load(open(filepath, "r")), target_platform=get_conda_subdir()
-    )
-    vinca_conf["package_name_mode"] = get_package_name_mode(vinca_conf).value
-
-    # normalize paths to absolute paths
-    conda_index = []
-    for i in vinca_conf["conda_index"]:
-        if os.path.isfile(i):
-            conda_index.append(os.path.abspath(i))
-        else:
-            conda_index.append(i)
-
-    vinca_conf["conda_index"] = conda_index
-    patch_dir = Path(vinca_conf["patch_dir"]).absolute()
-    vinca_conf["_patch_dir"] = patch_dir
-    patches = {}
-
-    for x in sorted(glob.glob(os.path.join(vinca_conf["_patch_dir"], "*.patch"))):
-        splitted = os.path.basename(x).split(".")
-        if splitted[0] not in patches:
-            patches[splitted[0]] = {
-                "any": [],
-                "osx": [],
-                "linux": [],
-                "win": [],
-                "emscripten": [],
-            }
-        if len(splitted) == 3:
-            if splitted[1] in ("osx", "linux", "win", "emscripten"):
-                patches[splitted[0]][splitted[1]].append(x)
-                continue
-            if splitted[1] == "unix":
-                patches[splitted[0]]["linux"].append(x)
-                patches[splitted[0]]["osx"].append(x)
-                continue
-
-        patches[splitted[0]]["any"].append(x)
-
-    add_package_name_variants(patches, vinca_conf["ros_distro"])
-    vinca_conf["_patches"] = patches
-
-    tests = {}
-    test_dir = Path(filepath).parent / "tests"
-    for x in test_dir.glob("*.yaml"):
-        tests[os.path.basename(x).split(".")[0]] = x
-    add_package_name_variants(tests, vinca_conf["ros_distro"])
-    vinca_conf["_tests"] = tests
-
-    test_folders = {path.name: path for path in test_dir.glob("*") if path.is_dir()}
-    add_package_name_variants(test_folders, vinca_conf["ros_distro"])
-    vinca_conf["_test_folders"] = test_folders
-
-    if (patch_dir / "dependencies.yaml").exists():
-        vinca_conf["depmods"] = evaluate_selectors(
-            yaml.load(open(patch_dir / "dependencies.yaml")),
-            target_platform=get_conda_subdir(),
-        )
-    if not vinca_conf.get("depmods"):
-        vinca_conf["depmods"] = {}
-
-    config.ros_distro = vinca_conf["ros_distro"]
-    config.skip_testing = vinca_conf.get("skip_testing", True)
-
-    vinca_conf["_conda_indexes"] = get_conda_index(
-        vinca_conf, os.path.dirname(filepath)
-    )
-
-    vinca_conf["trigger_new_versions"] = vinca_conf.get("trigger_new_versions", False)
-
-    if (Path(filepath).parent / "pkg_additional_info.yaml").exists():
-        vinca_conf["_pkg_additional_info"] = evaluate_selectors(
-            yaml.load(open(Path(filepath).parent / "pkg_additional_info.yaml")),
-            target_platform=get_conda_subdir(),
-        )
-    else:
-        vinca_conf["_pkg_additional_info"] = {}
-
-    # snapshot contains both rosdistro_snapshot.yaml and
-    # rosdistro_additional_recipes.yaml
-    snapshot, additional_packages_snapshot = read_snapshot(vinca_conf)
-
-    # Store additional_packages_snapshot in vinca_conf for template access
-    vinca_conf["_snapshot"] = snapshot or {}
-    vinca_conf["_additional_packages_snapshot"] = additional_packages_snapshot or {}
-
-    return vinca_conf
-
-
-def read_snapshot(vinca_conf):
-    if "rosdistro_snapshot" not in vinca_conf:
-        return None, None
-
-    yaml = ruamel.yaml.YAML()
-    # load primary snapshot
-    snapshot = yaml.load(open(vinca_conf["rosdistro_snapshot"], "r")) or {}
-    # if additional snapshot file specified, load and merge
-    additional_key = "rosdistro_additional_recipes"
-    additional = None
-    if additional_key in vinca_conf and vinca_conf[additional_key]:
-        additional = yaml.load(open(vinca_conf[additional_key], "r")) or {}
-        # merge additional entries, overriding or adding
-        snapshot.update(additional)
-
-    return snapshot, additional
+    """Load configuration for the currently selected conda platform."""
+    return load_vinca_yaml(filepath, target_platform=get_conda_subdir())
 
 
 def should_skip_output(output, vinca_conf):
@@ -320,349 +192,16 @@ def generate_output(
     *,
     dependencies_only: bool = False,
 ) -> Optional[dict[str, Any]]:
-    if not all_pkgs:
-        all_pkgs = []
-
-    if pkg_shortname not in vinca_conf["_selected_pkgs"]:
-        return None
-
-    pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-    if not pkg_names:
-        return None
-
-    # handle dummy recipe generation for vendored packages
-    output = {}
-    if is_dummy_metapackage(pkg_shortname, vinca_conf):
-        pkg_additional_info = get_pkg_additional_info(pkg_shortname, vinca_conf)
-        gen = pkg_additional_info["generate_dummy_package_with_run_deps"]
-        dep_name = gen.get("dep_name")
-        # dep_name is required to specify which dependency to pin in the dummy recipe
-        if not dep_name:
-            runerr = f"Missing 'dep_name' for dummy recipe of {pkg_shortname}"
-            raise RuntimeError(runerr)
-        # upper_bound is required for dummy recipe pinning
-        upper_bound = gen.get("upper_bound")
-        if not upper_bound:
-            upper_bound = gen.get("max_pin")
-            if not upper_bound:
-                runerr = f"Missing 'upper_bound' or 'max_pin' for dummy recipe of {pkg_shortname}"
-                raise RuntimeError(runerr)
-        # Compute rattler-build-compatible version constraint based on upper_bound:
-        # - lower bound: allow the exact package version (or override_version if specified)
-        # - upper bound: increment the segment of version defined by upper_bound length,
-        #   then append 'a0' to ensure the constraint captures pre-releases correctly
-
-        # Use override_version if specified, otherwise use the ROS package version
-        dummy_package_version = gen.get("override_version", version)
-        lower = dummy_package_version
-        parts = [int(p) for p in lower.split(".")]
-        seg = len(upper_bound.split("."))
-        upper_parts = parts[:seg]
-        upper_parts[-1] += 1
-        upper_parts += [0] * (len(parts) - seg)
-        upper = ".".join(str(p) for p in upper_parts) + "a0"
-        constraint = f"{dep_name} >={lower}, <{upper}"
-        output = {
-            "package": {"name": pkg_names[0], "version": dummy_package_version},
-            "build": {
-                "number": get_pkg_build_number(
-                    vinca_conf.get("build_number", 0), pkg_names[0], vinca_conf
-                ),
-                "script": "",
-            },
-            "requirements": {"build": [], "host": [], "run": [constraint]},
-        }
-    else:
-        # If the package is not a dummy recipe, we generate a full recipe
-        output = {
-            "package": {"name": pkg_names[0], "version": version},
-            "requirements": {
-                "build": [
-                    "${{ compiler('cxx') }}",
-                    "${{ compiler('c') }}",
-                    {
-                        "if": "target_platform!='emscripten-wasm32'",
-                        "then": ["${{ stdlib('c') }}"],
-                    },
-                    "ninja",
-                    "python",
-                    "setuptools",
-                    "git",
-                    "git-lfs",
-                    {"if": "unix", "then": ["patch", "make", "coreutils"]},
-                    {"if": "win", "then": ["m2-patch"]},
-                    {"if": "osx", "then": ["tapi"]},
-                    {"if": "build_platform != target_platform", "then": ["pkg-config"]},
-                    "cmake",
-                    "cython",
-                    {
-                        "if": "build_platform != target_platform",
-                        "then": [
-                            "python",
-                            "cross-python_${{ target_platform }}",
-                            "numpy",
-                        ],
-                    },
-                ],
-                "host": [
-                    {"if": "build_platform == target_platform", "then": ["pkg-config"]},
-                    "python",
-                    "numpy",
-                    "pip",
-                ],
-                "run": [],
-            },
-            "build": {"script": ""},
-        }
-
-    xml = distro.get_release_package_xml(pkg_shortname)
-
-    # Without a snapshot, rosdistro can return no manifest for an unreleased package.
-    if not xml:
-        print(f"Skip {pkg_shortname} because no release package.xml is available.")
-        return None
-
-    pkg = catkin_pkg.package.parse_package_string(xml)
-
-    pkg.evaluate_conditions(os.environ)
-
-    resolved_python = resolve_pkgname("python", vinca_conf, distro)
-    output["requirements"]["run"].extend(resolved_python)
-    output["requirements"]["host"].extend(resolved_python)
-
-    is_dummy_package = is_dummy_metapackage(pkg_shortname, vinca_conf)
-    build_type = pkg.get_build_type()
-
-    if is_dummy_package:
-        # Dummy recipes do not actually build anything, so we set the script to empty
-        output["build"]["script"] = ""
-    elif build_type in ["cmake", "catkin"]:
-        output["build"]["script"] = (
-            "${{ '$RECIPE_DIR/build_catkin.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_catkin.bat' }}"
-        )
-    elif build_type in ["ament_cmake"]:
-        output["build"]["script"] = (
-            "${{ '$RECIPE_DIR/build_ament_cmake.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_ament_cmake.bat' }}"
-        )
-    elif build_type in ["ament_python"]:
-        output["build"]["script"] = (
-            "${{ '$RECIPE_DIR/build_ament_python.sh' if unix or wasm32 else '%RECIPE_DIR%\\\\bld_ament_python.bat' }}"
-        )
-        resolved_setuptools = resolve_pkgname("python-setuptools", vinca_conf, distro)
-        output["requirements"]["host"].extend(resolved_setuptools)
-    else:
-        print(f"Unknown build type for {pkg_shortname}: {build_type}")
-        return None
-
-    if not is_dummy_package and build_type in ["cmake", "catkin", "ament_cmake"]:
-        output["requirements"]["build"].append(
-            {
-                "if": "osx",
-                "then": [
-                    "clang-tools ${{ (cxx_compiler_version ~ '.*') if "
-                    "cxx_compiler_version is defined else '*' }}"
-                ],
-            }
-        )
-
-    if vinca_conf.get("mutex_package"):
-        mutex_dep = get_mutex_package_dependency(vinca_conf, distro)
-        if mutex_dep:
-            output["requirements"]["host"].append(mutex_dep)
-            output["requirements"]["run"].append(mutex_dep)
-
-    if not distro.check_ros1() and pkg_shortname not in [
-        "ament_cmake_core",
-        "ament_package",
-        "ros_workspace",
-        "ros_environment",
-    ]:
-        package_prefix = get_package_prefix(distro, vinca_conf)
-        output["requirements"]["host"].append(f"{package_prefix}-ros-environment")
-        output["requirements"]["host"].append(f"{package_prefix}-ros-workspace")
-        output["requirements"]["run"].append(f"{package_prefix}-ros-workspace")
-
-    rm_deps, add_deps = get_depmods(vinca_conf, pkg.name, distro)
-    gdeps = []
-    if pkg.group_depends:
-        for gdep in pkg.group_depends:
-            gdep.extract_group_members(all_pkgs)
-            gdeps += gdep.members
-
-    build_tool_deps = pkg.buildtool_depends
-    build_tool_deps += pkg.buildtool_export_depends
-    build_tool_deps = [d.name for d in build_tool_deps if d.evaluated_condition]
-
-    build_deps = pkg.build_depends
-    build_deps += pkg.build_export_depends
-    build_deps += pkg.test_depends
-    build_deps = [d.name for d in build_deps if d.evaluated_condition]
-    build_deps += gdeps
-
-    # we stick some build tools into the `build` section to make cross compilation work
-    # right now it's only `git`.
-    for dep in build_tool_deps:
-        resolved_dep = resolve_pkgname(dep, vinca_conf, distro)
-        if not resolved_dep:
-            unsatisfied_deps.add(dep)
-            continue
-
-        if "git" in resolved_dep:
-            output["requirements"]["build"].extend(resolved_dep)
-        else:
-            # remove duplicate cmake
-            if dep not in ["cmake"]:
-                build_deps.append(dep)
-
-        # Hack to add cyclonedds into build for cross compilation
-        if pkg_shortname == "cyclonedds" or "cyclonedds" in (
-            build_deps + build_tool_deps
-        ):
-            output["requirements"]["build"].append(
-                {
-                    "if": "build_platform != target_platform",
-                    "then": [f"{get_package_prefix(distro, vinca_conf)}-cyclonedds"],
-                }
-            )
-
-    for dep in build_deps:
-        resolved_dep = resolve_pkgname(dep, vinca_conf, distro)
-        if not resolved_dep:
-            unsatisfied_deps.add(dep)
-            continue
-        output["requirements"]["host"].extend(resolved_dep)
-
-    run_deps = pkg.run_depends
-    run_deps += pkg.exec_depends
-    run_deps += pkg.build_export_depends
-    run_deps += pkg.buildtool_export_depends
-    run_deps = [d.name for d in run_deps if d.evaluated_condition]
-    run_deps += gdeps
-
-    for dep in run_deps:
-        resolved_dep = resolve_pkgname(dep, vinca_conf, distro, is_rundep=True)
-        if not resolved_dep:
-            unsatisfied_deps.add(dep)
-            continue
-        output["requirements"]["run"].extend(resolved_dep)
-
-    for dep_type in ["build", "host", "run"]:
-        for dep in add_deps[dep_type]:
-            output["requirements"][dep_type].append(dep)
-        for dep in rm_deps[dep_type]:
-            while dep in output["requirements"][dep_type]:
-                output["requirements"][dep_type].remove(dep)
-
-    def sortkey(k):
-        if isinstance(k, dict):
-            return list(k.values())[0]
-        return k
-
-    # For Emscripten, only install cmake as a build dependency.
-    # This should be ok as cmake is only really needed during builds, not when running packages.
-    if "cmake" in output["requirements"]["run"]:
-        output["requirements"]["run"].remove("cmake")
-        output["requirements"]["run"].append(
-            {"if": "target_platform != 'emscripten-wasm32'", "then": ["cmake"]}
-        )
-
-    if "cmake" in output["requirements"]["host"]:
-        output["requirements"]["host"].remove("cmake")
-        if "cmake" not in output["requirements"]["build"]:
-            output["requirements"]["build"].append("cmake")
-
-    package_prefix = get_package_prefix(distro, vinca_conf)
-    mimick_vendor_name = f"{package_prefix}-mimick-vendor"
-    if mimick_vendor_name in output["requirements"]["build"]:
-        output["requirements"]["build"].remove(mimick_vendor_name)
-        output["requirements"]["build"].append(
-            {
-                "if": "target_platform != 'emscripten-wasm32'",
-                "then": [mimick_vendor_name],
-            }
-        )
-
-    if mimick_vendor_name in output["requirements"]["host"]:
-        output["requirements"]["host"].remove(mimick_vendor_name)
-        output["requirements"]["build"].append(
-            {
-                "if": "target_platform != 'emscripten-wasm32'",
-                "then": [mimick_vendor_name],
-            }
-        )
-
-    rosidl_generators_name = f"{package_prefix}-rosidl-default-generators"
-    if rosidl_generators_name in output["requirements"]["host"]:
-        output["requirements"]["build"].append(
-            {
-                "if": "target_platform == 'emscripten-wasm32'",
-                "then": [rosidl_generators_name],
-            }
-        )
-
-    output["requirements"]["run"] = sorted(output["requirements"]["run"], key=sortkey)
-    output["requirements"]["host"] = sorted(output["requirements"]["host"], key=sortkey)
-
-    pybind11_vendor_name = f"{package_prefix}-pybind11-vendor"
-    if pybind11_vendor_name in output["requirements"]["host"]:
-        output["requirements"]["host"] += ["pybind11"]
-    if "pybind11" in output["requirements"]["host"]:
-        output["requirements"]["build"] += [
-            {"if": "build_platform != target_platform", "then": ["pybind11"]}
-        ]
-    if "qt-main" in output["requirements"]["host"]:
-        output["requirements"]["build"] += [
-            {"if": "build_platform != target_platform", "then": ["qt-main"]}
-        ]
-    # pyqt-builder + git + doxygen must be in build, not host for cross-compile
-    pkgs_move_to_build = ["pyqt-builder", "git", "doxygen", "git-lfs"]
-    for pkg_move_to_build in pkgs_move_to_build:
-        if pkg_move_to_build in output["requirements"]["host"]:
-            output["requirements"]["build"] += [
-                {"if": "build_platform != target_platform", "then": [pkg_move_to_build]}
-            ]
-            while pkg_move_to_build in output["requirements"]["host"]:
-                output["requirements"]["host"].remove(pkg_move_to_build)
-            output["requirements"]["host"] += [
-                {"if": "build_platform == target_platform", "then": [pkg_move_to_build]}
-            ]
-
-    # remove duplicates
-    for dep_type in ["build", "host", "run"]:
-        tmp_nonduplicate = []
-        [
-            tmp_nonduplicate.append(x)
-            for x in output["requirements"][dep_type]
-            if x not in tmp_nonduplicate
-        ]
-        output["requirements"][dep_type] = tmp_nonduplicate
-
-    if dependencies_only:
-        return output["requirements"]
-
-    # Add "about" section with license and package metadata
-    output["about"] = {}
-
-    # Add URLs from package.xml based on their type
-    for u in pkg.urls:
-        if u.type == "website":
-            output["about"]["homepage"] = u.url
-        elif u.type == "repository":
-            output["about"]["repository"] = u.url
-
-    # Add license if available (convert to SPDX format)
-    if pkg.licenses:
-        spdx_license = convert_to_spdx_license(
-            [str(lic) for lic in pkg.licenses], package_name=pkg_shortname
-        )
-        if spdx_license:
-            output["about"]["license"] = spdx_license
-
-    # Add summary/description if available
-    if pkg.description:
-        output["about"]["summary"] = pkg.description
-
-    return output
+    """Backward-compatible entry point bound to this module's unsatisfied-dep set."""
+    return build_output(
+        pkg_shortname,
+        vinca_conf,
+        distro,
+        version,
+        all_packages=all_pkgs,
+        unsatisfied=unsatisfied_deps,
+        dependencies_only=dependencies_only,
+    )
 
 
 def get_group_dependency_packages(distro: Distro) -> list[Any]:
@@ -773,131 +312,23 @@ def generate_outputs_version(distro, vinca_conf):
 
 
 def _source_reference(*, url, ref, ref_type):
-    """Return the source keys locating url at ref, for a git repository or an archive.
-
-    An archive is identified by a sha256 ref_type and is fetched by URL, so it carries
-    a checksum instead of a git revision.
-    """
-    if ref_type == "sha256":
-        return {"url": url, "sha256": ref}
-    return {"git": url, ref_type: ref}
+    """Backward-compatible entry point for source reference generation."""
+    return source_reference(url=url, ref=ref, ref_type=ref_type)
 
 
 def generate_source(distro, vinca_conf):
-    source = {}
-    for pkg_shortname in vinca_conf["_selected_pkgs"]:
-        if not distro.check_package(pkg_shortname):
-            print(f"Could not generate source for {pkg_shortname}")
-            continue
-        # skip cloning source for dummy recipes
-        if is_dummy_metapackage(pkg_shortname, vinca_conf):
-            continue
-        url, ref, ref_type = distro.get_released_repo(pkg_shortname)
-        entry = _source_reference(url=url, ref=ref, ref_type=ref_type)
-        pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-        pkg_version = distro.get_version(pkg_shortname)
-        print("Checking ", pkg_shortname, pkg_version)
-        if not pkg_names:
-            continue
-        if vinca_conf.get("trigger_new_versions"):
-            if (pkg_names[0], pkg_version) in vinca_conf["skip_built_packages"]:
-                continue
-        else:
-            if pkg_names[0] in vinca_conf["skip_built_packages"]:
-                continue
-        pkg_name = pkg_names[0]
-        entry["target_directory"] = "%s/src/work" % pkg_name
-
-        patches = []
-        pd = vinca_conf["_patches"].get(pkg_name)
-        if pd:
-            patches.extend(pd["any"])
-
-            # find specific patches
-            plat = get_conda_subdir().split("-")[0]
-            patches.extend(pd[plat])
-            if len(patches):
-                print(patches)
-                common_prefix = os.path.commonprefix((os.getcwd(), patches[0]))
-                print(common_prefix)
-                entry["patches"] = [os.path.relpath(p, common_prefix) for p in patches]
-
-        source[pkg_name] = entry
-
-    # Generate empty source for mutex package (if generated) since it's a meta-package
-    mutex_recipe = generate_mutex_package_recipe(vinca_conf, distro)
-    if mutex_recipe:
-        # Check if mutex package should be skipped
-        mutex_name = mutex_recipe["package"]["name"]
-        mutex_version = mutex_recipe["package"]["version"]
-
-        if not should_skip_mutex_package(vinca_conf, mutex_name, mutex_version):
-            source[mutex_name] = {}
-
-    return source
+    """Backward-compatible entry point that defaults to the selected platform."""
+    return build_source(distro, vinca_conf, get_conda_subdir())
 
 
 def generate_source_version(distro, vinca_conf):
-    source = {}
-    for pkg_shortname in vinca_conf["_selected_pkgs"]:
-        if not distro.check_package(pkg_shortname):
-            print(f"Could not generate source for {pkg_shortname}")
-            continue
-
-        url, ref, ref_type = distro.get_released_repo(pkg_shortname)
-
-        entry = _source_reference(url=url, ref=ref, ref_type=ref_type)
-        pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-        version = distro.get_version(pkg_shortname)
-        if vinca_conf.get("trigger_new_versions"):
-            if (
-                not pkg_names
-                or (pkg_names[0], version) in vinca_conf["skip_built_packages"]
-            ):
-                continue
-        else:
-            if not pkg_names or pkg_names[0] in vinca_conf["skip_built_packages"]:
-                continue
-        pkg_name = pkg_names[0]
-        entry["target_directory"] = "%s/src/work" % pkg_name
-
-        patches = []
-        pd = vinca_conf["_patches"].get(pkg_name)
-        if pd:
-            patches.extend(pd["any"])
-
-            # find specific patches
-            plat = get_conda_subdir().split("-")[0]
-            patches.extend(pd[plat])
-            if len(patches):
-                entry["patches"] = patches
-
-        source[pkg_name] = entry
-
-    return source
+    """Backward-compatible entry point that defaults to the selected platform."""
+    return build_source_version(distro, vinca_conf, get_conda_subdir())
 
 
 def generate_fat_source(distro, vinca_conf):
-    source = []
-    for pkg_shortname in vinca_conf["_selected_pkgs"]:
-        if not distro.check_package(pkg_shortname):
-            print(f"Could not generate source for {pkg_shortname}")
-            continue
-
-        url, ref, ref_type = distro.get_released_repo(pkg_shortname)
-        entry = _source_reference(url=url, ref=ref, ref_type=ref_type)
-        pkg_names = resolve_pkgname(pkg_shortname, vinca_conf, distro)
-        if not pkg_names:
-            continue
-        pkg_name = pkg_names[0]
-        entry["target_directory"] = "src/%s" % pkg_name
-        patch_path = os.path.join(vinca_conf["_patch_dir"], "%s.patch" % pkg_name)
-        if os.path.exists(patch_path):
-            entry["patches"] = [
-                "%s/%s" % (vinca_conf["patch_dir"], "%s.patch" % pkg_name)
-            ]
-        source.append(entry)
-    return source
+    """Backward-compatible entry point for fat-recipe source generation."""
+    return build_fat_source(distro, vinca_conf)
 
 
 def get_selected_packages(distro, vinca_conf):
@@ -992,124 +423,6 @@ def get_selected_packages(distro, vinca_conf):
     return result
 
 
-def parse_mutex_package_config(vinca_conf):
-    """Parse and validate mutex package configuration.
-
-    Returns:
-        dict: Parsed mutex configuration with all required fields, or None if mutex_package is a string
-
-    Raises:
-        ValueError: If mutex_package is a dict but missing required fields
-    """
-    mutex_pkg = vinca_conf.get("mutex_package")
-    if not mutex_pkg:
-        return None
-
-    if isinstance(mutex_pkg, str):
-        # Backward compatibility: return None to indicate string format
-        return None
-
-    if isinstance(mutex_pkg, dict):
-        # Validate required fields
-        required_fields = ["name", "version", "upper_bound", "run_constraints"]
-        missing_fields = [field for field in required_fields if field not in mutex_pkg]
-
-        if missing_fields:
-            raise ValueError(
-                f"mutex_package configuration is missing required fields: {missing_fields}"
-            )
-
-        # Return validated config with build_number from vinca_conf if not specified
-        config = dict(mutex_pkg)
-        if "build_number" not in config:
-            config["build_number"] = vinca_conf.get("build_number", 1)
-
-        return config
-
-    raise ValueError(
-        f"mutex_package must be either a string or a dictionary, got {type(mutex_pkg)}"
-    )
-
-
-def get_mutex_package_dependency(vinca_conf, distro):
-    """Get the mutex package dependency string, handling both string and dict formats."""
-    mutex_pkg = vinca_conf.get("mutex_package")
-    if not mutex_pkg:
-        return None
-
-    if isinstance(mutex_pkg, str):
-        # Backward compatibility: return the string as-is
-        return mutex_pkg
-
-    # Try to parse as dict configuration
-    try:
-        config = parse_mutex_package_config(vinca_conf)
-        if config is None:
-            # This shouldn't happen since we already checked isinstance(mutex_pkg, str) above
-            return None
-
-        # New format: construct the dependency string
-        # Compute the pin from version and upper_bound
-        version_parts = config["version"].split(".")
-        upper_bound_parts = config["upper_bound"].split(".")
-
-        # Take as many version parts as specified by upper_bound
-        pin_parts = version_parts[: len(upper_bound_parts)]
-        pin = ".".join(pin_parts) + ".*"
-
-        return f"{config['name']} {pin} {distro.name}_*"
-    except ValueError as e:
-        raise ValueError(f"Error parsing mutex_package configuration: {e}")
-
-    return None
-
-
-def should_skip_mutex_package(vinca_conf, mutex_name, mutex_version):
-    """Check if the mutex package should be skipped based on skip_built_packages logic."""
-    if vinca_conf.get("trigger_new_versions"):
-        return (mutex_name, mutex_version) in vinca_conf["skip_built_packages"]
-    else:
-        return mutex_name in vinca_conf["skip_built_packages"]
-
-
-def generate_mutex_package_recipe(vinca_conf, distro):
-    """Generate a mutex package recipe if mutex_package is defined as a dict."""
-    try:
-        config = parse_mutex_package_config(vinca_conf)
-        if config is None:
-            # mutex_package is a string or not configured, don't generate recipe
-            return None
-    except ValueError as e:
-        raise ValueError(f"Cannot generate mutex package recipe: {e}")
-
-    # Create build string using distro name
-    build_string = f"{distro.name}_{config['build_number']}"
-
-    recipe = {
-        "package": {"name": config["name"], "version": config["version"]},
-        "build": {
-            "number": config["build_number"],
-            "string": build_string,
-            "script": "",
-        },
-        "requirements": {
-            "run_constraints": config["run_constraints"],
-            "run_exports": {
-                "weak": [
-                    f"${{{{ pin_subpackage('{config['name']}', upper_bound='{config['upper_bound']}') }}}}"
-                ]
-            },
-        },
-        "about": {
-            "homepage": f"https://github.com/robostack/ros-{distro.name}",
-            "license": "BSD-3-Clause",
-            "summary": f"The ROS2 distro mutex. To switch between ROS2 versions, you need to change the mutex.\nE.g. mamba install {config['name']}=*={distro.name} to switch to {distro.name}.",
-        },
-    }
-
-    return recipe
-
-
 def parse_package(pkg, distro, vinca_conf, path):
     name = pkg["name"].replace("_", "-")
     final_name = get_package_name(name, distro, vinca_conf)
@@ -1166,14 +479,12 @@ def parse_package(pkg, distro, vinca_conf, path):
         recipe["about"]["maintainers"].append(name)
 
     for u in pkg["urls"]:
-        # if u.type == 'repository' :
-        #     recipe['source']['git'] = u.url
-        #     recipe['source']['tag'] = recipe['package']['version']
         if u.type == "website":
             recipe["about"]["homepage"] = u.url
 
-        # if u.type == 'bugtracker' :
-        #    recipe['about']['url_issues'] = u.url
+    repository = distro.get_repository_url(pkg.name, pkg["urls"])
+    if repository:
+        recipe["about"]["repository"] = repository
 
     if not recipe["source"].get("git", None):
         aux = path.split("/")

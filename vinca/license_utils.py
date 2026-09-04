@@ -1,8 +1,9 @@
 """Utilities for converting ROS package licenses to SPDX format."""
 
 import re
-from typing import List, Optional, Dict
-from license_expression import get_spdx_licensing, ExpressionError
+from typing import Dict, List, Optional
+
+from license_expression import ExpressionError, get_spdx_licensing
 
 # Lookup table for common non-SPDX license strings to SPDX identifiers
 # Note: Keys are lowercase for case-insensitive matching

@@ -8,14 +8,12 @@ normal migrations, zip keys, pin_run_as_build, key_add, and key_remove.
 
 from __future__ import annotations
 
-from typing import Any, MutableMapping, Optional
-
-from copy import deepcopy
 import re
+from copy import deepcopy
+from typing import Any, MutableMapping, Optional
 
 from packaging.version import InvalidVersion, Version
 from ruamel.yaml.comments import CommentedSeq
-
 
 _SELECTOR_RE = re.compile(r"#\s*\[(.+)]")
 _PLATFORMS = {

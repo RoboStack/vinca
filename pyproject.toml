@@ -50,7 +50,6 @@ GitHub = "https://github.com/RoboStack/vinca"
 vinca = "vinca.main:main"
 vinca-glab = "vinca.generate_gitlab:main"
 vinca-gha = "vinca.generate_gha:main"
-vinca-azure = "vinca.generate_azure:main"
 vinca-migrate = "vinca.migrate:main"
 vinca-snapshot = "vinca.snapshot:main"
 vinca-sort-vinca-lists = "vinca.sort_vinca_lists:main"
@@ -61,8 +60,12 @@ vinca-pinning-update = "vinca.pinning:update_main"
 [tool.hatch.build]
 include = [
   "vinca/templates/**",
-  "vinca/azure_templates/**",
+  "vinca/ci_templates/**",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["vinca"]
+
+[tool.pyrefly]
+preset = "basic"
+project-includes = ["vinca"]
