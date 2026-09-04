@@ -78,22 +78,24 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
 
     latest = {}
     for pkg in ros_pkgs:
-        current = current_version = None
+        current = None
+        current_version: tuple[int, ...] | None = None
         for pkey in packages:
             if packages[pkey]["name"] == pkg:
-                tmp = packages[pkey]["version"].split(".")
+                parts = packages[pkey]["version"].split(".")
                 version = []
-                for el in tmp:
-                    if el.isdecimal():
-                        version.append(int(el))
+                for element in parts:
+                    if element.isdecimal():
+                        version.append(int(element))
                     else:
-                        x = re.search(r"[^0-9]", version).start()
-                        version.append(int(el[:x]))
+                        match = re.search(r"[^0-9]", element)
+                        if match is not None:
+                            version.append(int(element[: match.start()]))
 
-                version = tuple(version)
+                parsed_version = tuple(version)
 
-                if not current or version > current_version:
-                    current_version = version
+                if current_version is None or parsed_version > current_version:
+                    current_version = parsed_version
                     current = pkey
         latest[pkg] = current
 
@@ -132,22 +134,24 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     if os.path.exists("recipes"):
         shutil.rmtree("recipes")
 
-    mutex_path = os.path.join(
-        config.parsed_args.dir, "additional_recipes/ros-distro-mutex"
-    )
-    if os.path.exists(mutex_path):
-        goal_folder = os.path.join(
-            config.parsed_args.dir, "recipes", "ros-distro-mutex"
+    parsed_args = config.parsed_args
+    if parsed_args is None:
+        raise RuntimeError(
+            "Migration arguments must be parsed before generating instructions"
         )
+
+    mutex_path = os.path.join(parsed_args.dir, "additional_recipes/ros-distro-mutex")
+    if os.path.exists(mutex_path):
+        goal_folder = os.path.join(parsed_args.dir, "recipes", "ros-distro-mutex")
         os.makedirs(goal_folder, exist_ok=True)
         copy_tree(mutex_path, goal_folder)
 
     subprocess.check_call(
-        ["vinca", "-d", config.parsed_args.dir, "--multiple", "--platform", arch]
+        ["vinca", "-d", parsed_args.dir, "--multiple", "--platform", arch]
     )
 
     # TODO remove hard coded build branch here!
-    recipe_dir = os.path.join(config.parsed_args.dir, "recipes")
+    recipe_dir = os.path.join(parsed_args.dir, "recipes")
     subprocess.check_call(
         [
             "vinca-gha",

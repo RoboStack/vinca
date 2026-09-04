@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -78,7 +79,7 @@ def make_snapshot_distro(monkeypatch):
 def test_snapshot_package_xml_and_dependencies_do_not_follow_live_rosdistro(
     monkeypatch,
 ):
-    distro = make_snapshot_distro(monkeypatch)
+    distro: Any = make_snapshot_distro(monkeypatch)
 
     package_xml_content = distro.get_release_package_xml("snapshot_package")
 
@@ -92,6 +93,8 @@ def test_snapshot_package_xml_and_dependencies_do_not_follow_live_rosdistro(
         == "https://github.com/example/snapshot-package"
     )
     assert distro.get_version("snapshot_package") == "1.0.0"
+    assert package_xml_content is not None
+
     assert "<version>1.0.0</version>" in package_xml_content
     assert "snapshot_dependency" in package_xml_content
     assert "live_dependency" not in package_xml_content
@@ -160,7 +163,7 @@ def test_snapshot_without_dependencies_requires_regeneration(monkeypatch):
 def test_snapshot_metadata_generates_dependency_required_by_pinned_source(
     monkeypatch,
 ):
-    distro = make_snapshot_distro(monkeypatch)
+    distro: Any = make_snapshot_distro(monkeypatch)
     dependency_names = {
         "snapshot_package": "ros2-snapshot-package",
         "python": "python",
@@ -185,6 +188,7 @@ def test_snapshot_metadata_generates_dependency_required_by_pinned_source(
         distro,
         distro.get_version("snapshot_package"),
     )
+    assert output is not None
 
     assert output["package"] == {
         "name": "ros2-snapshot-package",
@@ -198,7 +202,7 @@ def test_snapshot_metadata_generates_dependency_required_by_pinned_source(
 
 
 def test_snapshot_is_authoritative_for_package_membership(monkeypatch):
-    distro = make_snapshot_distro(monkeypatch)
+    distro: Any = make_snapshot_distro(monkeypatch)
     distro._distro.release_packages = {"live_only": Mock()}
 
     assert distro.check_package("snapshot_package")

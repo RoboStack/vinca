@@ -19,7 +19,7 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator, Mapping, Optional, Sequence, Union
+from typing import Any, Iterator, Literal, Mapping, Optional, Sequence, Union, cast
 from urllib.parse import quote
 
 import requests
@@ -127,7 +127,9 @@ def get_pinning_distribution(version: str) -> str:
     return url
 
 
-def _read_tar_members(fileobj: Any, *, mode: str) -> dict[str, bytes]:
+def _read_tar_members(
+    fileobj: Any, *, mode: Literal["r|", "r:bz2"]
+) -> dict[str, bytes]:
     """Extract only the base config and migration YAML files from a package tarball."""
     files = {}
     with tarfile.open(fileobj=fileobj, mode=mode) as archive:
@@ -290,7 +292,7 @@ def render_pinning(
     else:
         base_payload, migration_payloads = package
 
-    rendered = yaml.load(base_payload.decode("utf-8")) or {}
+    rendered: Any = yaml.load(base_payload.decode("utf-8")) or {}
     migration_names = {_migration_name(name): name for name in selected_migrations}
     missing = sorted(set(migration_names) - set(migration_payloads))
     if missing:
@@ -305,7 +307,7 @@ def render_pinning(
     for migration in ordered_migrations:
         migration_config = yaml.load(migration_payloads[migration].decode("utf-8"))
         try:
-            rendered = variant_add(rendered, migration_config or {})
+            rendered = cast(Any, variant_add(rendered, migration_config or {}))
         except (KeyError, RuntimeError, TypeError, ValueError) as exc:
             raise PinningError(f"Could not apply migration {migration}: {exc}") from exc
     _validate_zipped_overrides(rendered, overrides)
@@ -416,6 +418,8 @@ def dependencies_from_vinca(
                     raise PinningError(
                         "Platform selectors must not change the ROS distro snapshots"
                     )
+                if group_packages is None:
+                    raise PinningError("No group packages were generated")
                 vinca_config["_selected_pkgs"] = get_selected_packages(
                     distro, vinca_config
                 )
@@ -501,8 +505,9 @@ def _migration_selectors(data: Any) -> Iterator[Optional[str]]:
         key_comment = data.ca.items.get(key, [None, None, None])[2]
         key_selector = _comment_selector(key_comment)
         if isinstance(value, list):
+            value_with_comments: Any = value
             for index in range(len(value)):
-                item_comment = value.ca.items.get(index, [None])[0]
+                item_comment = value_with_comments.ca.items.get(index, [None])[0]
                 item_selector = _comment_selector(item_comment)
                 if key_selector and item_selector:
                     yield f"({key_selector}) and ({item_selector})"
@@ -525,6 +530,7 @@ def _migration_applies_to_platforms(payload: bytes, platforms: Sequence[str]) ->
     return any(
         _eval_condition(selector, _platform_flags(platform))
         for selector in selectors
+        if selector is not None
         for platform in platforms
     )
 

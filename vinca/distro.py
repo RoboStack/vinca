@@ -202,10 +202,8 @@ class Distro(object):
             return set(self._direct_depends_cache[pkg])
 
         snapshot_info = self._get_snapshot_package_info(pkg)
-        is_additional_package = (
-            self.additional_packages_snapshot
-            and pkg in self.additional_packages_snapshot
-        )
+        additional_packages_snapshot = self.additional_packages_snapshot or {}
+        is_additional_package = pkg in additional_packages_snapshot
         if snapshot_info is not None and not is_additional_package:
             if "dependencies" not in snapshot_info:
                 raise RuntimeError(
@@ -218,7 +216,7 @@ class Distro(object):
 
         # if pkg comes from additional_packages_snapshot, extract from its package.xml
         if is_additional_package:
-            pkg_info = self.additional_packages_snapshot[pkg]
+            pkg_info = additional_packages_snapshot[pkg]
             xml_str = self.get_package_xml_for_additional_package(pkg_info)
             # parse XML
             import xml.etree.ElementTree as ET

@@ -89,15 +89,16 @@ def _selector_platforms(selector: Optional[str]) -> set[str]:
     """Conservatively map a selector expression to its affected build platforms."""
     if selector is None:
         return set(_PLATFORMS)
+    selector_expression = selector
     platforms = set(_PLATFORMS)
-    tokens = set(re.findall(r"[A-Za-z0-9_]+", selector))
+    tokens = set(re.findall(r"[A-Za-z0-9_]+", selector_expression))
     if "unix" in tokens:
         platforms &= {item for item in _PLATFORMS if not item.startswith("win-")}
     os_scopes = []
 
     def is_positive_os(*names: Any) -> Any:
         return any(name in tokens for name in names) and not any(
-            re.search(rf"\bnot\s+{name}\b", selector) for name in names
+            re.search(rf"\bnot\s+{name}\b", selector_expression) for name in names
         )
 
     if is_positive_os("linux", "linux64"):

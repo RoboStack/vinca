@@ -1,6 +1,7 @@
 import io
 import tarfile
 import zipfile
+from typing import Any
 
 import pytest
 import requests
@@ -216,7 +217,7 @@ def test_get_forces_no_credentials_of_its_own(monkeypatch):
     """
     distro = Distro.__new__(Distro)
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-    calls = {}
+    calls: dict[str, Any] = {}
 
     class FakeResponse:
         content = b"payload"

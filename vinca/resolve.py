@@ -32,10 +32,15 @@ def get_conda_index(vinca_conf, base_dir):
 def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
     for i in conda_index:
         if pkg_shortname in i:
-            sys_platform = map_platform_python_to_conda[config.selected_platform]
+            selected_platform = config.selected_platform
+            if selected_platform is None:
+                raise RuntimeError(
+                    "A target platform is required to resolve package names"
+                )
+            sys_platform = map_platform_python_to_conda[selected_platform]
             if "robostack" in i[pkg_shortname].keys():
-                if config.selected_platform in i[pkg_shortname]["robostack"]:
-                    return i[pkg_shortname]["robostack"][config.selected_platform]
+                if selected_platform in i[pkg_shortname]["robostack"]:
+                    return i[pkg_shortname]["robostack"][selected_platform]
                 elif sys_platform in i[pkg_shortname]["robostack"]:
                     return i[pkg_shortname]["robostack"][sys_platform]
                 else:

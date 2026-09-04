@@ -117,26 +117,26 @@ def _process_node(node: Any, ctx: Mapping[str, Any]) -> Any | None:
 
     # Recursion – dict ---------------------------------------------------------
     if isinstance(node, MutableMapping):
-        out: dict[str, Any] = {}
+        mapping_out: dict[str, Any] = {}
         for k, v in node.items():
             new = _process_node(v, ctx)
             if new is not None:
-                out[k] = new
-        return out
+                mapping_out[k] = new
+        return mapping_out
 
     # Recursion – list ---------------------------------------------------------
     if isinstance(node, Sequence) and not isinstance(node, (str, bytes)):
-        out: list[Any] = []
+        sequence_out: list[Any] = []
         for item in node:
             new = _process_node(item, ctx)
             if new is None:
                 continue
             # Flatten lists returned from selectors so the example in docs works
             if isinstance(new, list):
-                out.extend(new)
+                sequence_out.extend(new)
             else:
-                out.append(new)
-        return out
+                sequence_out.append(new)
+        return sequence_out
 
     # Scalar – nothing to do ---------------------------------------------------
     return node
