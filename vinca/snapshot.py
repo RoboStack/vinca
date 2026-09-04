@@ -79,6 +79,8 @@ def main():
             continue
 
         output[dep] = {"url": url, "version": version, "tag": tag}
+        if repository := distro.get_repository_url(dep):
+            output[dep]["repository"] = repository
 
         if not args.quiet:
             print("{0:{2}} {1}".format(dep, version, max_len + 2))

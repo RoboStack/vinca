@@ -33,11 +33,13 @@ def make_snapshot_distro(monkeypatch):
     snapshot = {
         "snapshot_package": {
             "url": "https://github.com/example/snapshot-package-release.git",
+            "repository": "https://github.com/example/snapshot-package.git",
             "version": "1.0.0",
             "tag": "release/rolling/snapshot_package/1.0.0-1",
         },
         "snapshot_dependency": {
             "url": "https://github.com/example/snapshot-dependency-release.git",
+            "repository": "https://github.com/example/snapshot-dependency.git",
             "version": "1.0.0",
             "tag": "release/rolling/snapshot_dependency/1.0.0-1",
         },
@@ -82,6 +84,10 @@ def test_snapshot_package_xml_and_dependencies_do_not_follow_live_rosdistro(
         "https://github.com/example/snapshot-package-release.git",
         "release/rolling/snapshot_package/1.0.0-1",
         "tag",
+    )
+    assert (
+        distro.get_repository_url("snapshot_package")
+        == "https://github.com/example/snapshot-package"
     )
     assert distro.get_version("snapshot_package") == "1.0.0"
     assert "<version>1.0.0</version>" in package_xml_content
@@ -173,6 +179,9 @@ def test_snapshot_metadata_generates_dependency_required_by_pinned_source(
         "name": "ros2-snapshot-package",
         "version": "1.0.0",
     }
+    assert output["about"]["repository"] == (
+        "https://github.com/example/snapshot-package"
+    )
     assert "ros2-snapshot-dependency" in output["requirements"]["host"]
     assert "ros2-live-dependency" not in output["requirements"]["host"]
 
@@ -187,6 +196,90 @@ def test_snapshot_is_authoritative_for_package_membership(monkeypatch):
         "snapshot_package",
         "snapshot_dependency",
     }
+
+
+def test_live_repository_url_requires_upstream_source_metadata():
+    distro = Distro.__new__(Distro)
+    distro.snapshot = None
+    distro.additional_packages_snapshot = None
+    distro._distro = Mock()
+    distro._distro.release_packages = {
+        "source_package": Mock(repository_name="source-package"),
+        "release_only_package": Mock(repository_name="release-only-package"),
+        "bloom_source_package": Mock(repository_name="bloom-source-package"),
+    }
+    distro._distro.repositories = {
+        "source-package": Mock(
+            source_repository=Mock(url="https://github.com/example/source.git"),
+            release_repository=Mock(
+                url="https://github.com/example/source-release.git"
+            ),
+        ),
+        "release-only-package": Mock(
+            source_repository=None,
+            release_repository=Mock(
+                url="https://github.com/example/release-only-release.git"
+            ),
+        ),
+        "bloom-source-package": Mock(
+            source_repository=Mock(
+                url="https://github.com/example/bloom-source-release.git"
+            ),
+            release_repository=Mock(
+                url="https://github.com/ros2-gbp/bloom-source-release.git"
+            ),
+        ),
+    }
+
+    assert (
+        distro.get_repository_url("source_package")
+        == "https://github.com/example/source"
+    )
+    assert distro.get_repository_url("release_only_package") is None
+    assert (
+        distro.get_repository_url(
+            "release_only_package",
+            [Mock(type="repository", url="https://github.com/example/upstream.git")],
+        )
+        == "https://github.com/example/upstream"
+    )
+    assert distro.get_repository_url("bloom_source_package") is None
+
+
+def test_additional_package_repository_must_be_explicit():
+    distro = Distro.__new__(Distro)
+    distro.snapshot = None
+    distro.additional_packages_snapshot = {
+        "explicit": {
+            "url": "https://github.com/example/explicit-release.git",
+            "repository": "https://github.com/example/explicit.git",
+        },
+        "source_only": {"url": "https://github.com/example/source-only.git"},
+    }
+
+    assert (
+        distro.get_repository_url("explicit") == "https://github.com/example/explicit"
+    )
+    assert distro.get_repository_url("source_only") is None
+    assert (
+        distro.get_repository_url(
+            "source_only",
+            [Mock(type="repository", url="https://github.com/example/source-only.git")],
+        )
+        == "https://github.com/example/source-only"
+    )
+    assert (
+        distro.get_repository_url(
+            "source_only",
+            [
+                Mock(
+                    type="repository",
+                    url="https://github.com/example/source-only-release.git",
+                )
+            ],
+        )
+        is None
+    )
 
 
 def test_empty_snapshot_keeps_live_rosdistro_behavior():

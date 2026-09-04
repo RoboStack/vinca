@@ -38,6 +38,18 @@ def is_archive_url(url):
     return path.endswith(ARCHIVE_SUFFIXES)
 
 
+def is_bloom_release_repository_url(url):
+    """Return True when url names a Bloom-generated release repository."""
+    path = urllib.parse.urlparse(url).path.rstrip("/")
+    repository_name = posixpath.basename(path).removesuffix(".git").lower()
+    return repository_name.endswith(("-release", "_release"))
+
+
+def _strip_git_suffix(url):
+    """Return a repository URL without its optional ``.git`` suffix."""
+    return url[:-4] if url.lower().endswith(".git") else url
+
+
 def _normalize_member(name):
     """Return an archive member name without its './' prefix and trailing slash."""
     name = name.strip("/")
@@ -313,6 +325,38 @@ class Distro(object):
         repo = self._distro.repositories[pkg.repository_name].release_repository
         release_tag = get_release_tag(repo, pkg_name)
         return repo.url, release_tag, "tag"
+
+    def get_repository_url(self, pkg_name, package_urls=()):
+        """Return the best declared upstream repository for a package."""
+        pkg_info = self._get_snapshot_package_info(pkg_name)
+        if pkg_info is not None:
+            if repository := pkg_info.get("repository"):
+                return _strip_git_suffix(repository)
+
+        additional_info = (self.additional_packages_snapshot or {}).get(pkg_name)
+        if additional_info is not None:
+            if repository := additional_info.get("repository"):
+                return _strip_git_suffix(repository)
+        else:
+            package = self._distro.release_packages.get(pkg_name)
+            if package is not None:
+                repository = self._distro.repositories[package.repository_name]
+                source_repository = repository.source_repository
+                if (
+                    source_repository is not None
+                    and source_repository.url
+                    and not is_bloom_release_repository_url(source_repository.url)
+                ):
+                    return _strip_git_suffix(source_repository.url)
+
+        for package_url in package_urls:
+            if (
+                package_url.type == "repository"
+                and package_url.url
+                and not is_bloom_release_repository_url(package_url.url)
+            ):
+                return _strip_git_suffix(package_url.url)
+        return None
 
     def check_package(self, pkg_name):
         # If the package is in the additional_packages_snapshot, it is always considered valid

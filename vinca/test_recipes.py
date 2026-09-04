@@ -40,12 +40,21 @@ def package_xml(name, build_type="ament_cmake", depends=()):
 class FakeDistro:
     name = "rolling"
 
-    def __init__(self, xml_by_name, ros1=False):
+    def __init__(self, xml_by_name, ros1=False, repository_by_name=None):
         self._xml_by_name = xml_by_name
         self._ros1 = ros1
+        self._repository_by_name = repository_by_name or {}
 
     def get_release_package_xml(self, name):
         return self._xml_by_name.get(name)
+
+    def get_repository_url(self, name, package_urls=()):
+        if repository := self._repository_by_name.get(name):
+            return repository.removesuffix(".git")
+        for package_url in package_urls:
+            if package_url.type == "repository":
+                return package_url.url.removesuffix(".git")
+        return None
 
     def check_ros1(self):
         return self._ros1
@@ -90,7 +99,10 @@ def build(
     dependencies_only=False,
     **overrides,
 ):
-    distro = FakeDistro({name: package_xml(name, build_type, depends)})
+    distro = FakeDistro(
+        {name: package_xml(name, build_type, depends)},
+        repository_by_name={name: f"https://github.com/ros2/{name}.git"},
+    )
     return generate_output(
         name,
         make_config(name, **overrides),
@@ -154,11 +166,30 @@ def test_generate_output_produces_a_complete_recipe():
         },
         "about": {
             "homepage": "https://example.org/demo",
-            "repository": "https://github.com/example/demo",
+            "repository": "https://github.com/ros2/demo",
             "license": "Apache-2.0",
             "summary": "Description of demo.",
         },
     }
+
+
+def test_generate_output_uses_rosdistro_repository_instead_of_manifest_url():
+    distro = FakeDistro(
+        {"demo": package_xml("demo")},
+        repository_by_name={"demo": "https://github.com/ros2/demo.git"},
+    )
+
+    output = generate_output("demo", make_config("demo"), distro, "1.2.3")
+
+    assert output["about"]["repository"] == "https://github.com/ros2/demo"
+
+
+def test_generate_output_uses_manifest_repository_as_fallback():
+    distro = FakeDistro({"demo": package_xml("demo")})
+
+    output = generate_output("demo", make_config("demo"), distro, "1.2.3")
+
+    assert output["about"]["repository"] == "https://github.com/example/demo"
 
 
 def test_cmake_is_build_only_on_emscripten():
