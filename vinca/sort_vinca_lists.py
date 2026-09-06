@@ -97,9 +97,21 @@ def sort_vinca_lists(path: Path) -> bool:
 
                 # Start of conditional block: "  - if: ..."
                 if RE_IF_BLOCK.match(line):
-                    if current_if_block is None:
-                        current_if_block = []
-                    current_if_block.append(line)
+                    # If a previous if-block is already open (no blank line or
+                    # comment separated it from this one), close it first.
+                    # Otherwise this new block's "then:" would be treated as a
+                    # continuation of the previous one's, and sorting would
+                    # pool both blocks' items together and redistribute them
+                    # across the block boundary.
+                    if current_if_block is not None and any(
+                        RE_IF_BLOCK.match(bl) for bl in current_if_block
+                    ):
+                        if_blocks.append(current_if_block)
+                        current_if_block = [line]
+                    else:
+                        if current_if_block is None:
+                            current_if_block = []
+                        current_if_block.append(line)
                     i += 1
                     continue
 
