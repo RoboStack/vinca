@@ -38,7 +38,11 @@ SYSTEM_PACKAGES = {
 
 def package_xml(name, build_type="ament_cmake", depends=(), member_of_group=None):
     body = "\n".join(f"  <{tag}>{value}</{tag}>" for tag, value in depends)
-    group = f"  <member_of_group>{member_of_group}</member_of_group>" if member_of_group else ""
+    group = (
+        f"  <member_of_group>{member_of_group}</member_of_group>"
+        if member_of_group
+        else ""
+    )
     return PACKAGE_XML.format(
         name=name, depends=body, build_type=build_type, member_of_group=group
     )
