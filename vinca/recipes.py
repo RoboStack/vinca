@@ -51,7 +51,19 @@ _BASE_REQUIREMENTS = {
             "then": ["${{ stdlib('c') }}"],
         },
         "ninja",
-        "python",
+        # ament's own CMake/build tooling shells out to Python for boilerplate
+        # (environment hooks, package.xml parsing, index generation) regardless
+        # of whether the package being built has any Python content itself, so
+        # every package needs *some* interpreter present at build time. Pinned
+        # to the single python_min version (rather than left as a bare
+        # "python") so this doesn't drag a package that needs no interpreter
+        # into the full python-version build matrix: a fully-resolved version
+        # constraint like this is invisible to rattler-build's variant/used_vars
+        # scan, confirmed via `rattler-build build --render-only` producing one
+        # variant either way, vs. N variants (one per pinned python version)
+        # for a bare "python" -- see _package_needs_python for the actual
+        # per-package host/run python dependency this is distinct from.
+        "python ${{ python_min }}.*",
         "setuptools",
         "git",
         "git-lfs",
@@ -68,12 +80,74 @@ _BASE_REQUIREMENTS = {
     ],
     "host": [
         {"if": "build_platform == target_platform", "then": ["pkg-config"]},
-        "python",
-        "numpy",
-        "pip",
     ],
     "run": [],
 }
+
+# Dependency names that indicate a package's own recipe genuinely needs a
+# Python interpreter/ABI in host/run (as opposed to Python merely being a
+# build-time tool for ament's own scripts, handled unconditionally above).
+_PYTHON_DEPENDENCY_MARKERS = frozenset(
+    {
+        "rclpy",
+        "pybind11",
+        "python_cmake_module",
+        "ament_cmake_python",
+        "rosidl_default_generators",
+        "rosidl_generator_py",
+    }
+)
+
+
+def _package_needs_python(package: catkin_pkg.package.Package, build_type: str) -> bool:
+    """Decide whether a package's OWN artifact needs Python (host/run), ahead of
+    building anything.
+
+    This is deliberately conservative in the direction of false positives: a
+    package wrongly marked as needing Python just gets rebuilt once per Python
+    version for no benefit, whereas a package wrongly marked as NOT needing it
+    would silently be skipped when rebuilding for additional Python versions
+    and ship a stale/missing artifact for those versions. So every check here
+    is an "if in doubt, say yes":
+
+    * ``ament_python`` packages are pure Python by construction.
+    * Any ``rosidl_interface_packages`` member (i.e. it has .msg/.srv/.action
+      files) gets rosidl_generator_py-compiled Python bindings unconditionally,
+      independent of what build_type or explicit dependencies it declares.
+    * Anything that actually depends (build, buildtool, exec, run, or test --
+      a test-only dependency still means Python must be importable to run the
+      test suite during the build) on a known Python-flavored package name, or
+      on any rosdep key containing "python" or starting with "pybind"
+      (catches the python3-*/python-* rosdep naming conventions along with
+      pybind11 variants), needs Python.
+
+    Everything else -- the vast majority of ROS packages, which are plain C/
+    C++ libraries and nodes -- does not, and skips the Python host/run
+    dependency (and therefore the per-Python-version rebuild) entirely.
+    """
+    if build_type == "ament_python":
+        return True
+    if any(
+        group.name == "rosidl_interface_packages" for group in package.member_of_groups
+    ):
+        return True
+    dependency_names = {
+        dependency.name
+        for dependency in (
+            *package.build_depends,
+            *package.build_export_depends,
+            *package.buildtool_depends,
+            *package.buildtool_export_depends,
+            *package.exec_depends,
+            *package.run_depends,
+            *package.test_depends,
+        )
+    }
+    if dependency_names & _PYTHON_DEPENDENCY_MARKERS:
+        return True
+    return any(
+        "python" in name or name.startswith("pybind") for name in dependency_names
+    )
 
 
 def get_depmods(
@@ -347,12 +421,15 @@ def generate_output(
     package = catkin_pkg.package.parse_package_string(xml)
     package.evaluate_conditions(os.environ)
 
-    python_dependencies = resolve_pkgname("python", vinca_conf, distro)
-    output["requirements"]["run"].extend(python_dependencies)
-    output["requirements"]["host"].extend(python_dependencies)
-
     is_dummy = is_dummy_metapackage(shortname, vinca_conf)
     build_type = package.get_build_type()
+
+    if not is_dummy and _package_needs_python(package, build_type):
+        python_dependencies = resolve_pkgname("python", vinca_conf, distro)
+        output["requirements"]["run"].extend(python_dependencies)
+        output["requirements"]["host"].extend(python_dependencies)
+        output["requirements"]["host"].extend(["numpy", "pip"])
+
     if not is_dummy:
         try:
             output["build"]["script"] = _BUILD_SCRIPTS[build_type]
