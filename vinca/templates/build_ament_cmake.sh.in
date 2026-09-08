@@ -14,6 +14,24 @@ cd build
 # necessary for correctly linking SIP files (from python_qt_bindings)
 export LINK=$CXX
 
+# Speed up repeated local builds (e.g. rebuilding the same packages across
+# several Python-version passes) by routing the C/C++ compiler through
+# sccache -- opt-in via VINCA_USE_SCCACHE=1, rather than auto-detecting
+# sccache on PATH, so this never silently changes compiler invocations
+# just because sccache happens to be installed for some unrelated reason.
+# Requires the top-level `rattler-build build` invocation to pass
+# --no-build-id, since both ccache and sccache are sensitive to the
+# timestamped build-directory paths rattler-build uses by default.
+SCCACHE_CMAKE_ARGS=""
+if [[ "${VINCA_USE_SCCACHE:-}" == "1" ]]; then
+  if command -v sccache >/dev/null 2>&1; then
+    SCCACHE_CMAKE_ARGS="-DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
+  else
+    echo "VINCA_USE_SCCACHE=1 but sccache was not found on PATH" >&2
+    exit 1
+  fi
+fi
+
 if [[ "$CONDA_BUILD_CROSS_COMPILATION" != "1" ]]; then
   PYTHON_EXECUTABLE=$PREFIX/bin/python
   PKG_CONFIG_EXECUTABLE=$PREFIX/bin/pkg-config
@@ -58,8 +76,22 @@ fi;
 # PYTHON_INSTALL_DIR should be a relative path, see
 # https://github.com/ament/ament_cmake/blob/2.3.2/ament_cmake_python/README.md
 # So we compute the relative path of $SP_DIR w.r.t. to $PREFIX,
-# but it is not trivial to do this in bash scripting, so let's do it via python
-export PYTHON_INSTALL_DIR=`python -c "import os;print(os.path.relpath(os.environ['SP_DIR'],os.environ['PREFIX']))"`
+# but it is not trivial to do this in bash scripting, so let's do it via python.
+# rattler-build only sets $SP_DIR when python is one of the recipe's own host
+# dependencies (vinca now only adds that for packages it detects actually need
+# Python) -- but a handful of packages call ament_python_install_package() in
+# their own CMakeLists for some small internal helper without declaring a
+# Python-flavored dependency in package.xml at all (e.g. ament_cmake_test's
+# test-utility module), so $SP_DIR can be legitimately unset even though this
+# specific build still needs a real PYTHON_INSTALL_DIR. Fall back to computing
+# the standard site-packages layout from whatever python is on PATH (the
+# build-time-only interpreter every recipe gets, at minimum) instead of
+# failing outright.
+if [[ -n "${SP_DIR:-}" ]]; then
+  export PYTHON_INSTALL_DIR=`python -c "import os;print(os.path.relpath(os.environ['SP_DIR'],os.environ['PREFIX']))"`
+else
+  export PYTHON_INSTALL_DIR=`python -c "import sys;print('lib/python%d.%d/site-packages' % sys.version_info[:2])"`
+fi
 echo "Using PYTHON_INSTALL_DIR: $PYTHON_INSTALL_DIR"
 
 if [[ $target_platform =~ emscripten.* ]]; then
@@ -132,6 +164,7 @@ $CMAKE_GEN \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
     --compile-no-warning-as-error \
     $EXTRA_CMAKE_ARGS \
+    $SCCACHE_CMAKE_ARGS \
     @(additional_cmake_args) \
     $WORK_DIR
 
