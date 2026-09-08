@@ -22,6 +22,9 @@ UNRESOLVABLE = {"missing_tool", "missing_dep"}
 
 SYSTEM_PACKAGES = {
     "python": ["python"],
+    # matches robostack.yaml's real rosdep mapping: python3 -> the same
+    # conda "python" package as the plain "python" rosdep key.
+    "python3": ["python"],
     "python-setuptools": ["setuptools"],
     "cmake": ["cmake"],
     "git": ["git"],
