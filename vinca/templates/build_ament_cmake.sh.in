@@ -69,15 +69,36 @@ if [[ $target_platform =~ emscripten.* ]]; then
   echo "set(CMAKE_STRIP FALSE)  # used by default in pybind11 on .so modules">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)  # fixes an error where numpy header files are not found correctly">> $SRC_DIR/__vinca_shared_lib_patch.cmake
 
-  # if [ "${PKG_NAME}" == "ros-humble-examples-rclcpp-minimal-publisher" ] || [ "${PKG_NAME}" == "ros-humble-examples-rclcpp-minimal-subscriber" ] || [ "${PKG_NAME}" == "ros-humble-rclcpp-components" ]; then
-  #   echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=0 -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  #   echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=0 -s ALLOW_MEMORY_GROWTH=1 -sASYNCIFY -O3 -s ASYNCIFY_STACK_SIZE=24576 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  #   echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sWASM_BIGINT -s USE_PTHREADS=0 -sALLOW_MEMORY_GROWTH=1 -sASYNCIFY -O3 -s ASYNCIFY_STACK_SIZE=24576 -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  # else
-    echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=0 -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-    echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=0 -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-    echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sWASM_BIGINT -s USE_PTHREADS=0 -sALLOW_MEMORY_GROWTH=1 -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  # fi
+  # Real pthreads (USE_PTHREADS=1) are required so that blocking waits
+  # (std::condition_variable / rmw wait sets) actually work: without a real
+  # OS-level thread, libc++'s condition_variable timed-wait never wakes up
+  # on its own, and code that spins/blocks the main thread (e.g. rclcpp's
+  # executor) hangs forever with no way for the browser's JS event loop
+  # (and thus wall-clock time) to ever advance underneath it. This must be
+  # consistent across every emscripten-wasm32 package: mixing a
+  # pthread-enabled module with a non-pthread one is a hard ABI-level
+  # mismatch ("memory import shared state mismatch") since a wasm module's
+  # shared-vs-non-shared linear memory is fixed at compile+link time.
+  #
+  # This flag has to be set at COMPILE time too (not just link time) for
+  # every translation unit -- it bakes in the wasm 'atomics'/'bulk-memory'
+  # features that the linker later requires when producing shared memory
+  # ("wasm-ld: error: --shared-memory is disallowed ... because it was not
+  # compiled with 'atomics' or 'bulk-memory' features"). add_compile_options
+  # here (via CMAKE_PROJECT_INCLUDE, included right after every project()
+  # call) applies it to every target compiled in every package.
+  echo "add_compile_options(\"SHELL: -s USE_PTHREADS=1\")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+
+  echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  # PTHREAD_POOL_SIZE and MAXIMUM_MEMORY are only meaningful on the final
+  # MAIN_MODULE executable link (they configure the Worker pool and the
+  # shared SharedArrayBuffer's reserved size respectively -- side modules
+  # don't have memory of their own, they use the main module's). Emscripten
+  # requires MAXIMUM_MEMORY to be set explicitly whenever
+  # ALLOW_MEMORY_GROWTH is combined with USE_PTHREADS, since a shared
+  # wasm memory's maximum size can't be left unbounded.
+  echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sWASM_BIGINT -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=4 -sALLOW_MEMORY_GROWTH=1 -s MAXIMUM_MEMORY=1024MB -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
 
   export BUILD_TYPE="Debug"
   export EXTRA_CMAKE_ARGS=" \
