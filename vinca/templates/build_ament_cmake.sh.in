@@ -113,8 +113,8 @@ if [[ $target_platform =~ emscripten.* ]]; then
   export CMAKE_GEN="emcmake cmake"
   export CMAKE_BLD="cmake"
 
-  export STATIC_ROSIDL_TYPESUPPORT_C=rosidl_typesupport_introspection_c
-  export STATIC_ROSIDL_TYPESUPPORT_CPP=rosidl_typesupport_introspection_cpp
+  export STATIC_ROSIDL_TYPESUPPORT_C=${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_C:-rosidl_typesupport_introspection_c}
+  export STATIC_ROSIDL_TYPESUPPORT_CPP=${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_CPP:-rosidl_typesupport_introspection_cpp}
 else
   export BUILD_TYPE="Release"
   export CMAKE_GEN="cmake"
