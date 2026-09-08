@@ -14,6 +14,17 @@ cd build
 # necessary for correctly linking SIP files (from python_qt_bindings)
 export LINK=$CXX
 
+# Speed up repeated local builds (e.g. rebuilding the same packages across
+# several Python-version passes) by routing the C/C++ compiler through
+# sccache when it's present in the build environment; a no-op otherwise.
+# Requires the top-level `rattler-build build` invocation to pass
+# --no-build-id, since both ccache and sccache are sensitive to the
+# timestamped build-directory paths rattler-build uses by default.
+SCCACHE_CMAKE_ARGS=""
+if command -v sccache >/dev/null 2>&1; then
+  SCCACHE_CMAKE_ARGS="-DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
+fi
+
 if [[ "$CONDA_BUILD_CROSS_COMPILATION" != "1" ]]; then
   PYTHON_EXECUTABLE=$PREFIX/bin/python
   PKG_CONFIG_EXECUTABLE=$PREFIX/bin/pkg-config
@@ -132,6 +143,7 @@ $CMAKE_GEN \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_DEPLOYMENT_TARGET \
     --compile-no-warning-as-error \
     $EXTRA_CMAKE_ARGS \
+    $SCCACHE_CMAKE_ARGS \
     @(additional_cmake_args) \
     $WORK_DIR
 
