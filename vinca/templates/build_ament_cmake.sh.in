@@ -16,13 +16,20 @@ export LINK=$CXX
 
 # Speed up repeated local builds (e.g. rebuilding the same packages across
 # several Python-version passes) by routing the C/C++ compiler through
-# sccache when it's present in the build environment; a no-op otherwise.
+# sccache -- opt-in via VINCA_USE_SCCACHE=1, rather than auto-detecting
+# sccache on PATH, so this never silently changes compiler invocations
+# just because sccache happens to be installed for some unrelated reason.
 # Requires the top-level `rattler-build build` invocation to pass
 # --no-build-id, since both ccache and sccache are sensitive to the
 # timestamped build-directory paths rattler-build uses by default.
 SCCACHE_CMAKE_ARGS=""
-if command -v sccache >/dev/null 2>&1; then
-  SCCACHE_CMAKE_ARGS="-DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
+if [[ "${VINCA_USE_SCCACHE:-}" == "1" ]]; then
+  if command -v sccache >/dev/null 2>&1; then
+    SCCACHE_CMAKE_ARGS="-DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
+  else
+    echo "VINCA_USE_SCCACHE=1 but sccache was not found on PATH" >&2
+    exit 1
+  fi
 fi
 
 if [[ "$CONDA_BUILD_CROSS_COMPILATION" != "1" ]]; then
