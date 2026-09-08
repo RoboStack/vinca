@@ -69,8 +69,22 @@ fi;
 # PYTHON_INSTALL_DIR should be a relative path, see
 # https://github.com/ament/ament_cmake/blob/2.3.2/ament_cmake_python/README.md
 # So we compute the relative path of $SP_DIR w.r.t. to $PREFIX,
-# but it is not trivial to do this in bash scripting, so let's do it via python
-export PYTHON_INSTALL_DIR=`python -c "import os;print(os.path.relpath(os.environ['SP_DIR'],os.environ['PREFIX']))"`
+# but it is not trivial to do this in bash scripting, so let's do it via python.
+# rattler-build only sets $SP_DIR when python is one of the recipe's own host
+# dependencies (vinca now only adds that for packages it detects actually need
+# Python) -- but a handful of packages call ament_python_install_package() in
+# their own CMakeLists for some small internal helper without declaring a
+# Python-flavored dependency in package.xml at all (e.g. ament_cmake_test's
+# test-utility module), so $SP_DIR can be legitimately unset even though this
+# specific build still needs a real PYTHON_INSTALL_DIR. Fall back to computing
+# the standard site-packages layout from whatever python is on PATH (the
+# build-time-only interpreter every recipe gets, at minimum) instead of
+# failing outright.
+if [[ -n "${SP_DIR:-}" ]]; then
+  export PYTHON_INSTALL_DIR=`python -c "import os;print(os.path.relpath(os.environ['SP_DIR'],os.environ['PREFIX']))"`
+else
+  export PYTHON_INSTALL_DIR=`python -c "import sys;print('lib/python%d.%d/site-packages' % sys.version_info[:2])"`
+fi
 echo "Using PYTHON_INSTALL_DIR: $PYTHON_INSTALL_DIR"
 
 if [[ $target_platform =~ emscripten.* ]]; then
