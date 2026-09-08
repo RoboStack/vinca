@@ -14,6 +14,7 @@ PACKAGE_XML = """<?xml version="1.0"?>
   <url type="repository">https://github.com/example/{name}</url>
 {depends}
   <export><build_type>{build_type}</build_type></export>
+{member_of_group}
 </package>
 """
 
@@ -32,9 +33,12 @@ SYSTEM_PACKAGES = {
 }
 
 
-def package_xml(name, build_type="ament_cmake", depends=()):
+def package_xml(name, build_type="ament_cmake", depends=(), member_of_group=None):
     body = "\n".join(f"  <{tag}>{value}</{tag}>" for tag, value in depends)
-    return PACKAGE_XML.format(name=name, depends=body, build_type=build_type)
+    group = f"  <member_of_group>{member_of_group}</member_of_group>" if member_of_group else ""
+    return PACKAGE_XML.format(
+        name=name, depends=body, build_type=build_type, member_of_group=group
+    )
 
 
 class FakeDistro:
@@ -95,12 +99,13 @@ def build(
     name,
     depends=(),
     build_type="ament_cmake",
+    member_of_group=None,
     unsatisfied=None,
     dependencies_only=False,
     **overrides,
 ):
     distro = FakeDistro(
-        {name: package_xml(name, build_type, depends)},
+        {name: package_xml(name, build_type, depends, member_of_group)},
         repository_by_name={name: f"https://github.com/ros2/{name}.git"},
     )
     return generate_output(
@@ -127,7 +132,7 @@ def test_generate_output_produces_a_complete_recipe():
                     "then": ["${{ stdlib('c') }}"],
                 },
                 "ninja",
-                "python",
+                "python ${{ python_min }}.*",
                 "setuptools",
                 "git",
                 "git-lfs",
@@ -149,16 +154,18 @@ def test_generate_output_produces_a_complete_recipe():
                     ],
                 },
             ],
+            # A plain build_depend on rclcpp (the C++ client library) carries no
+            # Python-flavored dependency and isn't a rosidl interface package, so
+            # this recipe correctly gets no python/numpy/pip host dependency and
+            # no python run dependency -- see test_needs_python_* below for the
+            # cases that do.
             "host": [
                 {"if": "build_platform == target_platform", "then": ["pkg-config"]},
-                "numpy",
-                "pip",
-                "python",
                 "ros2-rclcpp",
                 "ros2-ros-environment",
                 "ros2-ros-workspace",
             ],
-            "run": ["python", "ros2-ros-workspace"],
+            "run": ["ros2-ros-workspace"],
         },
         "build": {
             "script": "${{ '$RECIPE_DIR/build_ament_cmake.sh' if unix or wasm32 "
@@ -220,6 +227,69 @@ def test_every_duplicate_cmake_is_replaced_by_the_selector():
         )
         == 1
     )
+
+
+def _host_run_python_markers(output):
+    host = output["requirements"]["host"]
+    run = output["requirements"]["run"]
+    return "python" in host, "numpy" in host, "pip" in host, "python" in run
+
+
+def test_needs_python_plain_cpp_package_gets_no_python_dependency():
+    # A pure C++ library/node (no rosidl interfaces, no python-flavored
+    # dependency) must not be pulled into the python host/run dependency --
+    # and therefore not into a per-python-version rebuild -- at all.
+    output = build("demo", depends=[("build_depend", "rclcpp")])
+
+    assert _host_run_python_markers(output) == (False, False, False, False)
+    # The build-time-only interpreter ament's own tooling needs is still
+    # present, but pinned to a single fixed version rather than the bare
+    # "python" that would drag this recipe into the python variant matrix.
+    assert "python ${{ python_min }}.*" in output["requirements"]["build"]
+    assert "python" not in output["requirements"]["build"]
+
+
+def test_needs_python_rosidl_interface_package_gets_python_dependency():
+    # msg/srv/action packages declare membership in rosidl_interface_packages;
+    # rosidl_generator_py always compiles Python bindings for these,
+    # independent of whatever build_type or explicit depends they declare.
+    output = build(
+        "demo",
+        depends=[("build_depend", "rosidl_default_generators")],
+        member_of_group="rosidl_interface_packages",
+    )
+
+    assert _host_run_python_markers(output) == (True, True, True, True)
+
+
+def test_needs_python_rclpy_dependency_gets_python_dependency():
+    output = build("demo", depends=[("exec_depend", "rclpy")])
+
+    assert _host_run_python_markers(output) == (True, True, True, True)
+
+
+def test_needs_python_rosdep_python3_key_gets_python_dependency():
+    # Broad, deliberately permissive catch-all for the python3-*/python-*
+    # rosdep naming convention: false positives here are cheap (one extra
+    # per-python-version rebuild), false negatives are not (a silently
+    # missing artifact for the versions it wasn't rebuilt for).
+    output = build("demo", depends=[("exec_depend", "python3-yaml")])
+
+    assert _host_run_python_markers(output) == (True, True, True, True)
+
+
+def test_needs_python_ament_python_build_type_gets_python_dependency():
+    output = build("demo", build_type="ament_python")
+
+    assert _host_run_python_markers(output) == (True, True, True, True)
+
+
+def test_needs_python_test_only_dependency_still_counts():
+    # A test-only dependency still means Python must be importable to run
+    # the test suite during the build, so it counts too.
+    output = build("demo", depends=[("test_depend", "rclpy")])
+
+    assert _host_run_python_markers(output) == (True, True, True, True)
 
 
 def test_mimick_vendor_moves_from_host_to_build():
