@@ -114,12 +114,21 @@ def _package_needs_python(package: catkin_pkg.package.Package, build_type: str) 
     * Any ``rosidl_interface_packages`` member (i.e. it has .msg/.srv/.action
       files) gets rosidl_generator_py-compiled Python bindings unconditionally,
       independent of what build_type or explicit dependencies it declares.
-    * Anything that actually depends (build, buildtool, exec, run, or test --
-      a test-only dependency still means Python must be importable to run the
-      test suite during the build) on a known Python-flavored package name, or
-      on any rosdep key containing "python" or starting with "pybind"
-      (catches the python3-*/python-* rosdep naming conventions along with
-      pybind11 variants), needs Python.
+    * Anything that actually depends (build, exec, run, or test -- a test-only
+      dependency still means Python must be importable to run the test suite
+      during the build) on a known Python-flavored package name, or on any
+      rosdep key containing "python" or starting with "pybind" (catches the
+      python3-*/python-* rosdep naming conventions along with pybind11
+      variants), needs Python.
+
+    ``buildtool_depend``/``buildtool_export_depend`` are deliberately NOT
+    scanned: by ROS's own convention that tag means "a tool needed to invoke
+    the build system" (e.g. many ament_cmake packages declare a plain
+    ``<buildtool_depend>python3</buildtool_depend>`` purely so a codegen
+    script can run at build time), never "this package's shipped artifact
+    contains Python content" -- and build-time-only Python is already covered
+    unconditionally by the fixed ``python_min``-pinned entry every recipe
+    gets in ``_BASE_REQUIREMENTS``.
 
     Everything else -- the vast majority of ROS packages, which are plain C/
     C++ libraries and nodes -- does not, and skips the Python host/run
@@ -136,8 +145,6 @@ def _package_needs_python(package: catkin_pkg.package.Package, build_type: str) 
         for dependency in (
             *package.build_depends,
             *package.build_export_depends,
-            *package.buildtool_depends,
-            *package.buildtool_export_depends,
             *package.exec_depends,
             *package.run_depends,
             *package.test_depends,

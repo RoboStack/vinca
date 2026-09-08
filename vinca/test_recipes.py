@@ -292,6 +292,19 @@ def test_needs_python_test_only_dependency_still_counts():
     assert _host_run_python_markers(output) == (True, True, True, True)
 
 
+def test_needs_python_ignores_buildtool_depend_on_python3():
+    # Real-world case: rclcpp (a pure C++ library with no Python content of
+    # its own) declares <buildtool_depend>python3</buildtool_depend> purely
+    # so ament_cmake_gen_version_h can run a codegen script at build time.
+    # buildtool_depend means "a tool needed to invoke the build", never
+    # "this package's shipped artifact has Python content", so it must not
+    # trigger the python host/run dependency (build-time-only Python is
+    # already covered unconditionally elsewhere).
+    output = build("demo", depends=[("buildtool_depend", "python3")])
+
+    assert _host_run_python_markers(output) == (False, False, False, False)
+
+
 def test_mimick_vendor_moves_from_host_to_build():
     output = build("demo", depends=[("build_depend", "mimick_vendor")])
 
