@@ -504,12 +504,20 @@ def generate_output(
     # Build tools normally belong in `host`, but git has to be in `build` so that it
     # is runnable on the build machine when cross-compiling. cmake is already part of
     # the base build requirements, so re-adding it would only create a duplicate.
+    # Likewise python3/python (a common buildtool_depend for packages that just need
+    # an interpreter present to run a codegen script, e.g. rclcpp's
+    # <buildtool_depend>python3</buildtool_depend> for ament_cmake_gen_version_h):
+    # re-adding a bare "python" here would drag the package back into the full
+    # python-version build matrix that _package_needs_python's build-time-only,
+    # python_min-pinned base entry exists specifically to avoid.
     for dependency in build_tools:
         resolved = resolve_pkgname(dependency, vinca_conf, distro)
         if not resolved:
             unsatisfied.add(dependency)
         elif "git" in resolved:
             output["requirements"]["build"].extend(resolved)
+        elif resolved == ["python"]:
+            pass
         elif dependency != "cmake":
             build_dependencies.append(dependency)
 
