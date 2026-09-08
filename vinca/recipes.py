@@ -63,7 +63,12 @@ _BASE_REQUIREMENTS = {
         # variant either way, vs. N variants (one per pinned python version)
         # for a bare "python" -- see _package_needs_python for the actual
         # per-package host/run python dependency this is distinct from.
-        "python ${{ python_min }}.*",
+        # `default('3.11')` covers recipe.yaml consumers whose own
+        # conda_build_config.yaml doesn't define python_min at all (e.g. a
+        # minimal, hand-maintained pinning file rather than a full
+        # conda-forge-pinning merge) -- an undefined python_min renders to an
+        # empty string, producing the invalid match spec "python .*".
+        "python ${{ python_min | default('3.11') }}.*",
         "setuptools",
         "git",
         "git-lfs",

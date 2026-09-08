@@ -139,7 +139,7 @@ def test_generate_output_produces_a_complete_recipe():
                     "then": ["${{ stdlib('c') }}"],
                 },
                 "ninja",
-                "python ${{ python_min }}.*",
+                "python ${{ python_min | default('3.11') }}.*",
                 "setuptools",
                 "git",
                 "git-lfs",
@@ -252,7 +252,10 @@ def test_needs_python_plain_cpp_package_gets_no_python_dependency():
     # The build-time-only interpreter ament's own tooling needs is still
     # present, but pinned to a single fixed version rather than the bare
     # "python" that would drag this recipe into the python variant matrix.
-    assert "python ${{ python_min }}.*" in output["requirements"]["build"]
+    assert (
+        "python ${{ python_min | default('3.11') }}.*"
+        in output["requirements"]["build"]
+    )
     assert "python" not in output["requirements"]["build"]
 
 
