@@ -305,6 +305,20 @@ def test_needs_python_ignores_buildtool_depend_on_python3():
     assert _host_run_python_markers(output) == (False, False, False, False)
 
 
+def test_needs_python_ignores_test_only_rosidl_default_generators():
+    # Real-world case: rclcpp (not a rosidl_interface_packages member) has
+    # <test_depend>rosidl_default_generators</test_depend> solely to
+    # generate test_msgs for its own test suite -- nothing to do with
+    # rclcpp's own shipped artifact having Python content. The
+    # member_of_groups check is the precise signal for "this package itself
+    # has rosidl-generated Python bindings" (see the positive case above);
+    # rosidl_default_generators/rosidl_generator_py depended on for any other
+    # reason must not, by itself, trigger the python host/run dependency.
+    output = build("demo", depends=[("test_depend", "rosidl_default_generators")])
+
+    assert _host_run_python_markers(output) == (False, False, False, False)
+
+
 def test_mimick_vendor_moves_from_host_to_build():
     output = build("demo", depends=[("build_depend", "mimick_vendor")])
 

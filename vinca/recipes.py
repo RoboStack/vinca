@@ -87,14 +87,22 @@ _BASE_REQUIREMENTS = {
 # Dependency names that indicate a package's own recipe genuinely needs a
 # Python interpreter/ABI in host/run (as opposed to Python merely being a
 # build-time tool for ament's own scripts, handled unconditionally above).
+#
+# Deliberately NOT included: rosidl_default_generators/rosidl_generator_py.
+# Real-world case found while testing on ros-humble: rclcpp (a pure C++
+# library, not a rosidl_interface_packages member) declares
+# <test_depend>rosidl_default_generators</test_depend> solely to generate
+# *test* message types (test_msgs) for its own test suite -- nothing to do
+# with rclcpp's own shipped artifact having Python content. The
+# member_of_groups check above is the precise, authoritative signal for "this
+# package itself has rosidl-generated Python bindings"; these two names would
+# only ever add noise on top of it.
 _PYTHON_DEPENDENCY_MARKERS = frozenset(
     {
         "rclpy",
         "pybind11",
         "python_cmake_module",
         "ament_cmake_python",
-        "rosidl_default_generators",
-        "rosidl_generator_py",
     }
 )
 
