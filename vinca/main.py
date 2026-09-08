@@ -593,15 +593,6 @@ def generate_output(
             }
         )
 
-    rosidl_generators_name = f"{package_prefix}-rosidl-default-generators"
-    if rosidl_generators_name in output["requirements"]["host"]:
-        output["requirements"]["build"].append(
-            {
-                "if": "target_platform == 'emscripten-wasm32'",
-                "then": [rosidl_generators_name],
-            }
-        )
-
     output["requirements"]["run"] = sorted(output["requirements"]["run"], key=sortkey)
     output["requirements"]["host"] = sorted(output["requirements"]["host"], key=sortkey)
 
