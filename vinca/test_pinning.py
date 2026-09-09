@@ -20,7 +20,6 @@ from vinca.pinning import (
 )
 from vinca.variant_algebra import _selector_platforms, variant_add
 
-
 BASE_CONFIG = b"""\
 python:
   - 3.13.* *_cp313

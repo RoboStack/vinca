@@ -1,15 +1,18 @@
+import glob
+import os
+import sys
+from typing import Any
+
 import networkx as nx
 import yaml
-import glob
-import sys
-import os
 
 from vinca.utils import extract_dependency_names
 
 try:
-    from yaml import CLoader as Loader, CDumper as Dumper
+    from yaml import CDumper as Dumper
+    from yaml import CLoader as Loader
 except ImportError:
-    from yaml import Loader, Dumper
+    from yaml import Dumper, Loader
 
 # def setup_yaml():
 #   """ https://stackoverflow.com/a/8661021 """
@@ -77,7 +80,7 @@ def main():
 
     print(stages)
 
-    gitlab_template = {"image": "condaforge/linux-anvil-cos7-x86_64"}
+    gitlab_template: dict[str, Any] = {"image": "condaforge/linux-anvil-cos7-x86_64"}
 
     stage_names = []
     for i, s in enumerate(stages):

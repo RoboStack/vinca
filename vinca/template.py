@@ -1,12 +1,12 @@
 import datetime
-from importlib import resources
-import shutil
 import os
 import re
+import shutil
 import stat
+from importlib import resources
+from pathlib import Path
 
 from ruamel import yaml
-from pathlib import Path
 
 from vinca.naming import get_package_prefix, is_legacy_compatibility_output
 from vinca.utils import (
@@ -217,7 +217,8 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
 
 def generate_template(template_in, template_out, extra_globals=None):
     import em
-    from vinca.config import skip_testing, ros_distro
+
+    from vinca.config import ros_distro, skip_testing
 
     g = {"ros_distro": ros_distro, "skip_testing": "ON" if skip_testing else "OFF"}
 

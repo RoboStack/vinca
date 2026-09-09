@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import Mock
 
 from vinca.distro import Distro
@@ -11,7 +12,7 @@ def test_dependency_walk_reuses_direct_dependencies_across_roots():
         "app-leaf": set(),
         "common-leaf": set(),
     }
-    distro = Distro.__new__(Distro)
+    distro: Any = Distro.__new__(Distro)
     distro._depends_cache = {}
     distro._direct_depends_cache = {}
     distro.snapshot = None
@@ -39,7 +40,7 @@ def test_dependency_walk_honors_ignored_packages():
         "ignored": {"hidden"},
         "hidden": set(),
     }
-    distro = Distro.__new__(Distro)
+    distro: Any = Distro.__new__(Distro)
     distro._depends_cache = {}
     distro._direct_depends_cache = {}
     distro.snapshot = None
@@ -57,7 +58,7 @@ def test_dependency_walk_honors_ignored_packages():
 
 def test_dependency_walk_excludes_root_in_cycles():
     graph = {"a": {"b"}, "b": {"a"}}
-    distro = Distro.__new__(Distro)
+    distro: Any = Distro.__new__(Distro)
     distro._depends_cache = {}
     distro._direct_depends_cache = {}
     distro.snapshot = None
@@ -69,7 +70,7 @@ def test_dependency_walk_excludes_root_in_cycles():
 
 
 def test_dependency_walk_excludes_root_from_self_dependency():
-    distro = Distro.__new__(Distro)
+    distro: Any = Distro.__new__(Distro)
     distro._depends_cache = {}
     distro._direct_depends_cache = {}
     distro.snapshot = None
@@ -82,7 +83,7 @@ def test_dependency_walk_excludes_root_from_self_dependency():
 
 def test_dependency_walk_excludes_root_from_longer_cycle():
     graph = {"a": {"b"}, "b": {"c"}, "c": {"a"}}
-    distro = Distro.__new__(Distro)
+    distro: Any = Distro.__new__(Distro)
     distro._depends_cache = {}
     distro._direct_depends_cache = {}
     distro.snapshot = None

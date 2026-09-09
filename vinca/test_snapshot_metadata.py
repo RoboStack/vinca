@@ -1,6 +1,10 @@
+from typing import Any
 from unittest.mock import Mock, patch
 
+import pytest
+
 import vinca.main as main
+import vinca.recipes as recipes
 from vinca.distro import Distro
 
 
@@ -32,13 +36,17 @@ def make_snapshot_distro(monkeypatch):
     snapshot = {
         "snapshot_package": {
             "url": "https://github.com/example/snapshot-package-release.git",
+            "repository": "https://github.com/example/snapshot-package.git",
             "version": "1.0.0",
             "tag": "release/rolling/snapshot_package/1.0.0-1",
+            "dependencies": ["snapshot_dependency"],
         },
         "snapshot_dependency": {
             "url": "https://github.com/example/snapshot-dependency-release.git",
+            "repository": "https://github.com/example/snapshot-dependency.git",
             "version": "1.0.0",
             "tag": "release/rolling/snapshot_dependency/1.0.0-1",
+            "dependencies": [],
         },
     }
     distro = Distro.__new__(Distro)
@@ -51,9 +59,6 @@ def make_snapshot_distro(monkeypatch):
     distro._depends_cache = {}
     distro._direct_depends_cache = {}
     distro._distro = Mock()
-    distro._distro.get_release_package_xml.return_value = LIVE_PACKAGE_XML
-    distro._walker = Mock()
-
     snapshot_xml_by_url = {
         "https://raw.githubusercontent.com/example/snapshot-package-release/"
         "release/rolling/snapshot_package/1.0.0-1/package.xml": (SNAPSHOT_PACKAGE_XML),
@@ -67,13 +72,14 @@ def make_snapshot_distro(monkeypatch):
         "_download_raw_pkg_xml_or_cached",
         lambda url: snapshot_xml_by_url[url],
     )
+    distro._walker = Mock()
     return distro
 
 
 def test_snapshot_package_xml_and_dependencies_do_not_follow_live_rosdistro(
     monkeypatch,
 ):
-    distro = make_snapshot_distro(monkeypatch)
+    distro: Any = make_snapshot_distro(monkeypatch)
 
     package_xml_content = distro.get_release_package_xml("snapshot_package")
 
@@ -82,13 +88,19 @@ def test_snapshot_package_xml_and_dependencies_do_not_follow_live_rosdistro(
         "release/rolling/snapshot_package/1.0.0-1",
         "tag",
     )
+    assert (
+        distro.get_repository_url("snapshot_package")
+        == "https://github.com/example/snapshot-package"
+    )
     assert distro.get_version("snapshot_package") == "1.0.0"
+    assert package_xml_content is not None
+
     assert "<version>1.0.0</version>" in package_xml_content
     assert "snapshot_dependency" in package_xml_content
     assert "live_dependency" not in package_xml_content
     assert distro.get_depends("snapshot_package") == {"snapshot_dependency"}
     distro._distro.get_release_package_xml.assert_not_called()
-    distro._walker.get_recursive_depends.assert_not_called()
+    distro._walker.get_depends.assert_not_called()
 
 
 def test_snapshot_package_xml_uses_matching_live_distribution_cache(monkeypatch):
@@ -103,6 +115,7 @@ def test_snapshot_package_xml_uses_matching_live_distribution_cache(monkeypatch)
     distro._distro.repositories = {
         "snapshot-package": Mock(release_repository=release_repository)
     }
+    distro._distro.get_release_package_xml.return_value = LIVE_PACKAGE_XML
 
     with patch(
         "vinca.distro.get_release_tag",
@@ -139,10 +152,18 @@ def test_snapshot_package_xml_does_not_use_live_cache_after_snapshot_change(
     distro._distro.get_release_package_xml.assert_not_called()
 
 
+def test_snapshot_without_dependencies_requires_regeneration(monkeypatch):
+    distro = make_snapshot_distro(monkeypatch)
+    del distro.snapshot["snapshot_package"]["dependencies"]
+
+    with pytest.raises(RuntimeError, match="regenerate the rosdistro snapshot"):
+        distro.get_depends("snapshot_package")
+
+
 def test_snapshot_metadata_generates_dependency_required_by_pinned_source(
     monkeypatch,
 ):
-    distro = make_snapshot_distro(monkeypatch)
+    distro: Any = make_snapshot_distro(monkeypatch)
     dependency_names = {
         "snapshot_package": "ros2-snapshot-package",
         "python": "python",
@@ -150,7 +171,7 @@ def test_snapshot_metadata_generates_dependency_required_by_pinned_source(
         "snapshot_dependency": "ros2-snapshot-dependency",
     }
     monkeypatch.setattr(
-        main,
+        recipes,
         "resolve_pkgname",
         lambda name, *_args, **_kwargs: [dependency_names[name]],
     )
@@ -167,17 +188,21 @@ def test_snapshot_metadata_generates_dependency_required_by_pinned_source(
         distro,
         distro.get_version("snapshot_package"),
     )
+    assert output is not None
 
     assert output["package"] == {
         "name": "ros2-snapshot-package",
         "version": "1.0.0",
     }
+    assert output["about"]["repository"] == (
+        "https://github.com/example/snapshot-package"
+    )
     assert "ros2-snapshot-dependency" in output["requirements"]["host"]
     assert "ros2-live-dependency" not in output["requirements"]["host"]
 
 
 def test_snapshot_is_authoritative_for_package_membership(monkeypatch):
-    distro = make_snapshot_distro(monkeypatch)
+    distro: Any = make_snapshot_distro(monkeypatch)
     distro._distro.release_packages = {"live_only": Mock()}
 
     assert distro.check_package("snapshot_package")
@@ -186,6 +211,90 @@ def test_snapshot_is_authoritative_for_package_membership(monkeypatch):
         "snapshot_package",
         "snapshot_dependency",
     }
+
+
+def test_live_repository_url_requires_upstream_source_metadata():
+    distro = Distro.__new__(Distro)
+    distro.snapshot = None
+    distro.additional_packages_snapshot = None
+    distro._distro = Mock()
+    distro._distro.release_packages = {
+        "source_package": Mock(repository_name="source-package"),
+        "release_only_package": Mock(repository_name="release-only-package"),
+        "bloom_source_package": Mock(repository_name="bloom-source-package"),
+    }
+    distro._distro.repositories = {
+        "source-package": Mock(
+            source_repository=Mock(url="https://github.com/example/source.git"),
+            release_repository=Mock(
+                url="https://github.com/example/source-release.git"
+            ),
+        ),
+        "release-only-package": Mock(
+            source_repository=None,
+            release_repository=Mock(
+                url="https://github.com/example/release-only-release.git"
+            ),
+        ),
+        "bloom-source-package": Mock(
+            source_repository=Mock(
+                url="https://github.com/example/bloom-source-release.git"
+            ),
+            release_repository=Mock(
+                url="https://github.com/ros2-gbp/bloom-source-release.git"
+            ),
+        ),
+    }
+
+    assert (
+        distro.get_repository_url("source_package")
+        == "https://github.com/example/source"
+    )
+    assert distro.get_repository_url("release_only_package") is None
+    assert (
+        distro.get_repository_url(
+            "release_only_package",
+            [Mock(type="repository", url="https://github.com/example/upstream.git")],
+        )
+        == "https://github.com/example/upstream"
+    )
+    assert distro.get_repository_url("bloom_source_package") is None
+
+
+def test_additional_package_repository_must_be_explicit():
+    distro = Distro.__new__(Distro)
+    distro.snapshot = None
+    distro.additional_packages_snapshot = {
+        "explicit": {
+            "url": "https://github.com/example/explicit-release.git",
+            "repository": "https://github.com/example/explicit.git",
+        },
+        "source_only": {"url": "https://github.com/example/source-only.git"},
+    }
+
+    assert (
+        distro.get_repository_url("explicit") == "https://github.com/example/explicit"
+    )
+    assert distro.get_repository_url("source_only") is None
+    assert (
+        distro.get_repository_url(
+            "source_only",
+            [Mock(type="repository", url="https://github.com/example/source-only.git")],
+        )
+        == "https://github.com/example/source-only"
+    )
+    assert (
+        distro.get_repository_url(
+            "source_only",
+            [
+                Mock(
+                    type="repository",
+                    url="https://github.com/example/source-only-release.git",
+                )
+            ],
+        )
+        is None
+    )
 
 
 def test_empty_snapshot_keeps_live_rosdistro_behavior():
@@ -209,3 +318,31 @@ def test_empty_snapshot_keeps_live_rosdistro_behavior():
     assert distro.get_release_package_xml("live_package") == LIVE_PACKAGE_XML
     assert distro.get_depends("live_package") == {"live_dependency"}
     assert set(distro.get_package_names()) == {"live_package"}
+
+
+def test_read_snapshot_merges_additional_packages(tmp_path, monkeypatch):
+    snapshot_path = tmp_path / "rosdistro_snapshot.yaml"
+    additional_path = tmp_path / "rosdistro_additional_recipes.yaml"
+    snapshot_path.write_text(
+        """\
+snapshot_package:
+  version: 1.0.0
+"""
+    )
+    additional_path.write_text(
+        """\
+additional_package:
+  version: 2.0.0
+"""
+    )
+    monkeypatch.chdir(tmp_path)
+
+    snapshot, additional = main.read_snapshot(
+        {
+            "rosdistro_snapshot": snapshot_path.name,
+            "rosdistro_additional_recipes": additional_path.name,
+        }
+    )
+
+    assert set(snapshot) == {"snapshot_package", "additional_package"}
+    assert additional == {"additional_package": {"version": "2.0.0"}}

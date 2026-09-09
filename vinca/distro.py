@@ -7,7 +7,6 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from typing import Iterable, Optional
 
-import catkin_pkg.package
 import requests
 from rosdistro import get_cached_distribution, get_index, get_index_url
 from rosdistro.dependency_walker import DependencyWalker
@@ -36,6 +35,18 @@ def is_archive_url(url):
         return False
     path = urllib.parse.urlparse(url).path.lower()
     return path.endswith(ARCHIVE_SUFFIXES)
+
+
+def is_bloom_release_repository_url(url):
+    """Return True when url names a Bloom-generated release repository."""
+    path = urllib.parse.urlparse(url).path.rstrip("/")
+    repository_name = posixpath.basename(path).removesuffix(".git").lower()
+    return repository_name.endswith(("-release", "_release"))
+
+
+def _strip_git_suffix(url):
+    """Return a repository URL without its optional ``.git`` suffix."""
+    return url[:-4] if url.lower().endswith(".git") else url
 
 
 def _normalize_member(name):
@@ -87,8 +98,8 @@ def _read_archive_member(*, payload, url, member):
             )
     try:
         archive = tarfile.open(fileobj=io.BytesIO(payload), mode="r:*")
-    except tarfile.TarError:
-        raise RuntimeError(f"Unsupported archive format: {url}")
+    except tarfile.TarError as error:
+        raise RuntimeError(f"Unsupported archive format: {url}") from error
     with archive:
         entries = [(m.name, m.isdir()) for m in archive.getmembers()]
         extracted = archive.extractfile(_resolve_member(entries=entries, member=member))
@@ -104,9 +115,12 @@ class Distro(object):
         python_version=None,
         snapshot=None,
         additional_packages_snapshot=None,
+        distribution_cache=None,
     ):
         index = get_index(get_index_url())
-        self._distro = get_cached_distribution(index, distro_name)
+        self._distro = get_cached_distribution(
+            index, distro_name, cache=distribution_cache
+        )
         self.distro_name = distro_name
         self.snapshot = snapshot
         self.additional_packages_snapshot = additional_packages_snapshot
@@ -157,11 +171,6 @@ class Distro(object):
 
         ignore_pkgs = set(ignore_pkgs or ())
 
-        if self.snapshot:
-            dependencies = self._get_snapshot_recursive_depends(pkg, ignore_pkgs)
-            self._depends_cache[cache_key] = set(dependencies)
-            return dependencies
-
         dependencies = set()
         visited = {pkg}
         packages_to_check = {pkg}
@@ -182,18 +191,32 @@ class Distro(object):
         self._depends_cache[cache_key] = set(dependencies)
         return dependencies
 
+    def get_direct_depends(self, pkg: str) -> set[str]:
+        """Return the direct ROS dependencies of a package."""
+        return self._get_direct_depends(pkg)
+
     def _get_direct_depends(self, pkg: str) -> set[str]:
         """Return direct dependencies, caching package metadata across root walks."""
 
         if pkg in self._direct_depends_cache:
             return set(self._direct_depends_cache[pkg])
 
+        snapshot_info = self._get_snapshot_package_info(pkg)
+        additional_packages_snapshot = self.additional_packages_snapshot or {}
+        is_additional_package = pkg in additional_packages_snapshot
+        if snapshot_info is not None and not is_additional_package:
+            if "dependencies" not in snapshot_info:
+                raise RuntimeError(
+                    f"Snapshot metadata for '{pkg}' has no dependencies; "
+                    "regenerate the rosdistro snapshot"
+                )
+            direct = set(snapshot_info["dependencies"] or [])
+            self._direct_depends_cache[pkg] = set(direct)
+            return direct
+
         # if pkg comes from additional_packages_snapshot, extract from its package.xml
-        if (
-            self.additional_packages_snapshot
-            and pkg in self.additional_packages_snapshot
-        ):
-            pkg_info = self.additional_packages_snapshot[pkg]
+        if is_additional_package:
+            pkg_info = additional_packages_snapshot[pkg]
             xml_str = self.get_package_xml_for_additional_package(pkg_info)
             # parse XML
             import xml.etree.ElementTree as ET
@@ -237,46 +260,6 @@ class Distro(object):
         self._direct_depends_cache[pkg] = set(direct)
         return direct
 
-    def _get_snapshot_recursive_depends(self, pkg, ignore_pkgs=None):
-        """Return ROS dependencies using only package manifests pinned by the snapshot."""
-        dependencies = set()
-        ignored = set(ignore_pkgs or [])
-        packages_to_check = {pkg}
-        checked_packages = set()
-        dependency_attributes = (
-            "buildtool_depends",
-            "buildtool_export_depends",
-            "build_depends",
-            "build_export_depends",
-            "run_depends",
-            "test_depends",
-            "exec_depends",
-        )
-
-        while packages_to_check:
-            package_name = sorted(packages_to_check)[0]
-            packages_to_check.remove(package_name)
-            if package_name in ignored or package_name in checked_packages:
-                continue
-            checked_packages.add(package_name)
-
-            package_xml = self.get_release_package_xml(package_name)
-            package = catkin_pkg.package.parse_package_string(package_xml)
-            package.evaluate_conditions(os.environ)
-            direct_dependencies = {
-                dependency.name
-                for attribute in dependency_attributes
-                for dependency in getattr(package, attribute)
-                if dependency.evaluated_condition is not False
-                and dependency.name not in ignored
-                and self.check_package(dependency.name)
-            }
-            new_dependencies = direct_dependencies - dependencies
-            dependencies |= new_dependencies
-            packages_to_check |= new_dependencies - checked_packages
-
-        return dependencies
-
     def _get_snapshot_package_info(self, pkg_name):
         if not self.snapshot:
             return None
@@ -314,6 +297,38 @@ class Distro(object):
         release_tag = get_release_tag(repo, pkg_name)
         return repo.url, release_tag, "tag"
 
+    def get_repository_url(self, pkg_name, package_urls=()):
+        """Return the best declared upstream repository for a package."""
+        pkg_info = self._get_snapshot_package_info(pkg_name)
+        if pkg_info is not None:
+            if repository := pkg_info.get("repository"):
+                return _strip_git_suffix(repository)
+
+        additional_info = (self.additional_packages_snapshot or {}).get(pkg_name)
+        if additional_info is not None:
+            if repository := additional_info.get("repository"):
+                return _strip_git_suffix(repository)
+        else:
+            package = self._distro.release_packages.get(pkg_name)
+            if package is not None:
+                repository = self._distro.repositories[package.repository_name]
+                source_repository = repository.source_repository
+                if (
+                    source_repository is not None
+                    and source_repository.url
+                    and not is_bloom_release_repository_url(source_repository.url)
+                ):
+                    return _strip_git_suffix(source_repository.url)
+
+        for package_url in package_urls:
+            if (
+                package_url.type == "repository"
+                and package_url.url
+                and not is_bloom_release_repository_url(package_url.url)
+            ):
+                return _strip_git_suffix(package_url.url)
+        return None
+
     def check_package(self, pkg_name):
         # If the package is in the additional_packages_snapshot, it is always considered valid
         # even if it is not in the released packages, as it is an additional
@@ -350,13 +365,7 @@ class Distro(object):
         return repo.version.split("-")[0]
 
     def live_cache_matches_snapshot(self, pkg_name, snapshot_entry):
-        """Return whether rosdistro's cached manifest is the pinned snapshot source.
-
-        A snapshot pins the release repository URL, the package-specific release
-        tag, and the release version.  Only an exact match may reuse rosdistro's
-        local ``DistributionCache``; otherwise the manifest must be read from the
-        immutable snapshot source.
-        """
+        """Return whether rosdistro's cached manifest is the pinned snapshot source."""
 
         for live_name in (pkg_name, pkg_name.replace("_", "-")):
             try:
@@ -470,8 +479,10 @@ class Distro(object):
             return self._additional_xml_cache[url]
         try:
             xml_content = self._get(url).text
-        except Exception as e:
-            raise RuntimeError(f"Failed to fetch package.xml from {url}: {e}")
+        except Exception as error:
+            raise RuntimeError(
+                f"Failed to fetch package.xml from {url}: {error}"
+            ) from error
         self._additional_xml_cache[url] = xml_content
         return xml_content
 
@@ -492,10 +503,14 @@ class Distro(object):
         payload = self._download_archive_or_cached(url)
         try:
             xml_content = _read_archive_member(payload=payload, url=url, member=member)
-        except KeyError:
-            raise RuntimeError(f"Could not find '{member}' inside the archive {url}")
-        except Exception as e:
-            raise RuntimeError(f"Failed to read '{member}' from the archive {url}: {e}")
+        except KeyError as error:
+            raise RuntimeError(
+                f"Could not find '{member}' inside the archive {url}"
+            ) from error
+        except Exception as error:
+            raise RuntimeError(
+                f"Failed to read '{member}' from the archive {url}: {error}"
+            ) from error
         self._additional_xml_cache[cache_key] = xml_content
         return xml_content
 
@@ -509,8 +524,10 @@ class Distro(object):
             return self._last_archive[1]
         try:
             payload = self._get(url).content
-        except Exception as e:
-            raise RuntimeError(f"Failed to download the archive {url}: {e}")
+        except Exception as error:
+            raise RuntimeError(
+                f"Failed to download the archive {url}: {error}"
+            ) from error
         self._last_archive = (url, payload)
         return payload
 

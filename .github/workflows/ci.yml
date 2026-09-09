@@ -29,5 +29,8 @@ jobs:
     - name: Run linter
       run: pixi run lint-check
 
+    - name: Check types
+      run: pixi run typecheck
+
     - name: Run tests
       run: pixi run test

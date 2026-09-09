@@ -2,6 +2,7 @@ line-length = 88
 target-version = "py39"
 
 [lint]
+extend-select = ["B", "I"]
 # Ignore rules that were excluded in .flake8:
 # D104: Missing docstring in public package
 # E501: Line too long (handled by line-length setting)
