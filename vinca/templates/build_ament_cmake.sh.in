@@ -91,6 +91,17 @@ if [[ $target_platform =~ emscripten.* ]]; then
 
   echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  # CMake's MODULE library type (add_library(... MODULE), what
+  # pybind11_add_module() uses for Python C extensions e.g. rclpy's
+  # _rclpy_pybind11) is a distinct target type from SHARED and reads its
+  # own CMAKE_SHARED_MODULE_CREATE_*_FLAGS variables -- setting only the
+  # SHARED ones above left every MODULE-type .so linked without
+  # USE_PTHREADS=1, producing a non-shared-memory module that fails to
+  # load ("mismatch in shared state of memory") next to the rest of a
+  # pthreads build, even though its own object files were compiled with
+  # atomics support and looked fine individually.
+  echo "set(CMAKE_SHARED_MODULE_CREATE_C_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_SHARED_MODULE_CREATE_CXX_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   # PTHREAD_POOL_SIZE and MAXIMUM_MEMORY are only meaningful on the final
   # MAIN_MODULE executable link (they configure the Worker pool and the
   # shared SharedArrayBuffer's reserved size respectively -- side modules
