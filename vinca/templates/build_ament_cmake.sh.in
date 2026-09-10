@@ -111,6 +111,28 @@ if [[ $target_platform =~ emscripten.* ]]; then
   # wasm memory's maximum size can't be left unbounded.
   echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sWASM_BIGINT -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=4 -sALLOW_MEMORY_GROWTH=1 -s MAXIMUM_MEMORY=1024MB -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
 
+  # A message package's *Config.cmake only exports find_dependency() calls
+  # for what its own package.xml/CMakeLists.txt actually declares -- it has
+  # no idea VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_C/_CPP named an extra
+  # typesupport backend, so it never re-exports *that* dependency to ITS
+  # OWN consumers. A package that only uses one message package at a time
+  # never notices (it already found the backend itself while configuring
+  # its own rosidl_generate_interfaces() call), but one that find_package()s
+  # several message packages together hits "the target was not found ...
+  # A find_package call is missing for an IMPORTED target" the first time a
+  # downstream *Export.cmake references
+  # rosidl_typesupport_microxrcedds_c(pp)::rosidl_typesupport_microxrcedds_c(pp)
+  # without anyone upstream having found it first. Pre-finding it here (via
+  # CMAKE_PROJECT_INCLUDE, so it's already in every target's CMake
+  # namespace before that project's own find_package() calls run) covers
+  # every consumer uniformly instead of patching each one individually.
+  if [ -n "${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_C:-}" ]; then
+    echo "find_package(${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_C} QUIET)">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  fi
+  if [ -n "${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_CPP:-}" ]; then
+    echo "find_package(${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_CPP} QUIET)">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  fi
+
   export BUILD_TYPE="Debug"
   export EXTRA_CMAKE_ARGS=" \
       -DPYTHON_SOABI="cpython-${ROS_PYTHON_VERSION//./}-wasm32-emscripten" \
