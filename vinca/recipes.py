@@ -232,6 +232,16 @@ def _adjust_requirements(requirements: Requirements, package_prefix: str) -> Non
         destination=requirements["build"],
     )
 
+    # Emscripten resolves the generators out of `build` rather than `host`.
+    rosidl_generators = f"{package_prefix}-rosidl-default-generators"
+    if rosidl_generators in requirements["host"]:
+        requirements["build"].append(
+            {
+                "if": "target_platform == 'emscripten-wasm32'",
+                "then": [rosidl_generators],
+            }
+        )
+
     requirements["run"].sort(key=_requirement_sort_key)
     requirements["host"].sort(key=_requirement_sort_key)
 
