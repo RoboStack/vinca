@@ -126,11 +126,33 @@ if [[ $target_platform =~ emscripten.* ]]; then
   # CMAKE_PROJECT_INCLUDE, so it's already in every target's CMake
   # namespace before that project's own find_package() calls run) covers
   # every consumer uniformly instead of patching each one individually.
-  if [ -n "${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_C:-}" ]; then
-    echo "find_package(${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_C} QUIET)">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  fi
-  if [ -n "${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_CPP:-}" ]; then
-    echo "find_package(${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_CPP} QUIET)">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  # A package that calls rosidl_generate_interfaces() itself (i.e. defines
+  # its own messages/services/actions) must NOT get this pre-find: that
+  # macro discovers available typesupport implementations itself and
+  # registers each one's ament_export_targets() call in a fixed relative
+  # order (each backend's generator target before its own typesupport
+  # target). Pre-finding the override backend here makes it "already a
+  # target" before that macro runs, which -- empirically confirmed by
+  # inspecting the resulting package's own ament_cmake_export_targets-extras.cmake
+  # -- causes THIS package's typesupport entry to jump to the front of its
+  # own _exported_targets list, ahead of the generator target its own
+  # Export.cmake requires (INTERFACE_LINK_LIBRARIES references
+  # <pkg>::<pkg>__rosidl_generator_c(pp)). That makes every downstream
+  # find_package(<this package>) fail with "referenced, but are missing:
+  # <pkg>::<pkg>__rosidl_generator_c(pp)" -- reproducible regardless of
+  # whether the C or C++ (or both) override is set. Without any pre-find,
+  # rosidl_generate_interfaces() discovers the same override backend on its
+  # own (via STATIC_ROSIDL_TYPESUPPORT_C/_CPP below) in the correct order,
+  # so skipping it here loses nothing for this package's own typesupport
+  # selection -- it only loses the (here unneeded) benefit described above
+  # of pre-registering the backend for *consumers* of this package.
+  if ! grep -q "rosidl_generate_interfaces(" "$SRC_DIR/$PKG_NAME"/src/work/CMakeLists.txt 2>/dev/null; then
+    if [ -n "${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_C:-}" ]; then
+      echo "find_package(${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_C} QUIET)">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+    fi
+    if [ -n "${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_CPP:-}" ]; then
+      echo "find_package(${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_CPP} QUIET)">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+    fi
   fi
 
   export BUILD_TYPE="Debug"
