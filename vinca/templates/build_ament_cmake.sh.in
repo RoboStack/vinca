@@ -85,6 +85,23 @@ if [[ $target_platform =~ emscripten.* ]]; then
   # service a message loop (e.g. JupyterLite's xeus-python kernel) just
   # deadlocks outright -- there's nothing left free to deliver the wakeup.
   # Asyncify avoids needing real concurrency at all for this.
+  #
+  # Asyncify is also flatly incompatible with wasm's native
+  # exception-handling proposal: binaryen's Asyncify pass hard-crashes
+  # ("UNREACHABLE executed ... Asyncify.cpp") on any object file compiled
+  # with wasm EH instructions, rather than just producing a slower build.
+  # The emscripten-forge toolchain package's own activation script
+  # (etc/conda/activate.d/activate_emscripten_emscripten-wasm32.sh) sets
+  # EMCC_CFLAGS="... -sSUPPORT_LONGJMP=wasm -fwasm-exceptions" globally, so
+  # *every* em++/emcc invocation gets wasm EH by default regardless of what
+  # CMake is told -- confirmed by tracing emcc.py: -fwasm-exceptions is the
+  # only thing that sets settings.WASM_EXCEPTIONS=1, and there's no
+  # -fno-wasm-exceptions counter-flag it recognizes to un-set it again.
+  # Overriding EMCC_CFLAGS here (dropping just the exception-handling part,
+  # keeping the rest of the toolchain's own base flags) is the only place
+  # that actually works -- back to this toolchain's other documented
+  # default, the older JS-based mechanism, which Asyncify does handle.
+  export EMCC_CFLAGS="${EM_FORGE_CFLAGS_BASE:-}"
   echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s ALLOW_MEMORY_GROWTH=1 -sASYNCIFY -s ASYNCIFY_STACK_SIZE=24576 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s ALLOW_MEMORY_GROWTH=1 -sASYNCIFY -s ASYNCIFY_STACK_SIZE=24576 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   # CMake's MODULE library type (add_library(... MODULE), what
