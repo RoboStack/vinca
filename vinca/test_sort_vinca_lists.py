@@ -1,6 +1,8 @@
 """Tests for the vinca.yaml list sorter."""
 
-from vinca.sort_vinca_lists import sort_vinca_lists
+import pytest
+
+from vinca.sort_vinca_lists import DuplicateConditionError, sort_vinca_lists
 
 BASE = """packages_select_by_deps:
   - alpha
@@ -96,3 +98,64 @@ patch_dir: patch
     first_block, second_block = path.read_text().split("- if: linux and not aarch64")
     assert "- webots_ros2" not in first_block
     assert "- webots_ros2" in second_block
+
+
+def test_duplicate_condition_in_same_list_raises(tmp_path):
+    # Two non-adjacent "- if: win" blocks under the same list key, separated
+    # by unrelated content -- not the adjacency bug from the previous fix,
+    # just two blocks that should have been one all along.
+    content = """packages_select_by_deps:
+  - if: win
+    then:
+      - alpha
+
+  - unrelated_package
+
+  - if: win
+    then:
+      - bravo
+"""
+    path = tmp_path / "vinca.yaml"
+    path.write_text(content)
+
+    with pytest.raises(
+        DuplicateConditionError, match=r"packages_select_by_deps.*'win'"
+    ):
+        sort_vinca_lists(path)
+
+
+def test_duplicate_condition_scoped_per_list_key(tmp_path):
+    # The same condition appearing once in each of two different list keys
+    # is fine -- duplication is only a problem within a single list key.
+    content = """packages_skip_by_deps:
+  - if: win
+    then:
+      - alpha
+
+packages_select_by_deps:
+  - if: win
+    then:
+      - bravo
+"""
+    path = tmp_path / "vinca.yaml"
+    path.write_text(content)
+
+    # Should not raise.
+    sort_vinca_lists(path)
+
+
+def test_different_conditions_do_not_raise(tmp_path):
+    content = """packages_select_by_deps:
+  - if: win
+    then:
+      - alpha
+
+  - if: not win
+    then:
+      - bravo
+"""
+    path = tmp_path / "vinca.yaml"
+    path.write_text(content)
+
+    # Should not raise.
+    sort_vinca_lists(path)

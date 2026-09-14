@@ -5,6 +5,15 @@ Sorts plain `  - item` entries alphabetically within each target list key.
 Conditional blocks (`- if: ... then: [...]`) stay at the end; their inner
 `then:` lists are also sorted.
 
+Also validates that each condition (e.g. "win", "not win", "linux") appears
+in at most one `- if:` block per top-level list key. Two separate blocks for
+the same condition are never wrong on their own, but they're a standing
+foot-gun: a future addition can land in the "wrong" one by accident, and
+nothing merges the two, so the same package can end up skipped from one
+angle and not the other depending on which block someone edits. Raises
+DuplicateConditionError (exit 1) rather than silently merging them, since
+merging by hand needs a human to reconcile any per-item comments correctly.
+
 Usage:
   vinca-sort-vinca-lists [FILE]
   vinca-sort-vinca-lists --check [FILE]
@@ -27,10 +36,17 @@ LISTS_TO_SORT = {
 RE_SIMPLE_ITEM = re.compile(r"^  - (\S.*)$")
 # Regex for the start of a conditional block: "  - if: ..."
 RE_IF_BLOCK = re.compile(r"^  - if:")
+# Regex capturing the condition text of a "  - if: <condition>" line
+RE_IF_CONDITION = re.compile(r"^  - if:\s*(.+?)\s*$")
 # Regex for a then-list item inside a conditional block: "      - value"
 RE_THEN_ITEM = re.compile(r"^      - (\S.*)$")
 # Regex for a top-level key
 RE_TOP_KEY = re.compile(r"^(\S+):")
+
+
+class DuplicateConditionError(ValueError):
+    """Raised when the same `- if:` condition appears in more than one block
+    under the same top-level list key."""
 
 
 def _sort_key(line: str) -> str:
@@ -57,6 +73,7 @@ def sort_vinca_lists(path: Path) -> bool:
         # Check if this line starts a target list key
         m = RE_TOP_KEY.match(line)
         if m and m.group(1) in LISTS_TO_SORT:
+            list_key = m.group(1)
             result.append(line)
             i += 1
 
@@ -135,6 +152,25 @@ def sort_vinca_lists(path: Path) -> bool:
             # Finalize any pending if-block
             if current_if_block is not None:
                 if_blocks.append(current_if_block)
+
+            # Reject duplicate conditions: two separate "- if:" blocks for the
+            # same condition under the same list key. See module docstring.
+            seen_conditions = {}
+            for block in if_blocks:
+                cond_match = RE_IF_CONDITION.match(block[0])
+                if not cond_match:
+                    continue
+                condition = cond_match.group(1)
+                if condition in seen_conditions:
+                    raise DuplicateConditionError(
+                        f"{list_key}: condition {condition!r} appears in more "
+                        f"than one '- if:' block. Merge them into a single "
+                        f"block (each item may need its own comment moved "
+                        f"inline first, since sorting the merged then: list "
+                        f"can otherwise separate a standalone comment from "
+                        f"the item it was meant to describe)."
+                    )
+                seen_conditions[condition] = True
 
             # Sort simple items
             sorted_simple = sorted(simple_items, key=_sort_key)
@@ -221,14 +257,20 @@ def main():
         print(f"ERROR: {args.file} not found", file=sys.stderr)
         sys.exit(1)
 
-    if args.check:
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as tf:
-            tmp = Path(tf.name)
-        shutil.copy2(args.file, tmp)
-        changed = sort_vinca_lists(tmp)
-        tmp.unlink(missing_ok=True)
-    else:
-        changed = sort_vinca_lists(args.file)
+    try:
+        if args.check:
+            with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as tf:
+                tmp = Path(tf.name)
+            shutil.copy2(args.file, tmp)
+            try:
+                changed = sort_vinca_lists(tmp)
+            finally:
+                tmp.unlink(missing_ok=True)
+        else:
+            changed = sort_vinca_lists(args.file)
+    except DuplicateConditionError as e:
+        print(f"ERROR: {args.file}: {e}", file=sys.stderr)
+        sys.exit(1)
 
     status = ("UNSORTED" if args.check else "SORTED") if changed else "OK"
     print(f"{status}: {args.file}")
