@@ -543,12 +543,26 @@ class Distro(object):
         # Extract owner/repo
         owner_repo = raw_url_base.split("github.com/")[-1]
         # Use rev if available, otherwise fallback to tag
-        ref = pkg_info.get("rev") or pkg_info.get("tag")
+        rev = pkg_info.get("rev")
+        tag = pkg_info.get("tag")
         xml_name = pkg_info.get("package_xml_name", "package.xml")
         additional_folder = pkg_info.get("additional_folder", "")
         if additional_folder != "":
             additional_folder = additional_folder + "/"
-        raw_url = f"https://raw.githubusercontent.com/{owner_repo}/{ref}/{additional_folder}{xml_name}"
+        if rev:
+            # A commit hash is unambiguous as-is.
+            ref_path = rev
+        else:
+            # ros2-gbp release tags look like "release/jazzy/foo_pkg/1.2.3-1" --
+            # raw.githubusercontent.com's short <owner>/<repo>/<ref>/<path> form
+            # has to guess where a slash-containing ref ends and the path
+            # begins, and that guess is inconsistently cached across CDN edges:
+            # the same URL can 404 from some vantage points (including GitHub
+            # Actions runners) while resolving fine from others. The explicit
+            # refs/tags/<name> form removes the ambiguity and resolves
+            # reliably everywhere.
+            ref_path = f"refs/tags/{tag}"
+        raw_url = f"https://raw.githubusercontent.com/{owner_repo}/{ref_path}/{additional_folder}{xml_name}"
         return raw_url
 
     # format (checked against GitLab 19.x): https://gitlab.com/<NAMESPACE>/-/raw/<REV>/<PATH>
