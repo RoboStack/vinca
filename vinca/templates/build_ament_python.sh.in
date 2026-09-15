@@ -15,5 +15,16 @@ if [ -f setup.cfg ] && grep -q "install[-_]scripts" setup.cfg; then
   echo "WARNING: setup.cfg not set, will set INSTALL_SCRIPTS_ARG to: $INSTALL_SCRIPTS_ARG"
   $PYTHON setup.py install --prefix="$PREFIX" --install-lib="$SP_DIR" $INSTALL_SCRIPTS_ARG --single-version-externally-managed --record=files.txt
 else
-  $PYTHON -m pip install . --no-deps -vvv
+  # emscripten-forge-recipes' own cross-python_emscripten-wasm32 activate.sh
+  # sets PIP_ARGS="--prefix=$PREFIX --no-deps -vv" specifically so cross-
+  # compiled pip installs land in the target host prefix -- $PYTHON there is
+  # crossenv's own wrapper script, and without an explicit --prefix, pip's
+  # install-scheme resolution isn't reliably targeting $PREFIX on every
+  # platform: confirmed via a real emscripten-wasm32 build where `pip install
+  # .` with no extra args installed ament_package into $BUILD_PREFIX/venv's
+  # own site-packages on Linux (never reaching $PREFIX at all, so nothing
+  # that declares this as a host: dependency can later find it), while the
+  # exact same recipe on macOS happened to also land a copy under $PREFIX.
+  # $PIP_ARGS is unset for a normal (non-cross) build, where this is a no-op.
+  $PYTHON -m pip install . --no-deps -vvv ${PIP_ARGS:-}
 fi

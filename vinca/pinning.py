@@ -219,11 +219,69 @@ def _migration_name(name: str) -> str:
     return name
 
 
+def _existing_eol_comment_text(source: Any, index: int) -> Optional[str]:
+    """Return the plain text of a CommentedSeq item's trailing EOL comment, if any."""
+    ca = getattr(source, "ca", None)
+    if ca is None:
+        return None
+    entry = ca.items.get(index)
+    if not entry:
+        return None
+    token = entry[0]
+    if token is None:
+        return None
+    return str(token.value).lstrip("#").strip()
+
+
+def _flatten_v1_selectors(value: Any) -> Any:
+    """Convert v1-style `- if: COND then: [...]` list entries into the legacy
+    `- VALUE  # [COND]` comment-annotated form that rattler-build's variant
+    config loader actually evaluates lazily per target_platform (unlike the
+    v1 if/then/else mapping form, which it treats as an opaque literal value
+    rather than a selector -- confirmed via `Could not parse version spec
+    for variant key ...: invalid channel` / `multiple bracket sections not
+    allowed` errors when left unconverted).
+
+    Passthrough items (plain scalars, possibly already carrying their own
+    `# [selector]` EOL comment) must have that existing comment re-attached
+    at their new index -- ruamel stores comments keyed by list position on
+    the *source* CommentedSeq, not on the item itself, so a naive
+    `result.append(item)` into a freshly created CommentedSeq silently
+    drops it, turning a platform-scoped entry into an unconditional one.
+    """
+    if not isinstance(value, list):
+        return value
+    import ruamel.yaml.comments as _rc
+
+    result = _rc.CommentedSeq()
+    for old_index, item in enumerate(value):
+        if isinstance(item, Mapping) and "if" in item and "then" in item:
+            cond = str(item["if"])
+            for entry in item["then"]:
+                idx = len(result)
+                result.append(entry)
+                result.yaml_add_eol_comment(f"[{cond}]", idx)
+            else_branch = item.get("else")
+            if else_branch is not None:
+                not_cond = f"not ({cond})"
+                for entry in else_branch:
+                    idx = len(result)
+                    result.append(entry)
+                    result.yaml_add_eol_comment(f"[{not_cond}]", idx)
+        else:
+            idx = len(result)
+            result.append(item)
+            comment_text = _existing_eol_comment_text(value, old_index)
+            if comment_text:
+                result.yaml_add_eol_comment(comment_text, idx)
+    return result
+
+
 def _overlay(target: Any, source: Any) -> None:
     for key, value in source.items():
         if key == "migrator_ts" or str(key).startswith("__"):
             continue
-        target[key] = value
+        target[key] = _flatten_v1_selectors(value)
 
 
 def _migration_timestamp(payload: bytes) -> float:

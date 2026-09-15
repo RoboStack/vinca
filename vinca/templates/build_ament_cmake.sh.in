@@ -36,6 +36,25 @@ echo "Using Python ${ROS_PYTHON_VERSION}"
 
 export ROS_DISTRO="@(ros_distro)"
 
+# Some packages' own CMake configure step (ament_cmake_core's package_templates/
+# templates_2_cmake.py is the confirmed case, importing `ament_package`) needs a
+# pure-Python host tool available to $BUILD_PREFIX's own (native) python during
+# cross-compilation -- the only python that can actually execute at configure
+# time. That tool is only ever declared as a `host` dependency (installed into
+# $PREFIX, the target env), so $BUILD_PREFIX's python has no way to see it on
+# its own, confirmed via a real "ModuleNotFoundError: No module named
+# 'ament_package'" configure failure. Rather than needing every such tool
+# separately declared as a native `build:`-time conda dependency too (which
+# for a target platform with no native builds published anywhere, like
+# emscripten-wasm32, would need its own build_platform-labeled mirror package
+# per tool -- fragile and easy to miss one), just point $BUILD_PREFIX's python
+# directly at $PREFIX's site-packages: every such tool is pure Python (no
+# compiled extension), so reading its .py files with a different, native
+# python interpreter is safe.
+if [[ "$CONDA_BUILD_CROSS_COMPILATION" == "1" ]]; then
+  export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$PREFIX/lib/python${ROS_PYTHON_VERSION}/site-packages"
+fi
+
 # see https://github.com/conda-forge/cross-python-feedstock/issues/24
 if [[ "$CONDA_BUILD_CROSS_COMPILATION" == "1" ]]; then
   find $PREFIX/lib/cmake -type f -exec sed -i "s~\${_IMPORT_PREFIX}/lib/python${ROS_PYTHON_VERSION}/site-packages~${BUILD_PREFIX}/lib/python${ROS_PYTHON_VERSION}/site-packages~g" {} + || true
@@ -69,20 +88,125 @@ if [[ $target_platform =~ emscripten.* ]]; then
   echo "set(CMAKE_STRIP FALSE)  # used by default in pybind11 on .so modules">> $SRC_DIR/__vinca_shared_lib_patch.cmake
   echo "set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)  # fixes an error where numpy header files are not found correctly">> $SRC_DIR/__vinca_shared_lib_patch.cmake
 
-  # if [ "${PKG_NAME}" == "ros-humble-examples-rclcpp-minimal-publisher" ] || [ "${PKG_NAME}" == "ros-humble-examples-rclcpp-minimal-subscriber" ] || [ "${PKG_NAME}" == "ros-humble-rclcpp-components" ]; then
-  #   echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=0 -s DEMANGLE_SUPPORT=1 -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  #   echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=0 -s DEMANGLE_SUPPORT=1 -s ALLOW_MEMORY_GROWTH=1 -sASYNCIFY -O3 -s ASYNCIFY_STACK_SIZE=24576 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  #   echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sWASM_BIGINT -s USE_PTHREADS=0 -s DEMANGLE_SUPPORT=1 -sALLOW_MEMORY_GROWTH=1 -sASYNCIFY -O3 -s ASYNCIFY_STACK_SIZE=24576 -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  # else
-    echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=0 -s ALLOW_MEMORY_GROWTH=1 -s DEMANGLE_SUPPORT=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-    echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s USE_PTHREADS=0 -s ALLOW_MEMORY_GROWTH=1 -s DEMANGLE_SUPPORT=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-    echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sWASM_BIGINT -s USE_PTHREADS=0 -sALLOW_MEMORY_GROWTH=1 -s DEMANGLE_SUPPORT=1 -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
-  # fi
+  # No real pthreads here, and (as of 2026-09-13) no Asyncify either --
+  # see git history on this file for the full saga of both. Asyncify was
+  # added to let rmw_wait's poll loop cooperatively yield instead of really
+  # blocking, without needing real OS threads -- but combining Asyncify
+  # with runtime dlopen() of a SIDE_MODULE turned out to be a real,
+  # unresolved Emscripten/Binaryen limitation (emscripten-core/emscripten
+  # #13049, #15594; pyodide/pyodide#4087 reports the identical crash
+  # against Pyodide's own CPython fork), discovered while trying to get
+  # rclpy dlopen()'d into a JupyterLite kernel. Real pthreads have their
+  # own, separate dealbreaker: they require wasm --shared-memory, which is
+  # viral (every module dlopen'd into an eagerly-linked host must also be
+  # pthreads/shared-memory or linking fails), and a genuinely blocking wait
+  # on a thread that also needs to service a message loop (e.g.
+  # JupyterLite's xeus-python kernel) just deadlocks outright.
+  #
+  # The actual fix is architectural, not a build flag: rmw_wait (see this
+  # project's own rmw_zenoh_pico patch) already takes a genuinely
+  # non-blocking, single-poll path whenever the requested wait timeout is
+  # exactly zero -- callers that want to keep checking for readiness
+  # periodically should call with a zero timeout in a loop and drive the
+  # "wait a bit, then check again" cadence themselves (e.g. rclpy callers:
+  # `rclpy.spin_once(node, timeout_sec=0)` inside a Python `asyncio.sleep()`
+  # loop, bridged to the browser's JS event loop via pyjs's webloop, not
+  # Asyncify -- exactly the pattern ros2wasm's own published JupyterLite
+  # demo uses). This matches Tobias-Fischer/ros-humble's own working
+  # emscripten-wasm32 port, which also builds with no pthreads and no
+  # Asyncify.
+  #
+  # ZENOH_EMSCRIPTEN: rmw_zenoh_pico's own patch (ros-rolling-rmw-zenoh-pico.patch)
+  # guards its wasm32-specific "ws/" locator scheme (vs. native's "tcp/") behind
+  # `#if defined(ZENOH_EMSCRIPTEN)` -- nothing previously defined that macro
+  # anywhere in this build, so it was silently always taking the native "tcp/"
+  # branch even on this target, and a browser sandbox has no raw TCP sockets
+  # (zenoh-pico here is built with Z_FEATURE_LINK_WS instead, dialing only
+  # "ws/" locators) -- confirmed via a real socket(AF_INET, SOCK_STREAM,
+  # IPPROTO_TCP) call reaching -lwebsocket.js's POSIX-socket-over-WebSocket
+  # shim and failing, instead of a native WebSocket connection ever being
+  # attempted. Defined project-wide here (not just for rmw_zenoh_pico) since
+  # zenoh-pico's own sources may rely on the same macro for analogous checks.
+  #
+  # NOTE (2026-09-13): this used to also override EMCC_CFLAGS to drop
+  # -fwasm-exceptions (replacing the toolchain's own native wasm
+  # exception-handling default with the older JS-based mechanism), because
+  # Binaryen's Asyncify pass hard-crashed on native wasm-EH instructions.
+  # Now that Asyncify is dropped entirely (see the block above), that
+  # override is not just unnecessary but actively harmful: it left every
+  # package here compiling with *neither* explicit exception-handling flag,
+  # which falls back to Emscripten's own default (the older JS-based
+  # mechanism) -- a genuine mismatch against the *stock*, unmodified
+  # xeus-python package this project now dlopen()'s into (built with the
+  # toolchain's real default, -fwasm-exceptions, since nothing patches it).
+  # That mismatch surfaced as "Dynamic linking error: cannot resolve symbol
+  # invoke_i" the first time a C++ exception-handling code path in a
+  # dlopen()'d ROS package (rmw_zenoh_pico) needed a JS-based invoke_*
+  # wrapper stock xeus-python's own MAIN_MODULE was never built to provide.
+  # Appending to whatever EMCC_CFLAGS the toolchain's own activation script
+  # already set (not overriding it) keeps -fwasm-exceptions intact, matching
+  # stock xeus-python exactly.
+  export EMCC_CFLAGS="${EMCC_CFLAGS:-} -DZENOH_EMSCRIPTEN"
+
+  echo "set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  # CMake's MODULE library type (add_library(... MODULE), what
+  # pybind11_add_module() uses for Python C extensions e.g. rclpy's
+  # _rclpy_pybind11) is a distinct target type from SHARED and reads its
+  # own CMAKE_SHARED_MODULE_CREATE_*_FLAGS variables -- keep it consistent
+  # with the SHARED flags above.
+  echo "set(CMAKE_SHARED_MODULE_CREATE_C_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_SHARED_MODULE_CREATE_CXX_FLAGS \"-s ASSERTIONS=1 -s SIDE_MODULE=1 -sWASM_BIGINT -s ALLOW_MEMORY_GROWTH=1 \")">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+  echo "set(CMAKE_EXE_LINKER_FLAGS \"-sMAIN_MODULE=1 -sASSERTIONS=1 -fexceptions -lembind -sWASM_BIGINT -sALLOW_MEMORY_GROWTH=1 -L$SRC_DIR/build -L$PREFIX/lib\")  # remove SIDE_MODULE from exe linker flags">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+
+  # A message package's *Config.cmake only exports find_dependency() calls
+  # for what its own package.xml/CMakeLists.txt actually declares -- it has
+  # no idea VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_C/_CPP named an extra
+  # typesupport backend, so it never re-exports *that* dependency to ITS
+  # OWN consumers. A package that only uses one message package at a time
+  # never notices (it already found the backend itself while configuring
+  # its own rosidl_generate_interfaces() call), but one that find_package()s
+  # several message packages together hits "the target was not found ...
+  # A find_package call is missing for an IMPORTED target" the first time a
+  # downstream *Export.cmake references
+  # rosidl_typesupport_microxrcedds_c(pp)::rosidl_typesupport_microxrcedds_c(pp)
+  # without anyone upstream having found it first. Pre-finding it here (via
+  # CMAKE_PROJECT_INCLUDE, so it's already in every target's CMake
+  # namespace before that project's own find_package() calls run) covers
+  # every consumer uniformly instead of patching each one individually.
+  # A package that calls rosidl_generate_interfaces() itself (i.e. defines
+  # its own messages/services/actions) must NOT get this pre-find: that
+  # macro discovers available typesupport implementations itself and
+  # registers each one's ament_export_targets() call in a fixed relative
+  # order (each backend's generator target before its own typesupport
+  # target). Pre-finding the override backend here makes it "already a
+  # target" before that macro runs, which -- empirically confirmed by
+  # inspecting the resulting package's own ament_cmake_export_targets-extras.cmake
+  # -- causes THIS package's typesupport entry to jump to the front of its
+  # own _exported_targets list, ahead of the generator target its own
+  # Export.cmake requires (INTERFACE_LINK_LIBRARIES references
+  # <pkg>::<pkg>__rosidl_generator_c(pp)). That makes every downstream
+  # find_package(<this package>) fail with "referenced, but are missing:
+  # <pkg>::<pkg>__rosidl_generator_c(pp)" -- reproducible regardless of
+  # whether the C or C++ (or both) override is set. Without any pre-find,
+  # rosidl_generate_interfaces() discovers the same override backend on its
+  # own (via STATIC_ROSIDL_TYPESUPPORT_C/_CPP below) in the correct order,
+  # so skipping it here loses nothing for this package's own typesupport
+  # selection -- it only loses the (here unneeded) benefit described above
+  # of pre-registering the backend for *consumers* of this package.
+  if ! grep -q "rosidl_generate_interfaces(" "$SRC_DIR/$PKG_NAME"/src/work/CMakeLists.txt 2>/dev/null; then
+    if [ -n "${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_C:-}" ]; then
+      echo "find_package(${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_C} QUIET)">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+    fi
+    if [ -n "${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_CPP:-}" ]; then
+      echo "find_package(${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_CPP} QUIET)">> $SRC_DIR/__vinca_shared_lib_patch.cmake
+    fi
+  fi
 
   export BUILD_TYPE="Debug"
   export EXTRA_CMAKE_ARGS=" \
       -DPYTHON_SOABI="cpython-${ROS_PYTHON_VERSION//./}-wasm32-emscripten" \
-      -DRMW_IMPLEMENTATION=rmw_wasm_cpp \
+      -DRMW_IMPLEMENTATION=${VINCA_EMSCRIPTEN_RMW_IMPLEMENTATION:-rmw_wasm_cpp} \
       -DCMAKE_FIND_ROOT_PATH=$PREFIX \
       -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE \
       -DCMAKE_PROJECT_INCLUDE=$SRC_DIR/__vinca_shared_lib_patch.cmake \
@@ -92,8 +216,8 @@ if [[ $target_platform =~ emscripten.* ]]; then
   export CMAKE_GEN="emcmake cmake"
   export CMAKE_BLD="cmake"
 
-  export STATIC_ROSIDL_TYPESUPPORT_C=rosidl_typesupport_introspection_c
-  export STATIC_ROSIDL_TYPESUPPORT_CPP=rosidl_typesupport_introspection_cpp
+  export STATIC_ROSIDL_TYPESUPPORT_C=${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_C:-rosidl_typesupport_introspection_c}
+  export STATIC_ROSIDL_TYPESUPPORT_CPP=${VINCA_EMSCRIPTEN_STATIC_TYPESUPPORT_CPP:-rosidl_typesupport_introspection_cpp}
 else
   export BUILD_TYPE="Release"
   export CMAKE_GEN="cmake"
