@@ -220,10 +220,22 @@ def _migration_name(name: str) -> str:
 
 
 def _overlay(target: Any, source: Any) -> None:
+    removed_keys = {key for key, value in source.items() if value is None}
     for key, value in source.items():
         if key == "migrator_ts" or str(key).startswith("__"):
             continue
-        target[key] = value
+        if value is None:
+            target.pop(key, None)
+        else:
+            target[key] = value
+    if removed_keys and "zip_keys" in target:
+        groups = [
+            group for group in target["zip_keys"] if not set(group) <= removed_keys
+        ]
+        if groups:
+            target["zip_keys"] = groups
+        else:
+            target.pop("zip_keys")
 
 
 def _migration_timestamp(payload: bytes) -> float:
@@ -243,6 +255,13 @@ def _validate_zipped_overrides(rendered: Any, overrides: Any) -> None:
                 "Pinning overrides must update an entire zip_keys group; "
                 f"{', '.join(sorted(touched))} also requires "
                 f"{', '.join(sorted(missing))}"
+            )
+        removed = {key for key in group if key in overrides and overrides[key] is None}
+        if removed and removed != group:
+            raise PinningError(
+                "Pinning overrides must remove every member of a zip_keys group; "
+                f"{', '.join(sorted(removed))} also requires "
+                f"{', '.join(sorted(group - removed))}: null"
             )
 
 

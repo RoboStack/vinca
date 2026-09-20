@@ -69,6 +69,8 @@ pinning_overrides:
     - false
   python_impl:
     - cpython
+  # Remove a pin inherited from conda-forge-pinning.
+  docker_image: null
 ```
 
 Render the build-tool input with:
@@ -80,6 +82,9 @@ vinca-pinning-render
 The renderer downloads that exact `conda-forge-pinning` package and starts with its
 `conda_build_config.yaml`. It sorts the named migrations by `migrator_ts`, just as
 `conda-smithy` does, and combines each one using the [CFEP-9 variant algebra](https://github.com/conda-forge/cfep/blob/main/cfep-09.md).
+An override set to `null` removes that key from the generated config, including
+pins added by migrations. To remove a key in a `zip_keys` group, set every member
+of that group to `null`; the group is removed as well.
 
 For a full rebuild, update the base and eligible migrations with:
 

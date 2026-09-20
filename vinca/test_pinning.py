@@ -100,6 +100,77 @@ pinning_overrides:
     assert not any(line.endswith(" ") for line in output_path.read_text().splitlines())
 
 
+def test_render_null_override_removes_base_and_migrated_pins(tmp_path):
+    config_path = tmp_path / "vinca_pinning.yaml"
+    config_path.write_text(
+        """\
+conda_forge_pinning_version: '1'
+migrations:
+  - libboost190
+pinning_overrides:
+  python: null
+  libboost_devel: null
+  absent: null
+"""
+    )
+    output_path = tmp_path / "conda_build_config.yaml"
+
+    rendered = render_pinning(
+        config_path,
+        output_path,
+        package=(BASE_CONFIG, {"libboost190": BOOST_MIGRATION}),
+    )
+
+    assert dict(rendered) == {"keep": ["base"]}
+    assert dict(ruamel.yaml.YAML(typ="safe").load(output_path.read_text())) == {
+        "keep": ["base"]
+    }
+
+
+def test_render_null_override_removes_entire_zip_group(tmp_path):
+    config_path = tmp_path / "vinca_pinning.yaml"
+    config_path.write_text(
+        """\
+conda_forge_pinning_version: '1'
+pinning_overrides:
+  python: null
+  is_python_min: null
+"""
+    )
+    base = b"""\
+python: ['3.13']
+is_python_min: [true]
+zip_keys:
+  - [python, is_python_min]
+keep: [base]
+"""
+
+    rendered = render_pinning(config_path, tmp_path / "output.yaml", package=(base, {}))
+
+    assert dict(rendered) == {"keep": ["base"]}
+
+
+def test_render_rejects_mixed_removal_and_override_in_zip_group(tmp_path):
+    config_path = tmp_path / "vinca_pinning.yaml"
+    config_path.write_text(
+        """\
+conda_forge_pinning_version: '1'
+pinning_overrides:
+  python: null
+  is_python_min: [false]
+"""
+    )
+    base = b"""\
+python: ['3.13']
+is_python_min: [true]
+zip_keys:
+  - [python, is_python_min]
+"""
+
+    with pytest.raises(PinningError, match="remove every member"):
+        render_pinning(config_path, tmp_path / "output.yaml", package=(base, {}))
+
+
 def test_render_keeps_selector_on_empty_sequence_item(tmp_path):
     config_path = tmp_path / "vinca_pinning.yaml"
     config_path.write_text(
