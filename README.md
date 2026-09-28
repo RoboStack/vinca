@@ -34,6 +34,34 @@ package_name_mode: both
 
 Once users and downstream projects have migrated, switch to `new` to stop generating the compatibility packages. New ROS 1 package names use the `ros-` prefix; new ROS 2 package names use `ros2-`.
 
+## Variants mode
+
+The optional `variants_mode` setting controls how rattler-build receives the
+repository-level `conda_build_config.yaml`:
+
+- `global` (default) leaves generated recipes unchanged. Builds must pass the
+  root configuration explicitly, for example with
+  `rattler-build build ... -m ./conda_build_config.yaml`.
+- `local` generates a `variants.yaml` beside every `recipe.yaml`. Vinca converts
+  legacy comment selectors to v1 selectors and keeps only pins used by that
+  package. Builds must not pass the root configuration with `-m`, because an
+  explicit variant file takes precedence over the recipe-local file.
+
+```yaml
+variants_mode: local
+```
+
+Local mode requires `conda_build_config.yaml` next to `vinca.yaml`. Optional
+per-package additions or replacements can be declared in
+`pkg_additional_info.yaml`:
+
+```yaml
+my_ros_package:
+  variant_overrides:
+    c_stdlib_version:
+      - '2.28'
+```
+
 ## Configuring setup-pixi in generated workflows
 
 Generated GitHub Actions workflows use `prefix-dev/setup-pixi@v0` by default. Override the action version in `vinca.yaml` when needed:

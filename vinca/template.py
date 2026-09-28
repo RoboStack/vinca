@@ -14,6 +14,7 @@ from vinca.utils import (
     get_pkg_additional_info,
     get_pkg_build_number,
 )
+from vinca.variants import VariantsMode, get_recipe_variants, get_variants_mode
 
 TEMPLATE = """\
 # yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
@@ -164,6 +165,11 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
 
             with open(recipe_dir / "recipe.yaml", "w") as stream:
                 file.dump(meta, stream)
+
+            if get_variants_mode(vinca_conf) is VariantsMode.LOCAL:
+                variants = get_recipe_variants(meta, package_shortname, vinca_conf)
+                with open(recipe_dir / "variants.yaml", "w") as stream:
+                    file.dump(variants, stream)
 
             if meta.get("source") and meta["source"].get("patches"):
                 for p in meta["source"]["patches"]:
