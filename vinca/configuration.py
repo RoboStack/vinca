@@ -22,6 +22,11 @@ from vinca.naming import get_package_name_mode
 from vinca.resolve import get_conda_index
 from vinca.utils import add_package_name_variants
 from vinca.v1_selectors import evaluate_selectors
+from vinca.variants import (
+    VariantsMode,
+    convert_v0_variant_selectors,
+    get_variants_mode,
+)
 
 _PATCH_PLATFORMS = ("osx", "linux", "win", "emscripten")
 
@@ -105,6 +110,7 @@ def read_vinca_yaml(filepath: str | Path, target_platform: str) -> dict[str, Any
     config_dir = filepath.parent
     vinca_conf = _load_selected_yaml(filepath, target_platform)
     vinca_conf["package_name_mode"] = get_package_name_mode(vinca_conf).value
+    vinca_conf["variants_mode"] = get_variants_mode(vinca_conf).value
     vinca_conf["conda_index"] = _normalize_conda_indexes(vinca_conf["conda_index"])
 
     patch_dir = Path(vinca_conf["patch_dir"]).absolute()
@@ -132,6 +138,17 @@ def read_vinca_yaml(filepath: str | Path, target_platform: str) -> dict[str, Any
         if additional_info_path.exists()
         else {}
     )
+
+    vinca_conf["_variant_config"] = {}
+    if get_variants_mode(vinca_conf) is VariantsMode.LOCAL:
+        variant_config_path = config_dir / "conda_build_config.yaml"
+        if not variant_config_path.is_file():
+            raise FileNotFoundError(
+                "variants_mode 'local' requires conda_build_config.yaml next to vinca.yaml"
+            )
+        vinca_conf["_variant_config"] = convert_v0_variant_selectors(
+            _load_yaml(variant_config_path) or {}
+        )
 
     snapshot, additional = read_snapshot(vinca_conf)
     vinca_conf["_snapshot"] = snapshot or {}

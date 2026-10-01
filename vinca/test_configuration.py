@@ -1,3 +1,5 @@
+import pytest
+
 from vinca.configuration import read_snapshot, read_vinca_yaml
 
 
@@ -31,6 +33,59 @@ def test_read_vinca_yaml_discovers_companion_files(tmp_path, monkeypatch):
     assert config["_test_folders"]["demo"] == tests / "demo"
     assert config["_pkg_additional_info"]["demo"]["build_number"] == 2
     assert config["depmods"] == {"demo": {}}
+    assert config["variants_mode"] == "global"
+    assert config["_variant_config"] == {}
+
+
+def test_read_vinca_yaml_loads_local_variant_config(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "patches").mkdir()
+    (tmp_path / "vinca.yaml").write_text(
+        "ros_distro: humble\nconda_index: []\npatch_dir: patches\nvariants_mode: local\n"
+    )
+    (tmp_path / "conda_build_config.yaml").write_text(
+        "c_compiler:\n"
+        "  - gcc  # [linux]\n"
+        "  - clang  # [osx]\n"
+        "c_compiler_version:  # [unix]\n"
+        "  - 14  # [linux]\n"
+        "  - 19  # [osx]\n"
+    )
+
+    config = read_vinca_yaml(tmp_path / "vinca.yaml", "linux-64")
+
+    assert config["variants_mode"] == "local"
+    assert config["_variant_config"] == {
+        "c_compiler": [
+            {"if": "linux", "then": "gcc"},
+            {"if": "osx", "then": "clang"},
+        ],
+        "c_compiler_version": [
+            {"if": "(unix) and (linux)", "then": 14},
+            {"if": "(unix) and (osx)", "then": 19},
+        ],
+    }
+
+
+def test_read_vinca_yaml_rejects_invalid_variants_mode(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "vinca.yaml").write_text(
+        "ros_distro: humble\nconda_index: []\npatch_dir: patches\nvariants_mode: other\n"
+    )
+
+    with pytest.raises(ValueError, match="Invalid variants_mode 'other'"):
+        read_vinca_yaml(tmp_path / "vinca.yaml", "linux-64")
+
+
+def test_read_vinca_yaml_requires_config_for_local_pinning(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "patches").mkdir()
+    (tmp_path / "vinca.yaml").write_text(
+        "ros_distro: humble\nconda_index: []\npatch_dir: patches\nvariants_mode: local\n"
+    )
+
+    with pytest.raises(FileNotFoundError, match="requires conda_build_config.yaml"):
+        read_vinca_yaml(tmp_path / "vinca.yaml", "linux-64")
 
 
 def test_read_snapshot_merges_additional_packages(tmp_path):
