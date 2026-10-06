@@ -487,30 +487,23 @@ class Distro(object):
         raw.githubusercontent.com's "503 first byte timeout") are retried with
         exponential backoff before giving up.
         """
-        for attempt in range(1, _FETCH_ATTEMPTS + 1):
+        headers = self._get_auth_headers(url)
+        for attempt in range(1, _FETCH_ATTEMPTS):
             try:
-                response = requests.get(
-                    url, headers=self._get_auth_headers(url), timeout=60
-                )
+                response = requests.get(url, headers=headers, timeout=60)
                 status = getattr(response, "status_code", 200)
-                if status in _RETRY_STATUS and attempt < _FETCH_ATTEMPTS:
-                    raise requests.HTTPError(
-                        f"{response.status_code} for url: {url}", response=response
-                    )
-                response.raise_for_status()
-                return response
-            except (
-                requests.ConnectionError,
-                requests.Timeout,
-                requests.HTTPError,
-            ) as error:
-                status = getattr(getattr(error, "response", None), "status_code", None)
-                retryable = status is None or status in _RETRY_STATUS
-                if not retryable or attempt == _FETCH_ATTEMPTS:
-                    raise
-                delay = 2**attempt
-                print(f"Fetching {url} failed ({error}); retrying in {delay}s")
-                time.sleep(delay)
+                if status not in _RETRY_STATUS:
+                    response.raise_for_status()
+                    return response
+                error = f"{status} for url: {url}"
+            except (requests.ConnectionError, requests.Timeout) as exc:
+                error = exc
+            delay = 2**attempt
+            print(f"Fetching {url} failed ({error}); retrying in {delay}s")
+            time.sleep(delay)
+        response = requests.get(url, headers=headers, timeout=60)
+        response.raise_for_status()
+        return response
 
     def _download_raw_pkg_xml_or_cached(self, url):
         if url in self._additional_xml_cache:
