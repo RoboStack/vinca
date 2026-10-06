@@ -148,6 +148,7 @@ class Distro(object):
         self._last_archive = None
         self._depends_cache = {}
         self._direct_depends_cache = {}
+        self._warned_snapshot_without_dependencies = False
 
         os.environ["ROS_VERSION"] = "1" if self.check_ros1() else "2"
 
@@ -205,14 +206,21 @@ class Distro(object):
         additional_packages_snapshot = self.additional_packages_snapshot or {}
         is_additional_package = pkg in additional_packages_snapshot
         if snapshot_info is not None and not is_additional_package:
-            if "dependencies" not in snapshot_info:
-                raise RuntimeError(
-                    f"Snapshot metadata for '{pkg}' has no dependencies; "
-                    "regenerate the rosdistro snapshot"
+            if "dependencies" in snapshot_info:
+                direct = set(snapshot_info["dependencies"] or [])
+                self._direct_depends_cache[pkg] = set(direct)
+                return direct
+            # Snapshots written before dependencies were recorded: resolve them
+            # from the rosdistro cache, as vinca-snapshot itself does, so such a
+            # snapshot keeps working until it is regenerated.
+            if not getattr(self, "_warned_snapshot_without_dependencies", False):
+                print(
+                    "Warning: the rosdistro snapshot has no dependency metadata "
+                    f"(e.g. for '{pkg}'); resolving dependencies from the rosdistro "
+                    "cache instead. Regenerate the snapshot with vinca-snapshot to "
+                    "pin them."
                 )
-            direct = set(snapshot_info["dependencies"] or [])
-            self._direct_depends_cache[pkg] = set(direct)
-            return direct
+                self._warned_snapshot_without_dependencies = True
 
         # if pkg comes from additional_packages_snapshot, extract from its package.xml
         if is_additional_package:

@@ -154,12 +154,18 @@ def test_snapshot_package_xml_does_not_use_live_cache_after_snapshot_change(
     distro._distro.get_release_package_xml.assert_not_called()
 
 
-def test_snapshot_without_dependencies_requires_regeneration(monkeypatch):
+def test_snapshot_without_dependencies_falls_back_to_rosdistro_cache(
+    monkeypatch, capsys
+):
     distro = make_snapshot_distro(monkeypatch)
     del distro.snapshot["snapshot_package"]["dependencies"]
+    distro._walker = Mock()
+    distro._walker.get_depends.side_effect = lambda pkg, dependency_type, ros_packages_only: (
+        {"cache_dependency"} if dependency_type == "build" else set()
+    )
 
-    with pytest.raises(RuntimeError, match="regenerate the rosdistro snapshot"):
-        distro.get_depends("snapshot_package")
+    assert distro.get_direct_depends("snapshot_package") == {"cache_dependency"}
+    assert "Regenerate the snapshot" in capsys.readouterr().out
 
 
 def test_snapshot_metadata_generates_dependency_required_by_pinned_source(
