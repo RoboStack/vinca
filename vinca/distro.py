@@ -2,6 +2,7 @@ import io
 import os
 import posixpath
 import tarfile
+import time
 import urllib.parse
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -11,6 +12,10 @@ import requests
 from rosdistro import get_cached_distribution, get_index, get_index_url
 from rosdistro.dependency_walker import DependencyWalker
 from rosdistro.manifest_provider import get_release_tag
+
+# Retries for fetching package.xml files (raw.githubusercontent.com is flaky in CI).
+_FETCH_ATTEMPTS = 5
+_RETRY_STATUS = {429, 500, 502, 503, 504}
 
 # Source archive suffixes an additional recipe may point at instead of a git repository.
 # Such a package is fetched by URL (checksummed with sha256) rather than cloned.
@@ -477,10 +482,35 @@ class Distro(object):
         requests also drops the Authorization header when a redirect leaves the original
         host, which matters because an Artifactory server usually redirects a download
         to a presigned URL on a separate storage host.
+
+        Transient failures (connection errors, timeouts, 429 and 5xx responses, e.g.
+        raw.githubusercontent.com's "503 first byte timeout") are retried with
+        exponential backoff before giving up.
         """
-        response = requests.get(url, headers=self._get_auth_headers(url), timeout=60)
-        response.raise_for_status()
-        return response
+        for attempt in range(1, _FETCH_ATTEMPTS + 1):
+            try:
+                response = requests.get(
+                    url, headers=self._get_auth_headers(url), timeout=60
+                )
+                status = getattr(response, "status_code", 200)
+                if status in _RETRY_STATUS and attempt < _FETCH_ATTEMPTS:
+                    raise requests.HTTPError(
+                        f"{response.status_code} for url: {url}", response=response
+                    )
+                response.raise_for_status()
+                return response
+            except (
+                requests.ConnectionError,
+                requests.Timeout,
+                requests.HTTPError,
+            ) as error:
+                status = getattr(getattr(error, "response", None), "status_code", None)
+                retryable = status is None or status in _RETRY_STATUS
+                if not retryable or attempt == _FETCH_ATTEMPTS:
+                    raise
+                delay = 2**attempt
+                print(f"Fetching {url} failed ({error}); retrying in {delay}s")
+                time.sleep(delay)
 
     def _download_raw_pkg_xml_or_cached(self, url):
         if url in self._additional_xml_cache:
