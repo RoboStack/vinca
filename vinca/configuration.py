@@ -104,11 +104,51 @@ def read_snapshot(
     return snapshot, additional
 
 
+def _names(items: Any) -> list[str]:
+    """Package names of a (selector-resolved) package list, as written."""
+    return [str(item) for item in items or [] if item is not None]
+
+
+def _apply_package_exclusions(vinca_conf: dict[str, Any]) -> None:
+    """Translate ``packages_exclude`` / ``packages_skip`` into the classic keys.
+
+    ``packages_exclude``: the package is not built, and is dropped from the host and
+    run dependencies of every other package (``packages_skip_by_deps`` +
+    ``packages_remove_from_deps``).
+
+    ``packages_skip``: the package is not built, but packages that depend on it keep
+    the dependency, e.g. on a build that is already published
+    (``packages_skip_by_deps``).
+
+    Unlike the classic keys, both also remove the package from
+    ``packages_select_by_deps``, so a selection shared by several configurations can
+    be narrowed per platform or distribution. Selectors (``- if: ... then: ...``)
+    have already been resolved for the target platform at this point.
+    """
+    exclude = _names(vinca_conf.get("packages_exclude"))
+    skip = _names(vinca_conf.get("packages_skip"))
+    if not exclude and not skip:
+        return
+    dropped = {name.replace("-", "_") for name in exclude + skip}
+    vinca_conf["packages_select_by_deps"] = [
+        name
+        for name in _names(vinca_conf.get("packages_select_by_deps"))
+        if name.replace("-", "_") not in dropped
+    ]
+    vinca_conf["packages_skip_by_deps"] = list(
+        dict.fromkeys(_names(vinca_conf.get("packages_skip_by_deps")) + exclude + skip)
+    )
+    vinca_conf["packages_remove_from_deps"] = list(
+        dict.fromkeys(_names(vinca_conf.get("packages_remove_from_deps")) + exclude)
+    )
+
+
 def read_vinca_yaml(filepath: str | Path, target_platform: str) -> dict[str, Any]:
     """Read a vinca configuration and populate its derived internal fields."""
     filepath = Path(filepath)
     config_dir = filepath.parent
     vinca_conf = _load_selected_yaml(filepath, target_platform)
+    _apply_package_exclusions(vinca_conf)
     vinca_conf["package_name_mode"] = get_package_name_mode(vinca_conf).value
     vinca_conf["variants_mode"] = get_variants_mode(vinca_conf).value
     vinca_conf["conda_index"] = _normalize_conda_indexes(vinca_conf["conda_index"])

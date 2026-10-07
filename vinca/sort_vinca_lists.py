@@ -30,6 +30,8 @@ LISTS_TO_SORT = {
     "packages_select_by_deps",
     "packages_skip_by_deps",
     "packages_remove_from_deps",
+    "packages_exclude",
+    "packages_skip",
 }
 
 # Regex for a simple list item line: "  - value" with optional inline comment

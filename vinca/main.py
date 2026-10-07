@@ -333,6 +333,14 @@ def generate_fat_source(distro, vinca_conf):
     return build_fat_source(distro, vinca_conf)
 
 
+def conda_index_shadowed_packages(distro, vinca_conf):
+    """ROS packages of the distribution that a conda_index maps to conda packages."""
+    names = set()
+    for index in vinca_conf.get("_conda_indexes") or []:
+        names |= {name for name in index if distro.check_package(name)}
+    return names
+
+
 def get_selected_packages(distro, vinca_conf):
     selected_packages = set()
     skipped_packages = set()
@@ -366,8 +374,17 @@ def get_selected_packages(distro, vinca_conf):
             for i in vinca_conf["packages_skip_by_deps"]:
                 print(f"Calling replace on {i}.")
                 skipped_packages = skipped_packages.union([i, i.replace("-", "_")])
+        # ROS packages whose name a conda_index maps to a conda package (e.g.
+        # tl_expected -> cpp-expected) are not built: dependencies on them resolve to
+        # the conda package, and a ROS build would shadow it under the same name.
+        shadowed = conda_index_shadowed_packages(distro, vinca_conf)
+        if shadowed:
+            print("Mapped to conda packages, not built: ", sorted(shadowed))
+            skipped_packages |= shadowed
         print("Skipped pkgs: ", skipped_packages)
         for i in vinca_conf["packages_select_by_deps"]:
+            if i.replace("-", "_") in shadowed:
+                continue
             i = i.replace("-", "_")
             selected_packages = selected_packages.union([i])
             requested_by_config.add(i)
