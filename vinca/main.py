@@ -51,6 +51,7 @@ from .sources import (
     source_reference,
 )
 from .template import write_recipe, write_recipe_package
+from .v1_selectors import evaluate_distro_selectors
 
 unsatisfied_deps = set()
 distro = None
@@ -490,7 +491,9 @@ def parse_package(pkg, distro, vinca_conf, path):
     if test := vinca_conf.get("_tests", {}).get(final_name):
         # parse as yaml
         text = test.read_text()
-        test_content = ruamel.yaml.safe_load(text)
+        test_content = evaluate_distro_selectors(
+            ruamel.yaml.safe_load(text), ros_distro=config.ros_distro
+        )
         recipe["test"] = test_content
 
     for p in pkg["authors"]:

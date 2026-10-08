@@ -16,6 +16,7 @@ from vinca.utils import (
     get_pkg_additional_info,
     get_pkg_build_number,
 )
+from vinca.v1_selectors import evaluate_distro_selectors
 from vinca.variants import VariantsMode, get_recipe_variants, get_variants_mode
 
 TEMPLATE = """\
@@ -143,7 +144,9 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
             ):
                 print("Using test: ", test)
                 text = test.read_text()
-                test_content = yaml.safe_load(text)
+                test_content = evaluate_distro_selectors(
+                    yaml.safe_load(text), ros_distro=config.ros_distro
+                )
                 meta["tests"] = test_content["tests"]
 
             recipe_dir = (Path("recipes") / package_name).absolute()
