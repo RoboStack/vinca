@@ -41,9 +41,9 @@ packages_exclude:
       - foxglove_bridge
 ```
 
-They are equivalent to the classic `packages_skip_by_deps` (not pulled in as a
-dependency) and `packages_remove_from_deps` (also removed from other packages'
-dependencies), which keep working.
+They replace `packages_skip_by_deps` and `packages_remove_from_deps`: a package that
+was in `packages_remove_from_deps` goes into `packages_exclude`, one that was only in
+`packages_skip_by_deps` into `packages_skip`. vinca rejects the old keys.
 
 A ROS package whose name a `conda_index` maps to a conda package (for example
 `tl_expected` mapped to `cpp-expected`) is not built: dependencies on it resolve to the

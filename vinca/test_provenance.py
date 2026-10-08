@@ -36,7 +36,7 @@ def test_provenance_requested_and_required_by():
     )
     conf: dict[str, Any] = {
         "packages_select_by_deps": ["app", "libA"],
-        "packages_skip_by_deps": None,
+        "packages_skip": None,
     }
 
     selected = m.get_selected_packages(distro, conf)
@@ -59,7 +59,7 @@ def test_provenance_skip_by_deps_excludes_package():
     distro = FakeDistro({"app": {"libA", "skipme"}}, ros1=True)
     conf: dict[str, Any] = {
         "packages_select_by_deps": ["app"],
-        "packages_skip_by_deps": ["skipme"],
+        "packages_skip": ["skipme"],
     }
 
     selected = m.get_selected_packages(distro, conf)
@@ -72,7 +72,7 @@ def test_ros2_workspace_auto_injected_with_reason():
     distro = FakeDistro({"app": set()}, ros1=False)
     conf: dict[str, Any] = {
         "packages_select_by_deps": ["app"],
-        "packages_skip_by_deps": None,
+        "packages_skip": None,
     }
 
     selected = m.get_selected_packages(distro, conf)
@@ -90,7 +90,7 @@ def test_generation_summary_output(monkeypatch, capsys):
     )
     conf: dict[str, Any] = {
         "packages_select_by_deps": ["app", "libA"],
-        "packages_skip_by_deps": None,
+        "packages_skip": None,
     }
     conf["_selected_pkgs"] = m.get_selected_packages(distro, conf)
 

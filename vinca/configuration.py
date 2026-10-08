@@ -110,37 +110,39 @@ def _names(items: Any) -> list[str]:
 
 
 def _apply_package_exclusions(vinca_conf: dict[str, Any]) -> None:
-    """Translate ``packages_exclude`` / ``packages_skip`` into the classic keys.
+    """Normalize ``packages_exclude`` / ``packages_skip``.
 
     ``packages_exclude``: the package is not built, and is dropped from the host and
-    run dependencies of every other package (``packages_skip_by_deps`` +
-    ``packages_remove_from_deps``).
+    run dependencies of every other package.
 
     ``packages_skip``: the package is not built, but packages that depend on it keep
-    the dependency, e.g. on a build that is already published
-    (``packages_skip_by_deps``).
+    the dependency, e.g. on a build that is already published.
 
-    Unlike the classic keys, both also remove the package from
-    ``packages_select_by_deps``, so a selection shared by several configurations can
-    be narrowed per platform or distribution. Selectors (``- if: ... then: ...``)
-    have already been resolved for the target platform at this point.
+    Both also remove the package from ``packages_select_by_deps``. Selectors
+    (``- if: ... then: ...``) have already been resolved for the target platform.
     """
-    exclude = _names(vinca_conf.get("packages_exclude"))
-    skip = _names(vinca_conf.get("packages_skip"))
-    if not exclude and not skip:
-        return
+    legacy = [
+        key
+        for key in ("packages_skip_by_deps", "packages_remove_from_deps")
+        if key in vinca_conf
+    ]
+    if legacy:
+        raise ValueError(
+            f"{' and '.join(legacy)} {'were' if len(legacy) > 1 else 'was'} replaced: list a "
+            "package in packages_exclude if it was in packages_remove_from_deps (not built, "
+            "dropped from other packages' dependencies), or in packages_skip if it was only "
+            "in packages_skip_by_deps (not built, dependents keep the dependency)"
+        )
+    exclude = list(dict.fromkeys(_names(vinca_conf.get("packages_exclude"))))
+    skip = list(dict.fromkeys(_names(vinca_conf.get("packages_skip"))))
+    vinca_conf["packages_exclude"] = exclude
+    vinca_conf["packages_skip"] = skip
     dropped = {name.replace("-", "_") for name in exclude + skip}
     vinca_conf["packages_select_by_deps"] = [
         name
         for name in _names(vinca_conf.get("packages_select_by_deps"))
         if name.replace("-", "_") not in dropped
     ]
-    vinca_conf["packages_skip_by_deps"] = list(
-        dict.fromkeys(_names(vinca_conf.get("packages_skip_by_deps")) + exclude + skip)
-    )
-    vinca_conf["packages_remove_from_deps"] = list(
-        dict.fromkeys(_names(vinca_conf.get("packages_remove_from_deps")) + exclude)
-    )
 
 
 def read_vinca_yaml(filepath: str | Path, target_platform: str) -> dict[str, Any]:

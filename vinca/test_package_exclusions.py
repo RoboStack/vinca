@@ -2,8 +2,11 @@
 
 from typing import Any
 
+import pytest
+
 import vinca.main as m
 from vinca.configuration import read_vinca_yaml
+from vinca.resolve import should_skip_pkg
 
 
 class FakeDistro:
@@ -39,8 +42,6 @@ packages_select_by_deps:
   - tool
   - viewer
   - helper
-packages_skip_by_deps:
-  - legacy
 packages_exclude:
   - tool
   - if: win
@@ -51,26 +52,32 @@ packages_skip:
 """
 
 
-def test_exclude_and_skip_translate_to_classic_keys(tmp_path, monkeypatch):
+def test_exclude_and_skip_drop_selected_packages(tmp_path, monkeypatch):
     conf = _config(tmp_path, monkeypatch, BODY)
 
     assert conf["packages_select_by_deps"] == ["app", "viewer"]
-    assert conf["packages_skip_by_deps"] == ["legacy", "tool", "helper"]
-    assert conf["packages_remove_from_deps"] == ["tool"]
+    assert conf["packages_exclude"] == ["tool"]
+    assert conf["packages_skip"] == ["helper"]
 
 
 def test_exclude_under_selector_applies_on_that_platform_only(tmp_path, monkeypatch):
     conf = _config(tmp_path, monkeypatch, BODY, platform="win-64")
 
     assert conf["packages_select_by_deps"] == ["app"]
-    assert conf["packages_remove_from_deps"] == ["tool", "viewer"]
+    assert conf["packages_exclude"] == ["tool", "viewer"]
 
 
-def test_config_without_new_keys_is_unchanged(tmp_path, monkeypatch):
-    conf = _config(tmp_path, monkeypatch, "packages_select_by_deps:\n  - app\n")
+def test_excluded_packages_are_dropped_from_dependencies(tmp_path, monkeypatch):
+    conf = _config(tmp_path, monkeypatch, BODY)
 
-    assert conf["packages_select_by_deps"] == ["app"]
-    assert "packages_remove_from_deps" not in conf
+    assert should_skip_pkg("tool", conf)
+    assert not should_skip_pkg("helper", conf)  # skipped, but dependents keep it
+
+
+@pytest.mark.parametrize("key", ["packages_skip_by_deps", "packages_remove_from_deps"])
+def test_replaced_keys_are_rejected(tmp_path, monkeypatch, key):
+    with pytest.raises(ValueError, match="packages_exclude"):
+        _config(tmp_path, monkeypatch, f"{key}:\n  - app\n")
 
 
 def test_conda_index_shadowed_ros_packages_are_not_built():
@@ -80,7 +87,7 @@ def test_conda_index_shadowed_ros_packages_are_not_built():
     )
     conf: dict[str, Any] = {
         "packages_select_by_deps": ["app", "tl_expected"],
-        "packages_skip_by_deps": None,
+        "packages_skip": None,
         "_conda_indexes": [
             {"tl_expected": {"robostack": ["cpp-expected"]}, "eigen": {}}
         ],

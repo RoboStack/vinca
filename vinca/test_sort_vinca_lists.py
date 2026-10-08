@@ -127,7 +127,7 @@ def test_duplicate_condition_in_same_list_raises(tmp_path):
 def test_duplicate_condition_scoped_per_list_key(tmp_path):
     # The same condition appearing once in each of two different list keys
     # is fine -- duplication is only a problem within a single list key.
-    content = """packages_skip_by_deps:
+    content = """packages_skip:
   - if: win
     then:
       - alpha
