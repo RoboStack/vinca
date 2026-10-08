@@ -66,7 +66,7 @@ def write_recipe_package(recipe):
 
     os.makedirs(recipe["package"]["name"], exist_ok=True)
     recipe_path = os.path.join(recipe["package"]["name"], "recipe.yaml")
-    with open(recipe_path, "w") as stream:
+    with open(recipe_path, "w", encoding="utf-8") as stream:
         file.dump(recipe, stream)
 
 
@@ -99,7 +99,7 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
         del meta["package"]
         meta["build"]["number"] = vinca_conf.get("build_number", 0)
         meta["build"]["post_process"] = post_process_items
-        with open("recipe.yaml", "w") as stream:
+        with open("recipe.yaml", "w", encoding="utf-8") as stream:
             file.dump(meta, stream)
     else:
         for o in outputs:
@@ -163,12 +163,14 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
                             shutil.rmtree(dest_dir)
                         shutil.copytree(item, dest_dir)
 
-            with open(recipe_dir / "recipe.yaml", "w") as stream:
+            with open(recipe_dir / "recipe.yaml", "w", encoding="utf-8") as stream:
                 file.dump(meta, stream)
 
             if get_variants_mode(vinca_conf) is VariantsMode.LOCAL:
                 variants = get_recipe_variants(meta, package_shortname, vinca_conf)
-                with open(recipe_dir / "variants.yaml", "w") as stream:
+                with open(
+                    recipe_dir / "variants.yaml", "w", encoding="utf-8"
+                ) as stream:
                     file.dump(variants, stream)
 
             if meta.get("source") and meta["source"].get("patches"):
@@ -236,7 +238,7 @@ def generate_template(template_in, template_out, extra_globals=None):
         output=template_out, options={em.RAW_OPT: True, em.BUFFERED_OPT: True}
     )
     interpreter.updateGlobals(g)
-    interpreter.file(open(template_in))
+    interpreter.file(open(template_in, encoding="utf-8"))
     interpreter.shutdown()
 
     # It seems that rattler-build requires script to have executable permissions
@@ -274,7 +276,7 @@ def generate_build_script_for_recipe(
 
     if script_name in script_templates:
         template_in = resources.files("vinca") / script_templates[script_name]
-        with open(output_path, "w") as output_file:
+        with open(output_path, "w", encoding="utf-8") as output_file:
             extra_globals = {}
             extra_globals["ros_package_prefix"] = ros_package_prefix
             if additional_cmake_args:
@@ -313,7 +315,7 @@ def generate_activation_scripts_for_recipe(recipe_dir):
     for script_name, template_path in activation_templates.items():
         template_in = resources.files("vinca") / template_path
         output_path = recipe_dir / script_name
-        with open(output_path, "w") as output_file:
+        with open(output_path, "w", encoding="utf-8") as output_file:
             generate_template(
                 template_in, output_file
             )  # No extra globals needed for activation scripts

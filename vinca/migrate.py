@@ -43,7 +43,7 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     url = "https://conda.anaconda.org/robostack/"
 
     yaml = ruamel.yaml.YAML()
-    with open("vinca.yaml", "r") as fi:
+    with open("vinca.yaml", encoding="utf-8") as fi:
         vinca_conf = yaml.load(fi)
 
     global distro_version, ros_prefix
@@ -128,7 +128,7 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     vinca_conf["is_migration"] = True
     vinca_conf["skip_existing"] = []
 
-    with open("vinca.yaml", "w") as fo:
+    with open("vinca.yaml", "w", encoding="utf-8") as fo:
         yaml.dump(vinca_conf, fo)
 
     if os.path.exists("recipes"):
@@ -211,7 +211,7 @@ def main():
     args = parse_command_line(sys.argv)
 
     mfile = os.path.join(args.dir + "/migration.yaml")
-    with open(mfile, "r") as fi:
+    with open(mfile, encoding="utf-8") as fi:
         migration = yaml.safe_load(fi)
         print(migration)
         create_migration_instructions(

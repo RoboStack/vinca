@@ -100,14 +100,14 @@ def add_additional_recipes(args):
     if not os.path.exists(additional_recipes_path):
         return []
 
-    with open("vinca.yaml", "r") as vinca_yaml:
+    with open("vinca.yaml", encoding="utf-8") as vinca_yaml:
         vinca_conf = yaml.safe_load(vinca_yaml)
 
     repodatas = get_skip_existing(vinca_conf, args.platform)
 
     additional_recipes = []
     for recipe_path in glob.glob(additional_recipes_path + "/**/recipe.yaml"):
-        with open(recipe_path) as recipe:
+        with open(recipe_path, encoding="utf-8") as recipe:
             additional_recipe = yaml.safe_load(recipe)
 
         name, version, bnumber = (
@@ -152,7 +152,7 @@ MAX_WORKFLOW_SIZE_BYTES = 500 * 1024
 def dump_for_gha(doc, f):
     s = yaml.dump(doc, sort_keys=False, Dumper=NoAliasDumper)
     s = s.replace("'on':", "on:")
-    with open(f, "w") as fo:
+    with open(f, "w", encoding="utf-8") as fo:
         fo.write(s)
 
     workflow_size = os.path.getsize(f)
@@ -352,7 +352,7 @@ def build_win_pipeline(
             f"{WINDOWS_BUILD_SCRIPT} not found in {os.getcwd()}: the Windows workflow "
             "runs the repository's build script, run vinca-gha where it exists"
         )
-    with open(WINDOWS_BUILD_SCRIPT, "r") as fi:
+    with open(WINDOWS_BUILD_SCRIPT, encoding="utf-8") as fi:
         script = lu(fi.read())
 
     prev_batch_keys = []
@@ -468,7 +468,7 @@ def main():
 
     all_recipes = glob.glob(os.path.join(args.dir, "**", "*.yaml"))
     for f in all_recipes:
-        with open(f) as fi:
+        with open(f, encoding="utf-8") as fi:
             metas.append(yaml.safe_load(fi.read()))
 
     platform = args.platform
@@ -546,7 +546,7 @@ def main():
     stages = batch_stages(filtered_stages, args.batch_size)
     print(stages)
 
-    with open("buildorder.txt", "w") as fo:
+    with open("buildorder.txt", "w", encoding="utf-8") as fo:
         order = []
         for stage in filtered_stages:
             for el in stage:

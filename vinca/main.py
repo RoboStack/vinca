@@ -690,7 +690,7 @@ def main():
             for add_rec in glob.glob(
                 os.path.join(base_dir, "additional_recipes", "**", "recipe.yaml")
             ):
-                with open(add_rec) as fi:
+                with open(add_rec, encoding="utf-8") as fi:
                     add_rec_y = yaml.load(fi)
                 if arguments.platform == "emscripten-wasm32":
                     additional_recipe_names.add(add_rec_y["package"]["name"])
