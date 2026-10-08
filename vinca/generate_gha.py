@@ -192,6 +192,17 @@ def normalize_version(version: str) -> str:
     return version
 
 
+# pixi clones git dependencies (e.g. vinca) into its cache, which setup-pixi saves.
+# git's background auto-maintenance can leave a lock file in such a clone ("hardlink
+# different from source at .../commit-graph-chain.lock"), which then breaks every
+# later run restoring that cache. This step runs before Setup pixi, so it also covers
+# the build script.
+DISABLE_GIT_MAINTENANCE_STEP: dict[str, Any] = {
+    "name": "Disable git auto-maintenance",
+    "run": "git config --global maintenance.auto false && git config --global gc.auto 0",
+}
+
+
 def get_setup_pixi_step(
     setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
     pixi_version: str = DEFAULT_PIXI_VERSION,
@@ -247,6 +258,7 @@ def build_unix_pipeline(
                     "name": "Checkout code",
                     "uses": "actions/checkout@v7",
                 },
+                DISABLE_GIT_MAINTENANCE_STEP,
                 get_setup_pixi_step(setup_pixi_version, pixi_version),
                 {
                     "name": f"Build {' '.join([pkg for pkg in batch])}",
@@ -371,6 +383,7 @@ def build_win_pipeline(
 
             steps = [
                 {"name": "Checkout code", "uses": "actions/checkout@v7"},
+                DISABLE_GIT_MAINTENANCE_STEP,
                 get_setup_pixi_step(setup_pixi_version, pixi_version),
                 {
                     "uses": "egor-tensin/cleanup-path@v5",
