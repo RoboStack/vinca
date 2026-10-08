@@ -5,6 +5,7 @@ import pytest
 from vinca import config
 from vinca.generate_gha import (
     build_unix_pipeline,
+    build_win_pipeline,
     get_setup_pixi_step,
     get_stage_name,
 )
@@ -94,3 +95,25 @@ def test_pixi_version_can_be_configured(configured_version, expected_version):
 def test_setup_pixi_versions_must_not_be_empty():
     with pytest.raises(ValueError, match="must not be empty"):
         get_setup_pixi_step(setup_pixi_version="  ")
+
+
+def test_win_pipeline_inlines_the_repository_build_script(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".scripts").mkdir()
+    (tmp_path / ".scripts" / "build_win.bat").write_text("echo repository script\n")
+    outfile = tmp_path / "win.yml"
+
+    build_win_pipeline([[["ros2-rclcpp"]]], "buildbranch_win", outfile=outfile)
+
+    workflow = pytest.importorskip("yaml").safe_load(outfile.read_text())
+    steps = workflow["jobs"]["stage_0_job_0"]["steps"]
+    assert "echo repository script" in steps[-1]["run"]
+
+
+def test_win_pipeline_requires_the_repository_build_script(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(FileNotFoundError, match="build_win.bat"):
+        build_win_pipeline(
+            [[["ros2-rclcpp"]]], "buildbranch_win", outfile=tmp_path / "win.yml"
+        )

@@ -38,8 +38,8 @@ def read_ci_script(fn):
 
 
 unix_build_script = lu(read_ci_script("unix.sh"))
+WINDOWS_BUILD_SCRIPT = ".scripts/build_win.bat"
 windows_preconfig_script = lu(read_ci_script("windows_preconfig.bat"))
-windows_build_script = lu(read_ci_script("windows_build.bat"))
 
 
 def parse_command_line(argv):
@@ -346,12 +346,14 @@ def build_win_pipeline(
     if workflow is None:
         workflow = blurb
 
-    script = windows_build_script
-
-    # overwrite with what we're finding in the repo!
-    if os.path.exists(".scripts/build_win.bat"):
-        with open(".scripts/build_win.bat", "r") as fi:
-            script = lu(fi.read())
+    # The build script is the repository's own; it is inlined into the workflow.
+    if not os.path.exists(WINDOWS_BUILD_SCRIPT):
+        raise FileNotFoundError(
+            f"{WINDOWS_BUILD_SCRIPT} not found in {os.getcwd()}: the Windows workflow "
+            "runs the repository's build script, run vinca-gha where it exists"
+        )
+    with open(WINDOWS_BUILD_SCRIPT, "r") as fi:
+        script = lu(fi.read())
 
     prev_batch_keys = []
     for i, s in enumerate(stages):
