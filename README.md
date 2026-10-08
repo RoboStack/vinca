@@ -50,6 +50,37 @@ A ROS package whose name a `conda_index` maps to a conda package (for example
 `tl_expected` mapped to `cpp-expected`) is not built: dependencies on it resolve to the
 conda package, and a ROS build would shadow that package under the same name.
 
+## Sharing configuration between distributions
+
+A `vinca.yaml` can build on another one with `extends: <path>` (relative to the file),
+for example one configuration per ROS distribution on top of a shared one:
+
+```yaml
+# distros/jazzy/vinca.yaml
+extends: ../../shared/vinca.yaml
+ros_distro: jazzy
+mutex_package:
+  version: 0.19.0
+  run_constraints:
+    - libprotobuf 7.35.*   # replaces the shared libprotobuf constraint
+packages_exclude:
+  - if: win
+    then: [some_package]
+```
+
+- `packages_select_by_deps`, `packages_exclude` and `packages_skip` are combined (the
+  base's entries first).
+- `mutex_package` is merged: the extending file's keys win, and its `run_constraints`
+  replace the base's constraint on the same package and add the others.
+- Any other key of the extending file replaces the base's.
+- Files next to each configuration are combined too, relative to that
+  configuration's directory: `pkg_additional_info.yaml` and `<patch_dir>/dependencies.yaml`
+  per package (the extending file's keys win), patches and `tests/` per package (the
+  extending file's file wins), and `conda_index` files (the extending file's mappings
+  are looked up first).
+
+A base configuration can itself extend another one.
+
 ## Package naming
 
 The optional `package_name_mode` setting controls the transition from legacy distro-qualified names such as `ros-humble-rclcpp` to ROS-major-version names such as `ros2-rclcpp`:
