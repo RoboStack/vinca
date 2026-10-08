@@ -43,7 +43,8 @@ packages_exclude:
 
 They replace `packages_skip_by_deps` and `packages_remove_from_deps`: a package that
 was in `packages_remove_from_deps` goes into `packages_exclude`, one that was only in
-`packages_skip_by_deps` into `packages_skip`. vinca rejects the old keys.
+`packages_skip_by_deps` into `packages_skip`. The old keys still work as before, with a
+deprecation warning.
 
 A ROS package whose name a `conda_index` maps to a conda package (for example
 `tl_expected` mapped to `cpp-expected`) is not built: dependencies on it resolve to the

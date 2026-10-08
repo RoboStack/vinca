@@ -12,6 +12,7 @@ keys are internal to vinca and are never read from the user's file.
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -121,22 +122,26 @@ def _apply_package_exclusions(vinca_conf: dict[str, Any]) -> None:
     Both also remove the package from ``packages_select_by_deps``. Selectors
     (``- if: ... then: ...``) have already been resolved for the target platform.
     """
-    legacy = [
-        key
-        for key in ("packages_skip_by_deps", "packages_remove_from_deps")
-        if key in vinca_conf
-    ]
-    if legacy:
-        raise ValueError(
-            f"{' and '.join(legacy)} {'were' if len(legacy) > 1 else 'was'} replaced: list a "
-            "package in packages_exclude if it was in packages_remove_from_deps (not built, "
-            "dropped from other packages' dependencies), or in packages_skip if it was only "
-            "in packages_skip_by_deps (not built, dependents keep the dependency)"
-        )
     exclude = list(dict.fromkeys(_names(vinca_conf.get("packages_exclude"))))
     skip = list(dict.fromkeys(_names(vinca_conf.get("packages_skip"))))
+    # The keys these replace still work as before, so that existing configurations
+    # keep working with a newer vinca.
+    legacy_skip = _names(vinca_conf.pop("packages_skip_by_deps", None))
+    legacy_remove = _names(vinca_conf.pop("packages_remove_from_deps", None))
+    if legacy_skip or legacy_remove:
+        warnings.warn(
+            "packages_skip_by_deps and packages_remove_from_deps are deprecated: list a "
+            "package in packages_exclude if it was in packages_remove_from_deps (not "
+            "built, dropped from other packages' dependencies), or in packages_skip if it "
+            "was only in packages_skip_by_deps (not built, dependents keep the dependency)",
+            FutureWarning,
+            stacklevel=2,
+        )
     vinca_conf["packages_exclude"] = exclude
     vinca_conf["packages_skip"] = skip
+    # what the dependency traversal ignores, and what is dropped from dependencies
+    vinca_conf["_skip_by_deps"] = list(dict.fromkeys(exclude + skip + legacy_skip))
+    vinca_conf["_remove_from_deps"] = list(dict.fromkeys(exclude + legacy_remove))
     dropped = {name.replace("-", "_") for name in exclude + skip}
     vinca_conf["packages_select_by_deps"] = [
         name

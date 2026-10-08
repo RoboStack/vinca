@@ -55,7 +55,7 @@ def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
 
 
 def should_skip_pkg(pkg_shortname, vinca_conf):
-    skip = vinca_conf.get("packages_exclude", [])
+    skip = vinca_conf.get("_remove_from_deps", vinca_conf.get("packages_exclude"))
     if not skip:
         return False
 

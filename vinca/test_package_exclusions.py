@@ -74,10 +74,28 @@ def test_excluded_packages_are_dropped_from_dependencies(tmp_path, monkeypatch):
     assert not should_skip_pkg("helper", conf)  # skipped, but dependents keep it
 
 
-@pytest.mark.parametrize("key", ["packages_skip_by_deps", "packages_remove_from_deps"])
-def test_replaced_keys_are_rejected(tmp_path, monkeypatch, key):
-    with pytest.raises(ValueError, match="packages_exclude"):
-        _config(tmp_path, monkeypatch, f"{key}:\n  - app\n")
+def test_replaced_keys_still_work_with_a_warning(tmp_path, monkeypatch):
+    body = """\
+packages_select_by_deps:
+  - app
+  - tool
+packages_skip_by_deps:
+  - tool
+  - helper
+packages_remove_from_deps:
+  - tool
+  - removed
+"""
+    with pytest.warns(FutureWarning, match="packages_exclude"):
+        conf = _config(tmp_path, monkeypatch, body)
+
+    # as before: the lists don't change the selection, only traversal and dependencies
+    assert conf["packages_select_by_deps"] == ["app", "tool"]
+    assert conf["_skip_by_deps"] == ["tool", "helper"]
+    assert should_skip_pkg("tool", conf)
+    assert should_skip_pkg("removed", conf)
+    assert not should_skip_pkg("helper", conf)
+    assert "packages_skip_by_deps" not in conf
 
 
 def test_conda_index_shadowed_ros_packages_are_not_built():

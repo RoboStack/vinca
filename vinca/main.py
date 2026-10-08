@@ -367,9 +367,12 @@ def get_selected_packages(distro, vinca_conf):
             selected_packages = selected_packages.union(additional_packages)
             requested_by_config |= additional_packages
     elif vinca_conf["packages_select_by_deps"]:
-        for i in (vinca_conf.get("packages_exclude") or []) + (
-            vinca_conf.get("packages_skip") or []
-        ):
+        skip_by_deps = vinca_conf.get("_skip_by_deps")
+        if skip_by_deps is None:  # configuration not read with read_vinca_yaml
+            skip_by_deps = (vinca_conf.get("packages_exclude") or []) + (
+                vinca_conf.get("packages_skip") or []
+            )
+        for i in skip_by_deps:
             skipped_packages = skipped_packages.union([i, i.replace("-", "_")])
         # ROS packages whose name a conda_index maps to a conda package (e.g.
         # tl_expected -> cpp-expected) are not built: dependencies on them resolve to
