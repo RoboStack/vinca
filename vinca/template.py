@@ -143,7 +143,7 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
                 test := vinca_conf["_tests"].get(package_name)
             ):
                 print("Using test: ", test)
-                text = test.read_text()
+                text = test.read_text(encoding="utf-8")
                 test_content = evaluate_distro_selectors(
                     yaml.safe_load(text), ros_distro=config.ros_distro
                 )

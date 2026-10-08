@@ -490,7 +490,7 @@ def parse_package(pkg, distro, vinca_conf, path):
 
     if test := vinca_conf.get("_tests", {}).get(final_name):
         # parse as yaml
-        text = test.read_text()
+        text = test.read_text(encoding="utf-8")
         test_content = evaluate_distro_selectors(
             ruamel.yaml.safe_load(text), ros_distro=config.ros_distro
         )
