@@ -83,6 +83,24 @@ A base configuration can itself extend another one. Paths (`patch_dir`,
 `rosdistro_snapshot`, `rosdistro_additional_recipes`, `conda_index` files) are relative
 to the file that sets them.
 
+## Package tests
+
+`tests/<package>.yaml` (next to `vinca.yaml`, or next to a configuration it extends)
+becomes the `tests` section of the package's recipe. Selectors that test `ros_distro`
+are resolved by vinca, so one test file can serve several distributions; all other
+selectors are left to rattler-build:
+
+```yaml
+tests:
+  - script:
+      - if: ros_distro in ["humble", "jazzy"]
+        then:
+          - if: osx
+            then: export ROS_LOCALHOST_ONLY=1 && launch_test smoke_test.py
+        else:
+          - launch_test smoke_test.py
+```
+
 ## Package naming
 
 The optional `package_name_mode` setting controls the transition from legacy distro-qualified names such as `ros-humble-rclcpp` to ROS-major-version names such as `ros2-rclcpp`:

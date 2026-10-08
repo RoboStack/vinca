@@ -168,3 +168,44 @@ def evaluate_selectors(
     ctx = _platform_flags(target_platform)
 
     return _process_node(copy.deepcopy(data), ctx)
+
+
+def _process_distro_node(node: Any, ctx: Mapping[str, Any]) -> Any | None:
+    """Like _process_node, but only for selectors that mention ``ros_distro``;
+    other selectors (e.g. platform ones) are left for rattler-build."""
+    if (
+        isinstance(node, Mapping)
+        and "if" in node
+        and "then" in node
+        and "ros_distro" in str(node["if"])
+    ):
+        branch = "then" if _eval_condition(str(node["if"]), ctx) else "else"
+        if branch in node:
+            return _process_distro_node(node[branch], ctx)
+        return None
+    if isinstance(node, MutableMapping):
+        mapping_out: dict[str, Any] = {}
+        for k, v in node.items():
+            new = _process_distro_node(v, ctx)
+            if new is not None:
+                mapping_out[k] = new
+        return mapping_out
+    if isinstance(node, Sequence) and not isinstance(node, (str, bytes)):
+        sequence_out: list[Any] = []
+        for item in node:
+            new = _process_distro_node(item, ctx)
+            if new is None:
+                continue
+            if isinstance(new, list):
+                sequence_out.extend(new)
+            else:
+                sequence_out.append(new)
+        return sequence_out
+    return node
+
+
+def evaluate_distro_selectors(data: Any, *, ros_distro: str | None) -> Any:
+    """Return *data* with the selectors that test ``ros_distro`` evaluated, e.g.
+    ``- if: ros_distro in ["humble", "jazzy"]``, so one test file can serve several
+    distributions. Selectors without ``ros_distro`` are kept unchanged."""
+    return _process_distro_node(copy.deepcopy(data), {"ros_distro": ros_distro})
