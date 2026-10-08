@@ -151,6 +151,9 @@ def _apply_package_exclusions(vinca_conf: dict[str, Any]) -> None:
     ]
 
 
+# paths in a configuration, relative to the file that sets them
+_PATH_KEYS = ("patch_dir", "rosdistro_snapshot", "rosdistro_additional_recipes")
+
 # package lists that a configuration adds to the ones of the configuration it extends
 _LAYERED_LISTS = ("packages_select_by_deps", "packages_exclude", "packages_skip")
 
@@ -206,6 +209,9 @@ def _load_layers(
         chain = " -> ".join(str(p) for p in (*seen, filepath))
         raise ValueError(f"vinca.yaml extends itself: {chain}")
     conf = _load_selected_yaml(filepath, target_platform) or {}
+    for key in _PATH_KEYS:
+        if conf.get(key):
+            conf[key] = str((filepath.parent / conf[key]).resolve())
     base = conf.pop("extends", None)
     layers = (
         _load_layers(filepath.parent / base, target_platform, (*seen, filepath))
@@ -227,10 +233,8 @@ def read_vinca_yaml(filepath: str | Path, target_platform: str) -> dict[str, Any
     vinca_conf["package_name_mode"] = get_package_name_mode(vinca_conf).value
     vinca_conf["variants_mode"] = get_variants_mode(vinca_conf).value
 
-    # Files next to each layer: patches and dependencies.yaml (patch_dir), tests,
-    # pkg_additional_info.yaml and conda_index files. Paths of a base configuration
-    # are relative to its own file; the extending configuration (the root) keeps
-    # resolving patch_dir against the working directory, as without extends.
+    # Files of each layer: patches and dependencies.yaml (patch_dir), tests,
+    # pkg_additional_info.yaml and conda_index files, relative to that layer's file.
     patches: dict[str, Any] = {}
     tests: dict[str, Path] = {}
     test_folders: dict[str, Path] = {}
@@ -239,13 +243,8 @@ def read_vinca_yaml(filepath: str | Path, target_platform: str) -> dict[str, Any
     conda_indexes: list[Any] = []
     patch_dir: Path | None = None
     for layer_dir, layer in layers:
-        is_root = layer_dir == config_dir.resolve()
         if layer.get("patch_dir"):
-            layer_patch_dir = (
-                Path(layer["patch_dir"]).absolute()
-                if is_root
-                else (layer_dir / layer["patch_dir"]).resolve()
-            )
+            layer_patch_dir = Path(layer["patch_dir"])
             patches.update(_discover_patches(layer_patch_dir, vinca_conf["ros_distro"]))
             dependencies_path = layer_patch_dir / "dependencies.yaml"
             if dependencies_path.exists():
@@ -266,14 +265,10 @@ def read_vinca_yaml(filepath: str | Path, target_platform: str) -> dict[str, Any
                 _load_selected_yaml(additional_info_path, target_platform) or {},
             )
         if layer.get("conda_index"):
-            layer_indexes = (
-                _normalize_conda_indexes(layer["conda_index"])
-                if is_root
-                else [
-                    str(layer_dir / i) if (layer_dir / i).is_file() else i
-                    for i in layer["conda_index"]
-                ]
-            )
+            layer_indexes = [
+                str(layer_dir / i) if (layer_dir / i).is_file() else i
+                for i in layer["conda_index"]
+            ]
             # the extending configuration's mappings are looked up first
             conda_indexes = (
                 get_conda_index({"conda_index": layer_indexes}, str(layer_dir))

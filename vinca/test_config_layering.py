@@ -141,3 +141,21 @@ def test_extends_cycle_is_rejected(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError, match="extends itself"):
         read_vinca_yaml(tmp_path / "a.yaml", "linux-64")
+
+
+def test_paths_are_relative_to_the_file_that_sets_them(layered, tmp_path, monkeypatch):
+    shared, distro = layered
+    _write(distro / "rosdistro_snapshot.yaml", "demo:\n  version: 1.0.0\n")
+    text = (distro / "vinca.yaml").read_text()
+    (distro / "vinca.yaml").write_text(
+        text + "rosdistro_snapshot: rosdistro_snapshot.yaml\n"
+    )
+    monkeypatch.chdir(tmp_path)  # not the configuration's directory
+
+    conf = read_vinca_yaml(distro / "vinca.yaml", "linux-64")
+
+    assert conf["_snapshot"]["demo"]["version"] == "1.0.0"
+    assert conf["_patch_dir"] == distro / "patch"
+    assert conf["_patches"]["ros2-demo"]["any"] == [
+        str(distro / "patch" / "ros2-demo.patch")
+    ]

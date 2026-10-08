@@ -79,7 +79,9 @@ packages_exclude:
   extending file's file wins), and `conda_index` files (the extending file's mappings
   are looked up first).
 
-A base configuration can itself extend another one.
+A base configuration can itself extend another one. Paths (`patch_dir`,
+`rosdistro_snapshot`, `rosdistro_additional_recipes`, `conda_index` files) are relative
+to the file that sets them.
 
 ## Package naming
 
