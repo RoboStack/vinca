@@ -131,8 +131,12 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
                 o, distro, vinca_conf
             )
 
+            # an output's own build number (e.g. mutex_package.build_number) wins
+            # over the distribution's; pkg_additional_info.yaml overrides both
             meta["build"]["number"] = get_pkg_build_number(
-                vinca_conf.get("build_number", 0), package_name, vinca_conf
+                o.get("build", {}).get("number", vinca_conf.get("build_number", 0)),
+                package_name,
+                vinca_conf,
             )
             meta["build"]["post_process"] = post_process_items
 
