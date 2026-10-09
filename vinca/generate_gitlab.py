@@ -40,7 +40,7 @@ def main():
 
     for f in glob.glob(os.path.join(sys.argv[1], "*.yaml")):
         print(f)
-        with open(f) as fi:
+        with open(f, encoding="utf-8") as fi:
             metas.append(yaml.load(fi.read(), Loader=Loader))
 
     requirements = {}
@@ -102,5 +102,5 @@ def main():
 
     gitlab_template["stages"] = stage_names
 
-    with open(".gitlab-ci.yml", "w") as fo:
+    with open(".gitlab-ci.yml", "w", encoding="utf-8") as fo:
         fo.write(yaml.dump(gitlab_template, Dumper=Dumper))

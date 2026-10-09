@@ -49,7 +49,7 @@ def get_repodata(url_or_path, platform=None):
         if not os.path.exists(url_or_path):
             print(f"No repodata found at {url_or_path}, assuming no existing packages")
             return {"packages": {}, "packages.conda": {}}
-        with open(url_or_path) as fi:
+        with open(url_or_path, encoding="utf-8") as fi:
             return json.load(fi)
     print("Downloading repodata from ", url_or_path)
 
@@ -63,7 +63,7 @@ def get_repodata(url_or_path, platform=None):
         max_age = 100_000  # seconds == 27 hours
         if age < max_age:
             try:
-                with open(fn) as fi:
+                with open(fn, encoding="utf-8") as fi:
                     return json.load(fi)
             except json.JSONDecodeError:
                 print(f"Ignoring invalid cached repodata at {fn}")
@@ -86,7 +86,7 @@ def get_repodata(url_or_path, platform=None):
         )
         return {"packages": {}, "packages.conda": {}}
 
-    with open(fn, "w") as fcache:
+    with open(fn, "w", encoding="utf-8") as fcache:
         fcache.write(content.decode("utf-8"))
     return parsed_repodata
 
