@@ -51,7 +51,10 @@ def test_unix_pipeline_sets_up_pixi(tmp_path):
     )
 
     workflow = pytest.importorskip("yaml").safe_load(outfile.read_text())
-    setup_step = workflow["jobs"]["stage_0_job_0"]["steps"][1]
+    steps = workflow["jobs"]["stage_0_job_0"]["steps"]
+    assert steps[1]["name"] == "Disable git auto-maintenance"
+    assert "maintenance.auto false" in steps[1]["run"]
+    setup_step = steps[2]
     assert setup_step == {
         "name": "Setup pixi",
         "uses": "prefix-dev/setup-pixi@v0",
