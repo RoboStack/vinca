@@ -18,6 +18,38 @@ For an up-to-date example of how to write a `vinca.yaml`, check the repos of the
 * https://github.com/RoboStack/ros-humble
 * https://github.com/RoboStack/ros-jazzy/
 
+## Selecting and excluding packages
+
+`packages_select_by_deps` lists the packages to build; their dependencies are added
+automatically. Two keys exclude packages again, as plain names or under a selector
+(`- if: win` / `then: [...]`), and both also take them out of
+`packages_select_by_deps`, so one selection can be narrowed per platform or per
+configuration:
+
+* `packages_exclude`: not built, and dropped from the dependencies of every other
+  package. Use it for a package that doesn't build on a platform and isn't needed.
+* `packages_skip`: not built, but packages that depend on it keep the dependency, for
+  example on a build that is already published.
+
+```yaml
+packages_select_by_deps:
+  - desktop
+  - foxglove_bridge
+packages_exclude:
+  - if: win
+    then:
+      - foxglove_bridge
+```
+
+They replace `packages_skip_by_deps` and `packages_remove_from_deps`: a package that
+was in `packages_remove_from_deps` goes into `packages_exclude`, one that was only in
+`packages_skip_by_deps` into `packages_skip`. The old keys still work as before, with a
+deprecation warning.
+
+A ROS package whose name a `conda_index` maps to a conda package (for example
+`tl_expected` mapped to `cpp-expected`) is not built: dependencies on it resolve to the
+conda package, and a ROS build would shadow that package under the same name.
+
 ## Package naming
 
 The optional `package_name_mode` setting controls the transition from legacy distro-qualified names such as `ros-humble-rclcpp` to ROS-major-version names such as `ros2-rclcpp`:
