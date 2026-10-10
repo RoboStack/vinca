@@ -100,9 +100,7 @@ def add_additional_recipes(args):
     if not os.path.exists(additional_recipes_path):
         return []
 
-    with open("vinca.yaml", encoding="utf-8") as vinca_yaml:
-        vinca_conf = yaml.safe_load(vinca_yaml)
-
+    vinca_conf = read_vinca_yaml("vinca.yaml")
     repodatas = get_skip_existing(vinca_conf, args.platform)
 
     additional_recipes = []

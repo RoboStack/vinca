@@ -12,6 +12,7 @@ keys are internal to vinca and are never read from the user's file.
 
 from __future__ import annotations
 
+import re
 import warnings
 from pathlib import Path
 from typing import Any
@@ -150,41 +151,144 @@ def _apply_package_exclusions(vinca_conf: dict[str, Any]) -> None:
     ]
 
 
+# paths in a configuration, relative to the file that sets them
+_PATH_KEYS = ("patch_dir", "rosdistro_snapshot", "rosdistro_additional_recipes")
+
+# package lists that a configuration adds to the ones of the configuration it extends
+_LAYERED_LISTS = ("packages_select_by_deps", "packages_exclude", "packages_skip")
+
+
+def _constraint_name(spec: Any) -> str:
+    return re.split(r"[\s=<>!~]", str(spec).strip(), maxsplit=1)[0]
+
+
+def _merge_mutex(base: dict[str, Any], own: dict[str, Any]) -> dict[str, Any]:
+    """``mutex_package``: own keys win; own ``run_constraints`` replace the base's
+    constraint on the same package and add the others."""
+    merged = {**base, **own}
+    mine = list(own.get("run_constraints") or [])
+    names = {_constraint_name(c) for c in mine}
+    merged["run_constraints"] = [
+        c for c in base.get("run_constraints") or [] if _constraint_name(c) not in names
+    ] + mine
+    return merged
+
+
+def _merge_configs(base: dict[str, Any], own: dict[str, Any]) -> dict[str, Any]:
+    """A configuration on top of the one it extends: package lists are combined,
+    ``mutex_package`` is merged, any other key of ``own`` replaces the base's."""
+    merged = dict(base)
+    for key, value in own.items():
+        if key in _LAYERED_LISTS:
+            merged[key] = list(dict.fromkeys(_names(base.get(key)) + _names(value)))
+        elif key == "mutex_package" and isinstance(base.get(key), dict):
+            merged[key] = _merge_mutex(base[key], value or {})
+        else:
+            merged[key] = value
+    return merged
+
+
+def _merge_per_package(base: dict[str, Any], own: dict[str, Any]) -> dict[str, Any]:
+    """Per-package settings: own keys of a package's entry win over the base's."""
+    merged = {k: (dict(v) if isinstance(v, dict) else v) for k, v in base.items()}
+    for package, entry in own.items():
+        if isinstance(entry, dict) and isinstance(merged.get(package), dict):
+            merged[package] = {**merged[package], **entry}
+        else:
+            merged[package] = entry
+    return merged
+
+
+def _load_layers(
+    filepath: Path, target_platform: str, seen: tuple[Path, ...] = ()
+) -> list[tuple[Path, dict[str, Any]]]:
+    """The configuration and the ones it ``extends`` (resolved relative to the
+    file), base first, each as (directory, selector-resolved content)."""
+    filepath = filepath.resolve()
+    if filepath in seen:
+        chain = " -> ".join(str(p) for p in (*seen, filepath))
+        raise ValueError(f"vinca.yaml extends itself: {chain}")
+    conf = _load_selected_yaml(filepath, target_platform) or {}
+    for key in _PATH_KEYS:
+        if conf.get(key):
+            conf[key] = str((filepath.parent / conf[key]).resolve())
+    base = conf.pop("extends", None)
+    layers = (
+        _load_layers(filepath.parent / base, target_platform, (*seen, filepath))
+        if base
+        else []
+    )
+    return [*layers, (filepath.parent, conf)]
+
+
 def read_vinca_yaml(filepath: str | Path, target_platform: str) -> dict[str, Any]:
     """Read a vinca configuration and populate its derived internal fields."""
     filepath = Path(filepath)
     config_dir = filepath.parent
-    vinca_conf = _load_selected_yaml(filepath, target_platform)
+    layers = _load_layers(filepath, target_platform)
+    vinca_conf: dict[str, Any] = {}
+    for _, layer in layers:
+        vinca_conf = _merge_configs(vinca_conf, layer)
     _apply_package_exclusions(vinca_conf)
     vinca_conf["package_name_mode"] = get_package_name_mode(vinca_conf).value
     vinca_conf["variants_mode"] = get_variants_mode(vinca_conf).value
-    vinca_conf["conda_index"] = _normalize_conda_indexes(vinca_conf["conda_index"])
 
-    patch_dir = Path(vinca_conf["patch_dir"]).absolute()
-    vinca_conf["_patch_dir"] = patch_dir
-    vinca_conf["_patches"] = _discover_patches(patch_dir, vinca_conf["ros_distro"])
-    vinca_conf["_tests"], vinca_conf["_test_folders"] = _discover_tests(
-        config_dir, vinca_conf["ros_distro"]
+    # Files of each layer: patches and dependencies.yaml (patch_dir), tests,
+    # pkg_additional_info.yaml and conda_index files, relative to that layer's file.
+    patches: dict[str, Any] = {}
+    tests: dict[str, Path] = {}
+    test_folders: dict[str, Path] = {}
+    depmods: dict[str, Any] = {}
+    additional_info: dict[str, Any] = {}
+    conda_indexes: list[Any] = []
+    patch_dir: Path | None = None
+    for layer_dir, layer in layers:
+        if layer.get("patch_dir"):
+            layer_patch_dir = Path(layer["patch_dir"])
+            patches.update(_discover_patches(layer_patch_dir, vinca_conf["ros_distro"]))
+            dependencies_path = layer_patch_dir / "dependencies.yaml"
+            if dependencies_path.exists():
+                depmods = _merge_per_package(
+                    depmods,
+                    _load_selected_yaml(dependencies_path, target_platform) or {},
+                )
+            patch_dir = layer_patch_dir
+        layer_tests, layer_test_folders = _discover_tests(
+            layer_dir, vinca_conf["ros_distro"]
+        )
+        tests.update(layer_tests)
+        test_folders.update(layer_test_folders)
+        additional_info_path = layer_dir / "pkg_additional_info.yaml"
+        if additional_info_path.exists():
+            additional_info = _merge_per_package(
+                additional_info,
+                _load_selected_yaml(additional_info_path, target_platform) or {},
+            )
+        if layer.get("conda_index"):
+            layer_indexes = [
+                str(layer_dir / i) if (layer_dir / i).is_file() else i
+                for i in layer["conda_index"]
+            ]
+            # the extending configuration's mappings are looked up first
+            conda_indexes = (
+                get_conda_index({"conda_index": layer_indexes}, str(layer_dir))
+                + conda_indexes
+            )
+    vinca_conf["conda_index"] = _normalize_conda_indexes(
+        vinca_conf.get("conda_index") or []
     )
-
-    dependencies_path = patch_dir / "dependencies.yaml"
-    if dependencies_path.exists():
-        vinca_conf["depmods"] = _load_selected_yaml(dependencies_path, target_platform)
-    vinca_conf["depmods"] = vinca_conf.get("depmods") or {}
+    vinca_conf["_patch_dir"] = patch_dir or Path(vinca_conf["patch_dir"]).absolute()
+    vinca_conf["_patches"] = patches
+    vinca_conf["_tests"], vinca_conf["_test_folders"] = tests, test_folders
+    vinca_conf["depmods"] = depmods or vinca_conf.get("depmods") or {}
 
     config.ros_distro = vinca_conf["ros_distro"]
     config.skip_testing = vinca_conf.get("skip_testing", True)
     config.setup_pixi_version = vinca_conf.get("setup_pixi_version")
     config.pixi_version = vinca_conf.get("pixi_version")
-    vinca_conf["_conda_indexes"] = get_conda_index(vinca_conf, str(config_dir))
+    vinca_conf["_conda_indexes"] = conda_indexes
     vinca_conf["trigger_new_versions"] = vinca_conf.get("trigger_new_versions", False)
-
-    additional_info_path = config_dir / "pkg_additional_info.yaml"
-    vinca_conf["_pkg_additional_info"] = (
-        _load_selected_yaml(additional_info_path, target_platform)
-        if additional_info_path.exists()
-        else {}
-    )
+    vinca_conf["_pkg_additional_info"] = additional_info
 
     vinca_conf["_variant_config"] = {}
     if get_variants_mode(vinca_conf) is VariantsMode.LOCAL:

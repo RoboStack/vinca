@@ -8,12 +8,15 @@ from pathlib import Path
 
 from ruamel import yaml
 
+from vinca import config
 from vinca.naming import get_package_prefix, is_legacy_compatibility_output
+from vinca.sources import package_patches
 from vinca.utils import (
     ensure_name_is_without_distro_prefix_and_with_underscores,
     get_pkg_additional_info,
     get_pkg_build_number,
 )
+from vinca.v1_selectors import evaluate_distro_selectors
 from vinca.variants import VariantsMode, get_recipe_variants, get_variants_mode
 
 TEMPLATE = """\
@@ -140,8 +143,10 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
                 test := vinca_conf["_tests"].get(package_name)
             ):
                 print("Using test: ", test)
-                text = test.read_text()
-                test_content = yaml.safe_load(text)
+                text = test.read_text(encoding="utf-8")
+                test_content = evaluate_distro_selectors(
+                    yaml.safe_load(text), ros_distro=config.ros_distro
+                )
                 meta["tests"] = test_content["tests"]
 
             recipe_dir = (Path("recipes") / package_name).absolute()
@@ -174,10 +179,16 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
                     file.dump(variants, stream)
 
             if meta.get("source") and meta["source"].get("patches"):
+                # the recipe refers to patch/<file>; copy each from where it lives
+                files = {
+                    Path(p).name: p
+                    for p in package_patches(
+                        package_name, vinca_conf, config.selected_platform or ""
+                    )
+                }
                 for p in meta["source"]["patches"]:
-                    patch_dir, _ = os.path.split(p)
-                    os.makedirs(recipe_dir / patch_dir, exist_ok=True)
-                    shutil.copyfile(p, recipe_dir / p)
+                    os.makedirs((recipe_dir / p).parent, exist_ok=True)
+                    shutil.copyfile(files.get(Path(p).name, p), recipe_dir / p)
 
             build_scripts = re.findall(r"'(.*?)'", meta["build"]["script"])
             for script in build_scripts:
