@@ -12,13 +12,7 @@ import yaml
 from rich import print
 
 from vinca import config
-from vinca.distro import Distro
-from vinca.main import (
-    generate_outputs,
-    get_conda_subdir,
-    get_selected_packages,
-    read_vinca_yaml,
-)
+from vinca.main import get_conda_subdir, read_vinca_yaml
 from vinca.pipeline import batch_stages, get_all_ancestors, get_skip_existing
 from vinca.utils import (
     NoAliasDumper,
@@ -435,51 +429,53 @@ def build_win_pipeline(
     dump_for_gha(workflow, outfile)
 
 
-def get_full_tree():
+def load_configuration():
+    """Read vinca.yaml next to the recipes directory for the few settings the
+    workflow needs (distribution, pixi versions); the recipes themselves are
+    already generated, so the packages are not resolved again."""
     parsed_args = config.parsed_args
     if parsed_args is None:
-        raise RuntimeError("Pipeline arguments must be parsed before generating a tree")
-    recipes_dir = parsed_args.dir
-
-    vinca_yaml = os.path.join(os.path.dirname(recipes_dir), "vinca.yaml")
-
-    temp_vinca_conf = read_vinca_yaml(vinca_yaml)
-    temp_vinca_conf["build_all"] = True
-    temp_vinca_conf["skip_built_packages"] = []
+        raise RuntimeError(
+            "Pipeline arguments must be parsed before reading vinca.yaml"
+        )
+    vinca_yaml = os.path.join(os.path.dirname(parsed_args.dir), "vinca.yaml")
+    vinca_conf = read_vinca_yaml(vinca_yaml)
     config.selected_platform = get_conda_subdir()
+    return vinca_conf
 
-    python_version = temp_vinca_conf.get("python_version", None)
-    distro = Distro(
-        temp_vinca_conf["ros_distro"],
-        python_version,
-        temp_vinca_conf["_snapshot"],
-        temp_vinca_conf["_additional_packages_snapshot"],
-    )
 
-    all_packages = get_selected_packages(distro, temp_vinca_conf)
-    temp_vinca_conf["_selected_pkgs"] = all_packages
-
-    all_outputs = generate_outputs(distro, temp_vinca_conf)
-    return all_outputs
+def get_recipe_requirements(recipes):
+    """Host and run dependency names of each recipe, keyed by package name."""
+    requirements = {}
+    for pkg in recipes:
+        if "outputs" in pkg:
+            req_section = pkg["outputs"][0]["requirements"]
+        else:
+            req_section = pkg.get("requirements") or {}
+        requirements[pkg["package"]["name"]] = extract_dependency_names(
+            (req_section.get("host") or []) + (req_section.get("run") or [])
+        )
+    return requirements
 
 
 def main():
     args = parse_command_line(sys.argv)
 
-    full_tree = get_full_tree()
+    load_configuration()
     setup_pixi_version = config.setup_pixi_version or DEFAULT_SETUP_PIXI_VERSION
     pixi_version = config.pixi_version or DEFAULT_PIXI_VERSION
 
     metas = []
 
-    additional_recipes = []
     if args.additional_recipes:
-        additional_recipes = add_additional_recipes(args)
+        # copied into args.dir, so they are picked up with the generated recipes
+        add_additional_recipes(args)
 
     if not os.path.exists(args.dir):
         print(f"{args.dir} not found. Not generating a pipeline.")
 
-    all_recipes = glob.glob(os.path.join(args.dir, "**", "*.yaml"))
+    # sorted: the stage and batch order follows the order the recipes are read in
+    all_recipes = sorted(glob.glob(os.path.join(args.dir, "**", "*.yaml")))
     for f in all_recipes:
         with open(f, encoding="utf-8") as fi:
             metas.append(yaml.safe_load(fi.read()))
@@ -487,20 +483,10 @@ def main():
     platform = args.platform
 
     if len(metas) >= 1:
-        requirements = {}
-
-        for pkg in full_tree + additional_recipes:
-            if "outputs" in pkg:
-                req_section = pkg["outputs"][0]["requirements"]
-            else:
-                req_section = pkg["requirements"]
-            requirements[pkg["package"]["name"]] = req_section.get(
-                "host", []
-            ) + req_section.get("run", [])
-
-        # Normalize direct and conditional requirements to package names.
-        for pkg_name, reqs in requirements.items():
-            requirements[pkg_name] = extract_dependency_names(reqs)
+        # The stages only order the recipes being built, so their own requirements
+        # are enough: resolving every package of the distribution again (as
+        # generate-recipes already did) would only add packages that are not built.
+        requirements = get_recipe_requirements(metas)
 
         test_requirements = add_test_requirements(requirements, metas)
 
