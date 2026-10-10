@@ -17,7 +17,6 @@ def _conf(**extra):
             "name": "ros2-distro-mutex",
             "version": "0.21.0",
             "upper_bound": "x.x",
-            "run_constraints": [],
             "build_number": 28,
         },
         "_pkg_additional_info": {"rclcpp": {"build_number": 30}},
@@ -55,4 +54,14 @@ def test_mutex_recipe_keeps_its_build_number(tmp_path, monkeypatch):
     )
     assert meta["build"]["number"] == 28
     assert meta["build"]["string"] == "lyrical_28"
-    assert meta["requirements"]["run_constraints"] == []
+    # no (empty) run_constraints in the recipe
+    assert "run_constraints" not in meta["requirements"]
+
+
+def test_mutex_with_run_constraints_keeps_them():
+    conf = _conf()
+    conf["mutex_package"]["run_constraints"] = ["libfoo 1.*"]
+    distro = Mock()
+    distro.name = "lyrical"
+    recipe = generate_mutex_package_recipe(conf, distro)
+    assert recipe["requirements"]["run_constraints"] == ["libfoo 1.*"]
