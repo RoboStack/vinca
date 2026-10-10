@@ -271,7 +271,8 @@ def build_unix_pipeline(
                 "name": pretty_stage_name,
                 "runs-on": runs_on,
                 "strategy": {"fail-fast": False},
-                "needs": prev_batch_keys,
+                # actionlint rejects an empty needs list, so first-stage jobs omit it
+                **({"needs": prev_batch_keys} if prev_batch_keys else {}),
                 "steps": steps,
             }
 
@@ -410,7 +411,8 @@ def build_win_pipeline(
                 "name": pretty_stage_name,
                 "runs-on": vm_imagename,
                 "strategy": {"fail-fast": False},
-                "needs": prev_batch_keys,
+                # actionlint rejects an empty needs list, so first-stage jobs omit it
+                **({"needs": prev_batch_keys} if prev_batch_keys else {}),
                 "env": {
                     "CONDA_BLD_PATH": "C:\\\\bld\\\\",
                     "VINCA_CUSTOM_CMAKE_BUILD_DIR": "C:\\\\x\\\\",

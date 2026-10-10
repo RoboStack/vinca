@@ -120,3 +120,21 @@ def test_win_pipeline_requires_the_repository_build_script(tmp_path, monkeypatch
         build_win_pipeline(
             [[["ros2-rclcpp"]]], "buildbranch_win", outfile=tmp_path / "win.yml"
         )
+
+
+def test_only_later_stages_declare_needs(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".scripts").mkdir()
+    (tmp_path / ".scripts" / "build_win.bat").write_text("echo build\n")
+    stages = [[["ros2-a"], ["ros2-b"]], [["ros2-c"]]]
+    yaml = pytest.importorskip("yaml")
+
+    build_unix_pipeline(stages, "branch", outfile=tmp_path / "linux.yml")
+    build_win_pipeline(stages, "branch", outfile=tmp_path / "win.yml")
+
+    for outfile in ("linux.yml", "win.yml"):
+        jobs = yaml.safe_load((tmp_path / outfile).read_text())["jobs"]
+        # actionlint rejects `needs: []`
+        assert "needs" not in jobs["stage_0_job_0"]
+        assert "needs" not in jobs["stage_0_job_1"]
+        assert jobs["stage_1_job_2"]["needs"] == ["stage_0_job_0", "stage_0_job_1"]
