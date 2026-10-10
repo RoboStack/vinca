@@ -2,6 +2,8 @@
 
 from enum import Enum
 
+from vinca.mutex import get_mutex_package_dependency
+
 
 class PackageNameMode(str, Enum):
     """Supported ROS package naming transition modes."""
@@ -81,10 +83,17 @@ def generate_legacy_compatibility_output(output, pkg_shortname, distro, vinca_co
 
     legacy_name = get_legacy_package_name(pkg_shortname, distro)
     version = output["package"]["version"]
+    run = [f"{canonical_name} =={version}"]
+    # Several distributions can publish the same ros2-<pkg> version to one channel;
+    # requiring this distribution's mutex (as the canonical packages do) keeps the
+    # alias from being satisfied by another distribution's build.
+    mutex_dependency = get_mutex_package_dependency(vinca_conf, distro)
+    if mutex_dependency:
+        run.append(mutex_dependency)
     return {
         "package": {"name": legacy_name, "version": version},
         "build": {"script": ""},
-        "requirements": {"run": [f"{canonical_name} =={version}"]},
+        "requirements": {"run": run},
         "about": {"summary": f"Compatibility package for {canonical_name}"},
     }
 
@@ -106,6 +115,6 @@ def is_legacy_compatibility_output(output, distro, vinca_conf):
     shortname = name[len(legacy_prefix) :]
     canonical_name = get_new_package_name(shortname, distro)
     version = output["package"]["version"]
-    return output.get("requirements", {}).get("run") == [
-        f"{canonical_name} =={version}"
-    ]
+    # the canonical package comes first, optionally followed by the mutex
+    run = output.get("requirements", {}).get("run") or []
+    return run[:1] == [f"{canonical_name} =={version}"]
