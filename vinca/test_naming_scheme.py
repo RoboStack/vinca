@@ -11,6 +11,7 @@ from vinca.naming import (
     generate_legacy_compatibility_output,
     get_package_name,
     get_package_name_mode,
+    is_legacy_compatibility_output,
 )
 from vinca.resolve import resolve_pkgname
 from vinca.utils import (
@@ -247,6 +248,40 @@ def test_both_mode_generates_legacy_compatibility_output():
         "requirements": {"run": ["ros2-my-package ==1.2.3"]},
         "about": {"summary": "Compatibility package for ros2-my-package"},
     }
+
+
+@pytest.mark.parametrize(
+    "mutex_package,expected_mutex",
+    [
+        (
+            {
+                "name": "ros2-distro-mutex",
+                "version": "0.21.0",
+                "upper_bound": "x.x",
+                "run_constraints": [],
+            },
+            "ros2-distro-mutex 0.21.* humble_*",
+        ),
+        # legacy string form: the spec is used verbatim, as for canonical packages
+        ("ros2-distro-mutex 0.5.* humble", "ros2-distro-mutex 0.5.* humble"),
+    ],
+)
+def test_compatibility_output_requires_the_distribution_mutex(
+    mutex_package, expected_mutex
+):
+    distro = make_distro()
+    vinca_conf = {"package_name_mode": "both", "mutex_package": mutex_package}
+    output = {"package": {"name": "ros2-my-package", "version": "1.2.3"}}
+
+    compatibility_output = generate_legacy_compatibility_output(
+        output, "my_package", distro, vinca_conf
+    )
+
+    assert compatibility_output["requirements"]["run"] == [
+        "ros2-my-package ==1.2.3",
+        expected_mutex,
+    ]
+    assert is_legacy_compatibility_output(compatibility_output, distro, vinca_conf)
 
 
 @pytest.mark.parametrize("mode", ["legacy", "new"])

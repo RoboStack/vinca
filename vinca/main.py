@@ -341,6 +341,16 @@ def conda_index_shadowed_packages(distro, vinca_conf):
     return names
 
 
+def expected_build_number(default_build_number, pkg_name, vinca_conf):
+    """The build number a package of this configuration gets: the mutex has its own
+    (mutex_package.build_number, e.g. a new build at the same version), the others
+    the distribution's unless pkg_additional_info.yaml overrides it."""
+    mutex_config = parse_mutex_package_config(vinca_conf)
+    if mutex_config and pkg_name == mutex_config["name"]:
+        return mutex_config["build_number"]
+    return get_pkg_build_number(default_build_number, pkg_name, vinca_conf)
+
+
 def get_selected_packages(distro, vinca_conf):
     selected_packages = set()
     skipped_packages = set()
@@ -742,7 +752,7 @@ def main():
                 for _, pkg in all_pkgs.items():
                     is_built = False
                     if selected_bn is not None:
-                        pkg_build_number = get_pkg_build_number(
+                        pkg_build_number = expected_build_number(
                             selected_bn, pkg["name"], vinca_conf
                         )
                         if pkg["build_number"] == pkg_build_number:
