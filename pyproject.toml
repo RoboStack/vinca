@@ -56,6 +56,7 @@ vinca-sort-vinca-lists = "vinca.sort_vinca_lists:main"
 vinca-sort-yaml-keys = "vinca.sort_yaml_keys:main"
 vinca-pinning-render = "vinca.pinning:render_main"
 vinca-pinning-update = "vinca.pinning:update_main"
+vinca-rebuild-plan = "vinca.rebuild:main"
 
 [tool.hatch.build]
 include = [
