@@ -1,11 +1,14 @@
 """Tests for the GitHub Actions pipeline generation."""
 
+import sys
+
 import pytest
 
-from vinca import config
+from vinca import config, generate_gha
 from vinca.generate_gha import (
     build_unix_pipeline,
     build_win_pipeline,
+    get_recipe_requirements,
     get_setup_pixi_step,
     get_stage_name,
 )
@@ -120,3 +123,54 @@ def test_win_pipeline_requires_the_repository_build_script(tmp_path, monkeypatch
         build_win_pipeline(
             [[["ros2-rclcpp"]]], "buildbranch_win", outfile=tmp_path / "win.yml"
         )
+
+
+def test_recipe_requirements_are_host_and_run_names():
+    recipe = {
+        "package": {"name": "ros2-b", "version": "1.0.0"},
+        "requirements": {
+            "build": ["cmake"],
+            "host": ["ros2-a ==1.0.0", {"if": "linux", "then": ["ros2-linux-only"]}],
+            "run": ["ros2-a", "python"],
+        },
+    }
+
+    assert get_recipe_requirements([recipe]) == {
+        "ros2-b": ["ros2-a", "ros2-linux-only", "python"]
+    }
+
+
+def test_stages_are_derived_from_the_generated_recipes(tmp_path, monkeypatch):
+    yaml = pytest.importorskip("yaml")
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "vinca.yaml").write_text("{}\n")
+    recipes = {
+        "ros2-a": [],
+        # ros2-published is not in ./recipes (already built): no stage of its own
+        "ros2-b": ["ros2-a", "ros2-published"],
+        "ros2-c": ["ros2-b"],
+    }
+    for name, deps in recipes.items():
+        (tmp_path / "recipes" / name).mkdir(parents=True)
+        recipe = {
+            "package": {"name": name, "version": "1.0.0"},
+            "requirements": {"host": deps, "run": deps},
+        }
+        (tmp_path / "recipes" / name / "recipe.yaml").write_text(yaml.safe_dump(recipe))
+    # no resolution of the ROS distribution: only the recipes are read
+    monkeypatch.setattr(generate_gha, "load_configuration", lambda: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        # batch size 1: consecutive small stages are not merged into one job
+        ["vinca-gha", "-d", "./recipes", "-t", "branch", "-p", "linux-64", "-b", "1"],
+    )
+
+    generate_gha.main()
+
+    jobs = yaml.safe_load((tmp_path / "linux.yml").read_text())["jobs"]
+    assert [job["steps"][-1]["env"]["CURRENT_RECIPES"] for job in jobs.values()] == [
+        "ros2-a",
+        "ros2-b",
+        "ros2-c",
+    ]
