@@ -14,7 +14,8 @@ from typing import Any
 
 from vinca.distro import Distro
 
-_REQUIRED_FIELDS = ("name", "version", "upper_bound", "run_constraints")
+# run_constraints is optional: a mutex only has to keep one distribution per environment
+_REQUIRED_FIELDS = ("name", "version", "upper_bound")
 
 
 def parse_mutex_package_config(vinca_conf: dict[str, Any]) -> dict[str, Any] | None:
@@ -102,7 +103,11 @@ def generate_mutex_package_recipe(
             "script": "",
         },
         "requirements": {
-            "run_constraints": mutex_config["run_constraints"],
+            **(
+                {"run_constraints": mutex_config["run_constraints"]}
+                if mutex_config.get("run_constraints")
+                else {}
+            ),
             "run_exports": {
                 "weak": [
                     f"${{{{ pin_subpackage('{name}', upper_bound='{mutex_config['upper_bound']}') }}}}"
