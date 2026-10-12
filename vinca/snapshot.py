@@ -132,11 +132,23 @@ def main():
             )
             continue
 
+        try:
+            dependencies = sorted(distro.get_direct_depends(dep))
+        except (
+            Exception
+        ) as e:  # e.g. no package.xml in the rosdistro cache (release repository gone)
+            print(
+                "\033[93mPackage '{}': can't read its package.xml ({}), skipping...\033[0m".format(
+                    dep, e
+                )
+            )
+            continue
+
         output[dep] = {
             "url": url,
             "version": version,
             "tag": tag,
-            "dependencies": sorted(distro.get_direct_depends(dep)),
+            "dependencies": dependencies,
         }
         if repository := distro.get_repository_url(dep):
             output[dep]["repository"] = repository
