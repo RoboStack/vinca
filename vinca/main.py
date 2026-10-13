@@ -12,7 +12,7 @@ import catkin_pkg
 import ruamel.yaml
 
 from vinca import __version__, config
-from vinca.utils import get_pkg_build_number, get_repodata
+from vinca.utils import built_for_distro, get_pkg_build_number, get_repodata
 
 from .configuration import read_snapshot as read_snapshot
 from .configuration import read_vinca_yaml as load_vinca_yaml
@@ -751,6 +751,9 @@ def main():
                 all_pkgs.update(repodata.get("packages.conda", {}))
                 for _, pkg in all_pkgs.items():
                     is_built = False
+                    if not built_for_distro(pkg, vinca_conf["ros_distro"]):
+                        # e.g. a channel shared by several distributions
+                        continue
                     if selected_bn is not None:
                         pkg_build_number = expected_build_number(
                             selected_bn, pkg["name"], vinca_conf

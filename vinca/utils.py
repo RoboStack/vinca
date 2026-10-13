@@ -251,3 +251,19 @@ def is_dummy_metapackage(pkg_name, vinca_conf):
         return True
     else:
         return False
+
+
+def built_for_distro(pkg: dict, ros_distro: str) -> bool:
+    """Whether a repodata record was built for *ros_distro*: ROS 2 packages share their
+    names across distributions (ros2-*), so a channel holding several of them must not
+    make one distribution skip a package because another one has it. The distribution
+    shows in the mutex dependency (``ros2-distro-mutex 0.22.* lyrical_*``) or, for the
+    mutex itself, in its build string; records without either are kept."""
+    if pkg.get("name", "").endswith("distro-mutex"):
+        return pkg.get("build", "").startswith(f"{ros_distro}_")
+    mutexes = [
+        d for d in pkg.get("depends", []) if d.split(" ")[0].endswith("distro-mutex")
+    ]
+    if not mutexes:
+        return True
+    return any(f" {ros_distro}_" in d or d.endswith(f" {ros_distro}") for d in mutexes)
