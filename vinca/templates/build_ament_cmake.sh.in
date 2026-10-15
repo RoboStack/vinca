@@ -78,8 +78,8 @@ fi;
 # So we compute the relative path of $SP_DIR w.r.t. to $PREFIX,
 # but it is not trivial to do this in bash scripting, so let's do it via python.
 # rattler-build only sets $SP_DIR when python is one of the recipe's own host
-# dependencies (vinca now only adds that for packages it detects actually need
-# Python) -- but a handful of packages call ament_python_install_package() in
+# dependencies (with conditional_python_dependency, vinca only adds that for
+# packages it detects actually need Python) -- but a handful of packages call ament_python_install_package() in
 # their own CMakeLists for some small internal helper without declaring a
 # Python-flavored dependency in package.xml at all (e.g. ament_cmake_test's
 # test-utility module), so $SP_DIR can be legitimately unset even though this

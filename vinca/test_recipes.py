@@ -139,7 +139,7 @@ def test_generate_output_produces_a_complete_recipe():
                     "then": ["${{ stdlib('c') }}"],
                 },
                 "ninja",
-                "python ${{ python_min | default('3.11') }}.*",
+                "python",
                 "setuptools",
                 "git",
                 "git-lfs",
@@ -161,18 +161,16 @@ def test_generate_output_produces_a_complete_recipe():
                     ],
                 },
             ],
-            # A plain build_depend on rclcpp (the C++ client library) carries no
-            # Python-flavored dependency and isn't a rosidl interface package, so
-            # this recipe correctly gets no python/numpy/pip host dependency and
-            # no python run dependency -- see test_needs_python_* below for the
-            # cases that do.
             "host": [
                 {"if": "build_platform == target_platform", "then": ["pkg-config"]},
+                "numpy",
+                "pip",
+                "python",
                 "ros2-rclcpp",
                 "ros2-ros-environment",
                 "ros2-ros-workspace",
             ],
-            "run": ["ros2-ros-workspace"],
+            "run": ["python", "ros2-ros-workspace"],
         },
         "build": {
             "script": "${{ '$RECIPE_DIR/build_ament_cmake.sh' if unix or wasm32 "
@@ -236,17 +234,30 @@ def test_every_duplicate_cmake_is_replaced_by_the_selector():
     )
 
 
+def build_conditional(name, **kwargs):
+    return build(name, conditional_python_dependency=True, **kwargs)
+
+
 def _host_run_python_markers(output):
     host = output["requirements"]["host"]
     run = output["requirements"]["run"]
     return "python" in host, "numpy" in host, "pip" in host, "python" in run
 
 
+def test_python_dependency_is_unconditional_by_default():
+    # Without conditional_python_dependency every package keeps python in
+    # build/host/run, exactly as before the option existed.
+    output = build("demo", depends=[("build_depend", "rclcpp")])
+
+    assert _host_run_python_markers(output) == (True, True, True, True)
+    assert "python" in output["requirements"]["build"]
+
+
 def test_needs_python_plain_cpp_package_gets_no_python_dependency():
     # A pure C++ library/node (no rosidl interfaces, no python-flavored
     # dependency) must not be pulled into the python host/run dependency --
     # and therefore not into a per-python-version rebuild -- at all.
-    output = build("demo", depends=[("build_depend", "rclcpp")])
+    output = build_conditional("demo", depends=[("build_depend", "rclcpp")])
 
     assert _host_run_python_markers(output) == (False, False, False, False)
     # The build-time-only interpreter ament's own tooling needs is still
@@ -263,7 +274,7 @@ def test_needs_python_rosidl_interface_package_gets_python_dependency():
     # msg/srv/action packages declare membership in rosidl_interface_packages;
     # rosidl_generator_py always compiles Python bindings for these,
     # independent of whatever build_type or explicit depends they declare.
-    output = build(
+    output = build_conditional(
         "demo",
         depends=[("build_depend", "rosidl_default_generators")],
         member_of_group="rosidl_interface_packages",
@@ -273,7 +284,7 @@ def test_needs_python_rosidl_interface_package_gets_python_dependency():
 
 
 def test_needs_python_rclpy_dependency_gets_python_dependency():
-    output = build("demo", depends=[("exec_depend", "rclpy")])
+    output = build_conditional("demo", depends=[("exec_depend", "rclpy")])
 
     assert _host_run_python_markers(output) == (True, True, True, True)
 
@@ -283,13 +294,13 @@ def test_needs_python_rosdep_python3_key_gets_python_dependency():
     # rosdep naming convention: false positives here are cheap (one extra
     # per-python-version rebuild), false negatives are not (a silently
     # missing artifact for the versions it wasn't rebuilt for).
-    output = build("demo", depends=[("exec_depend", "python3-yaml")])
+    output = build_conditional("demo", depends=[("exec_depend", "python3-yaml")])
 
     assert _host_run_python_markers(output) == (True, True, True, True)
 
 
 def test_needs_python_ament_python_build_type_gets_python_dependency():
-    output = build("demo", build_type="ament_python")
+    output = build_conditional("demo", build_type="ament_python")
 
     assert _host_run_python_markers(output) == (True, True, True, True)
 
@@ -297,7 +308,7 @@ def test_needs_python_ament_python_build_type_gets_python_dependency():
 def test_needs_python_test_only_dependency_still_counts():
     # A test-only dependency still means Python must be importable to run
     # the test suite during the build, so it counts too.
-    output = build("demo", depends=[("test_depend", "rclpy")])
+    output = build_conditional("demo", depends=[("test_depend", "rclpy")])
 
     assert _host_run_python_markers(output) == (True, True, True, True)
 
@@ -310,7 +321,7 @@ def test_needs_python_ignores_buildtool_depend_on_python3():
     # "this package's shipped artifact has Python content", so it must not
     # trigger the python host/run dependency (build-time-only Python is
     # already covered unconditionally elsewhere).
-    output = build("demo", depends=[("buildtool_depend", "python3")])
+    output = build_conditional("demo", depends=[("buildtool_depend", "python3")])
 
     assert _host_run_python_markers(output) == (False, False, False, False)
 
@@ -324,7 +335,9 @@ def test_needs_python_ignores_test_only_rosidl_default_generators():
     # has rosidl-generated Python bindings" (see the positive case above);
     # rosidl_default_generators/rosidl_generator_py depended on for any other
     # reason must not, by itself, trigger the python host/run dependency.
-    output = build("demo", depends=[("test_depend", "rosidl_default_generators")])
+    output = build_conditional(
+        "demo", depends=[("test_depend", "rosidl_default_generators")]
+    )
 
     assert _host_run_python_markers(output) == (False, False, False, False)
 

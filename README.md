@@ -66,6 +66,22 @@ package_name_mode: both
 
 Once users and downstream projects have migrated, switch to `new` to stop generating the compatibility packages. New ROS 1 package names use the `ros-` prefix; new ROS 2 package names use `ros2-`.
 
+## Python dependency
+
+By default every generated recipe has `python` in `build`, `host` and `run` (and
+`numpy`/`pip` in `host`), so building for several Python versions rebuilds every
+package once per version. With
+
+```yaml
+conditional_python_dependency: true
+```
+
+only packages that need Python get it in `host`/`run`: `ament_python` packages, members
+of `rosidl_interface_packages`, and packages that depend (build, exec, run or test) on
+`rclpy`, `pybind11`, `python_cmake_module`, `ament_cmake_python` or a rosdep key
+containing `python` or starting with `pybind`. All other packages only get a build-time
+interpreter pinned to `python_min`, which does not create a Python variant.
+
 ## Variants mode
 
 The optional `variants_mode` setting controls how rattler-build receives the

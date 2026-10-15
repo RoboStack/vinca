@@ -51,24 +51,7 @@ _BASE_REQUIREMENTS = {
             "then": ["${{ stdlib('c') }}"],
         },
         "ninja",
-        # ament's own CMake/build tooling shells out to Python for boilerplate
-        # (environment hooks, package.xml parsing, index generation) regardless
-        # of whether the package being built has any Python content itself, so
-        # every package needs *some* interpreter present at build time. Pinned
-        # to the single python_min version (rather than left as a bare
-        # "python") so this doesn't drag a package that needs no interpreter
-        # into the full python-version build matrix: a fully-resolved version
-        # constraint like this is invisible to rattler-build's variant/used_vars
-        # scan, confirmed via `rattler-build build --render-only` producing one
-        # variant either way, vs. N variants (one per pinned python version)
-        # for a bare "python" -- see _package_needs_python for the actual
-        # per-package host/run python dependency this is distinct from.
-        # `default('3.11')` covers recipe.yaml consumers whose own
-        # conda_build_config.yaml doesn't define python_min at all (e.g. a
-        # minimal, hand-maintained pinning file rather than a full
-        # conda-forge-pinning merge) -- an undefined python_min renders to an
-        # empty string, producing the invalid match spec "python .*".
-        "python ${{ python_min | default('3.11') }}.*",
+        "python",
         "setuptools",
         "git",
         "git-lfs",
@@ -85,13 +68,35 @@ _BASE_REQUIREMENTS = {
     ],
     "host": [
         {"if": "build_platform == target_platform", "then": ["pkg-config"]},
+        "python",
+        "numpy",
+        "pip",
     ],
     "run": [],
 }
 
+# Opt-in via `conditional_python_dependency: true` in vinca.yaml (default: off, every
+# package gets python/numpy/pip as above). When on, only packages for which
+# _package_needs_python() holds get python in host/run (plus numpy/pip in host); every
+# other package keeps only a build-time interpreter, which ament's CMake tooling needs
+# regardless (environment hooks, package.xml parsing, index generation). That one is
+# pinned to python_min rather than a bare "python": a fully resolved version
+# constraint is invisible to rattler-build's variant scan (confirmed with
+# `rattler-build build --render-only`: one variant instead of one per pinned Python),
+# so a package without Python content is not rebuilt per Python version.
+# `default('3.11')` covers a conda_build_config.yaml without python_min, which would
+# otherwise render the invalid spec "python .*".
+_BUILD_TIME_PYTHON = "python ${{ python_min | default('3.11') }}.*"
+_HOST_PYTHON = ("python", "numpy", "pip")
+
+
+def _conditional_python(vinca_conf: dict[str, Any]) -> bool:
+    return bool(vinca_conf.get("conditional_python_dependency", False))
+
+
 # Dependency names that indicate a package's own recipe genuinely needs a
 # Python interpreter/ABI in host/run (as opposed to Python merely being a
-# build-time tool for ament's own scripts, handled unconditionally above).
+# build-time tool for ament's own scripts, see _BUILD_TIME_PYTHON).
 #
 # Deliberately NOT included: rosidl_default_generators/rosidl_generator_py.
 # Real-world case found while testing on ros-humble: rclcpp (a pure C++
@@ -140,8 +145,7 @@ def _package_needs_python(package: catkin_pkg.package.Package, build_type: str) 
     ``<buildtool_depend>python3</buildtool_depend>`` purely so a codegen
     script can run at build time), never "this package's shipped artifact
     contains Python content" -- and build-time-only Python is already covered
-    unconditionally by the fixed ``python_min``-pinned entry every recipe
-    gets in ``_BASE_REQUIREMENTS``.
+    by the ``python_min``-pinned ``_BUILD_TIME_PYTHON`` every recipe gets.
 
     Everything else -- the vast majority of ROS packages, which are plain C/
     C++ libraries and nodes -- does not, and skips the Python host/run
@@ -218,9 +222,18 @@ def _initial_output(
     vinca_conf: dict[str, Any],
 ) -> dict[str, Any]:
     if not is_dummy_metapackage(shortname, vinca_conf):
+        requirements = copy.deepcopy(_BASE_REQUIREMENTS)
+        if _conditional_python(vinca_conf):
+            requirements["build"] = [
+                _BUILD_TIME_PYTHON if r == "python" else r
+                for r in requirements["build"]
+            ]
+            requirements["host"] = [
+                r for r in requirements["host"] if r not in _HOST_PYTHON
+            ]
         return {
             "package": {"name": package_name, "version": version},
-            "requirements": copy.deepcopy(_BASE_REQUIREMENTS),
+            "requirements": requirements,
             "build": {"script": ""},
         }
 
@@ -444,11 +457,15 @@ def generate_output(
     is_dummy = is_dummy_metapackage(shortname, vinca_conf)
     build_type = package.get_build_type()
 
-    if not is_dummy and _package_needs_python(package, build_type):
+    conditional_python = _conditional_python(vinca_conf)
+    if not conditional_python or (
+        not is_dummy and _package_needs_python(package, build_type)
+    ):
         python_dependencies = resolve_pkgname("python", vinca_conf, distro)
         output["requirements"]["run"].extend(python_dependencies)
         output["requirements"]["host"].extend(python_dependencies)
-        output["requirements"]["host"].extend(["numpy", "pip"])
+        if conditional_python:
+            output["requirements"]["host"].extend(["numpy", "pip"])
 
     if not is_dummy:
         try:
@@ -509,19 +526,17 @@ def generate_output(
     # Build tools normally belong in `host`, but git has to be in `build` so that it
     # is runnable on the build machine when cross-compiling. cmake is already part of
     # the base build requirements, so re-adding it would only create a duplicate.
-    # Likewise python3/python (a common buildtool_depend for packages that just need
-    # an interpreter present to run a codegen script, e.g. rclcpp's
-    # <buildtool_depend>python3</buildtool_depend> for ament_cmake_gen_version_h):
-    # re-adding a bare "python" here would drag the package back into the full
-    # python-version build matrix that _package_needs_python's build-time-only,
-    # python_min-pinned base entry exists specifically to avoid.
+    # With conditional_python_dependency, python3/python as a buildtool_depend (just an
+    # interpreter for a codegen script, e.g. rclcpp's for ament_cmake_gen_version_h) is
+    # covered by _BUILD_TIME_PYTHON; a bare "python" here would put the package back
+    # into the per-Python-version build matrix.
     for dependency in build_tools:
         resolved = resolve_pkgname(dependency, vinca_conf, distro)
         if not resolved:
             unsatisfied.add(dependency)
         elif "git" in resolved:
             output["requirements"]["build"].extend(resolved)
-        elif resolved == ["python"]:
+        elif conditional_python and resolved == ["python"]:
             pass
         elif dependency != "cmake":
             build_dependencies.append(dependency)
