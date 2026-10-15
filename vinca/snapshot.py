@@ -132,14 +132,12 @@ def main():
             )
             continue
 
-        try:
-            dependencies = sorted(distro.get_direct_depends(dep))
-        except (
-            Exception
-        ) as e:  # e.g. no package.xml in the rosdistro cache (release repository gone)
+        # A release repository that was removed (e.g. humble's affordance_primitives)
+        # leaves no package.xml in the rosdistro cache to read the dependencies from.
+        if distro.get_release_package_xml(dep) is None:
             print(
-                "\033[93mPackage '{}': can't read its package.xml ({}), skipping...\033[0m".format(
-                    dep, e
+                "\033[93mPackage '{}' has no package.xml, skipping...\033[0m".format(
+                    dep
                 )
             )
             continue
@@ -148,7 +146,7 @@ def main():
             "url": url,
             "version": version,
             "tag": tag,
-            "dependencies": dependencies,
+            "dependencies": sorted(distro.get_direct_depends(dep)),
         }
         if repository := distro.get_repository_url(dep):
             output[dep]["repository"] = repository
