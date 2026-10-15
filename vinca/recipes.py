@@ -75,6 +75,104 @@ _BASE_REQUIREMENTS = {
     "run": [],
 }
 
+# Opt-in via `conditional_python_dependency: true` in vinca.yaml (default: off, every
+# package gets python/numpy/pip as above). When on, only packages for which
+# _package_needs_python() holds get python in host/run (plus numpy/pip in host); every
+# other package keeps only a build-time interpreter, which ament's CMake tooling needs
+# regardless (environment hooks, package.xml parsing, index generation). That one is
+# pinned to python_min rather than a bare "python": a fully resolved version
+# constraint is invisible to rattler-build's variant scan (confirmed with
+# `rattler-build build --render-only`: one variant instead of one per pinned Python),
+# so a package without Python content is not rebuilt per Python version.
+# `default('3.11')` covers a conda_build_config.yaml without python_min, which would
+# otherwise render the invalid spec "python .*".
+_BUILD_TIME_PYTHON = "python ${{ python_min | default('3.11') }}.*"
+_HOST_PYTHON = ("python", "numpy", "pip")
+
+
+def _conditional_python(vinca_conf: dict[str, Any]) -> bool:
+    return bool(vinca_conf.get("conditional_python_dependency", False))
+
+
+# Dependency names that indicate a package's own recipe genuinely needs a
+# Python interpreter/ABI in host/run (as opposed to Python merely being a
+# build-time tool for ament's own scripts, see _BUILD_TIME_PYTHON).
+#
+# Deliberately NOT included: rosidl_default_generators/rosidl_generator_py.
+# Real-world case found while testing on ros-humble: rclcpp (a pure C++
+# library, not a rosidl_interface_packages member) declares
+# <test_depend>rosidl_default_generators</test_depend> solely to generate
+# *test* message types (test_msgs) for its own test suite -- nothing to do
+# with rclcpp's own shipped artifact having Python content. The
+# member_of_groups check above is the precise, authoritative signal for "this
+# package itself has rosidl-generated Python bindings"; these two names would
+# only ever add noise on top of it.
+_PYTHON_DEPENDENCY_MARKERS = frozenset(
+    {
+        "rclpy",
+        "pybind11",
+        "python_cmake_module",
+        "ament_cmake_python",
+    }
+)
+
+
+def _package_needs_python(package: catkin_pkg.package.Package, build_type: str) -> bool:
+    """Decide whether a package's OWN artifact needs Python (host/run), ahead of
+    building anything.
+
+    This is deliberately conservative in the direction of false positives: a
+    package wrongly marked as needing Python just gets rebuilt once per Python
+    version for no benefit, whereas a package wrongly marked as NOT needing it
+    would silently be skipped when rebuilding for additional Python versions
+    and ship a stale/missing artifact for those versions. So every check here
+    is an "if in doubt, say yes":
+
+    * ``ament_python`` packages are pure Python by construction.
+    * Any ``rosidl_interface_packages`` member (i.e. it has .msg/.srv/.action
+      files) gets rosidl_generator_py-compiled Python bindings unconditionally,
+      independent of what build_type or explicit dependencies it declares.
+    * Anything that actually depends (build, exec, run, or test -- a test-only
+      dependency still means Python must be importable to run the test suite
+      during the build) on a known Python-flavored package name, or on any
+      rosdep key containing "python" or starting with "pybind" (catches the
+      python3-*/python-* rosdep naming conventions along with pybind11
+      variants), needs Python.
+
+    ``buildtool_depend``/``buildtool_export_depend`` are deliberately NOT
+    scanned: by ROS's own convention that tag means "a tool needed to invoke
+    the build system" (e.g. many ament_cmake packages declare a plain
+    ``<buildtool_depend>python3</buildtool_depend>`` purely so a codegen
+    script can run at build time), never "this package's shipped artifact
+    contains Python content" -- and build-time-only Python is already covered
+    by the ``python_min``-pinned ``_BUILD_TIME_PYTHON`` every recipe gets.
+
+    Everything else -- the vast majority of ROS packages, which are plain C/
+    C++ libraries and nodes -- does not, and skips the Python host/run
+    dependency (and therefore the per-Python-version rebuild) entirely.
+    """
+    if build_type == "ament_python":
+        return True
+    if any(
+        group.name == "rosidl_interface_packages" for group in package.member_of_groups
+    ):
+        return True
+    dependency_names = {
+        dependency.name
+        for dependency in (
+            *package.build_depends,
+            *package.build_export_depends,
+            *package.exec_depends,
+            *package.run_depends,
+            *package.test_depends,
+        )
+    }
+    if dependency_names & _PYTHON_DEPENDENCY_MARKERS:
+        return True
+    return any(
+        "python" in name or name.startswith("pybind") for name in dependency_names
+    )
+
 
 def get_depmods(
     vinca_conf: dict[str, Any], package_name: str, distro: Distro
@@ -124,9 +222,18 @@ def _initial_output(
     vinca_conf: dict[str, Any],
 ) -> dict[str, Any]:
     if not is_dummy_metapackage(shortname, vinca_conf):
+        requirements = copy.deepcopy(_BASE_REQUIREMENTS)
+        if _conditional_python(vinca_conf):
+            requirements["build"] = [
+                _BUILD_TIME_PYTHON if r == "python" else r
+                for r in requirements["build"]
+            ]
+            requirements["host"] = [
+                r for r in requirements["host"] if r not in _HOST_PYTHON
+            ]
         return {
             "package": {"name": package_name, "version": version},
-            "requirements": copy.deepcopy(_BASE_REQUIREMENTS),
+            "requirements": requirements,
             "build": {"script": ""},
         }
 
@@ -347,12 +454,19 @@ def generate_output(
     package = catkin_pkg.package.parse_package_string(xml)
     package.evaluate_conditions(os.environ)
 
-    python_dependencies = resolve_pkgname("python", vinca_conf, distro)
-    output["requirements"]["run"].extend(python_dependencies)
-    output["requirements"]["host"].extend(python_dependencies)
-
     is_dummy = is_dummy_metapackage(shortname, vinca_conf)
     build_type = package.get_build_type()
+
+    conditional_python = _conditional_python(vinca_conf)
+    if not conditional_python or (
+        not is_dummy and _package_needs_python(package, build_type)
+    ):
+        python_dependencies = resolve_pkgname("python", vinca_conf, distro)
+        output["requirements"]["run"].extend(python_dependencies)
+        output["requirements"]["host"].extend(python_dependencies)
+        if conditional_python:
+            output["requirements"]["host"].extend(["numpy", "pip"])
+
     if not is_dummy:
         try:
             output["build"]["script"] = _BUILD_SCRIPTS[build_type]
@@ -412,12 +526,18 @@ def generate_output(
     # Build tools normally belong in `host`, but git has to be in `build` so that it
     # is runnable on the build machine when cross-compiling. cmake is already part of
     # the base build requirements, so re-adding it would only create a duplicate.
+    # With conditional_python_dependency, python3/python as a buildtool_depend (just an
+    # interpreter for a codegen script, e.g. rclcpp's for ament_cmake_gen_version_h) is
+    # covered by _BUILD_TIME_PYTHON; a bare "python" here would put the package back
+    # into the per-Python-version build matrix.
     for dependency in build_tools:
         resolved = resolve_pkgname(dependency, vinca_conf, distro)
         if not resolved:
             unsatisfied.add(dependency)
         elif "git" in resolved:
             output["requirements"]["build"].extend(resolved)
+        elif conditional_python and resolved == ["python"]:
+            pass
         elif dependency != "cmake":
             build_dependencies.append(dependency)
 
