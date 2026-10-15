@@ -1,6 +1,4 @@
-import os
-
-from vinca.sources import _relative_patch_paths, generate_source, source_reference
+from vinca.sources import _recipe_patch_paths, generate_source, source_reference
 
 
 class FakeDistro:
@@ -58,24 +56,19 @@ def test_generate_source_combines_generic_and_platform_patches(tmp_path, monkeyp
         "url": "https://example.com/demo.tar.gz",
         "sha256": "abc123",
         "target_directory": "ros-humble-demo/src/work",
-        "patches": ["patches/demo.patch", "patches/demo.linux.patch"],
+        "patches": ["patch/demo.patch", "patch/demo.linux.patch"],
     }
 
 
-def test_relative_patch_paths_use_posix_separators(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    patch = tmp_path / "patches" / "demo.patch"
-
-    assert _relative_patch_paths([str(patch)]) == ["patches/demo.patch"]
-
-
-def test_relative_patch_paths_fall_back_to_absolute_without_a_shared_root(monkeypatch):
-    def explode(_paths):
-        raise ValueError("paths don't have the same drive")
-
-    monkeypatch.setattr(os.path, "commonpath", explode)
-
-    assert _relative_patch_paths(["/elsewhere/demo.patch"]) == ["/elsewhere/demo.patch"]
+def test_recipe_refers_to_patches_next_to_it():
+    # wherever the patches live (another configuration's directory, another drive),
+    # the recipe refers to patch/<file>; the template copies them there
+    assert _recipe_patch_paths(
+        ["/elsewhere/patch/demo.patch", "C:/x/demo.win.patch"]
+    ) == [
+        "patch/demo.patch",
+        "patch/demo.win.patch",
+    ]
 
 
 def test_generate_source_skips_already_built_package():

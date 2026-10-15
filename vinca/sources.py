@@ -13,7 +13,6 @@ containing every package.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -41,7 +40,7 @@ def _is_built(package_name: str, version: str, vinca_conf: dict[str, Any]) -> bo
     return key in skipped
 
 
-def _package_patches(
+def package_patches(
     package_name: str, vinca_conf: dict[str, Any], platform: str
 ) -> list[str]:
     """Return the generic patches for a package followed by its platform-specific ones."""
@@ -51,17 +50,14 @@ def _package_patches(
     return [*configured.get("any", []), *configured.get(platform.split("-")[0], [])]
 
 
-def _relative_patch_paths(patches: list[str]) -> list[str]:
-    """Rewrite patch paths relative to their closest shared root with the recipe.
+def _recipe_patch_paths(patches: list[str]) -> list[str]:
+    """Where the recipe refers to its patches: ``patch/<file>`` next to the recipe.
 
-    Falls back to absolute paths when no shared root exists, which on Windows happens
-    whenever the patches live on a different drive than the working directory.
+    The template copies each patch from where it lives (the configuration's patch
+    directory, or one of a configuration it extends), so patches outside the working
+    directory, or on another drive on Windows, work too.
     """
-    try:
-        common_root = os.path.commonpath([os.getcwd(), *patches])
-    except ValueError:
-        return [Path(patch).as_posix() for patch in patches]
-    return [Path(os.path.relpath(patch, common_root)).as_posix() for patch in patches]
+    return [f"patch/{Path(patch).name}" for patch in patches]
 
 
 def generate_source(
@@ -69,9 +65,8 @@ def generate_source(
 ) -> dict[str, dict[str, Any]]:
     """Generate per-package release sources for a multi-recipe build.
 
-    Patch paths are rewritten relative to the closest shared ancestor of the working
-    directory and the patches themselves, because rattler-build resolves them
-    relative to the recipe.
+    Patches are referred to as ``patch/<file>`` next to the recipe, because
+    rattler-build resolves them relative to the recipe; the template copies them.
     """
     sources: dict[str, dict[str, Any]] = {}
     for shortname in vinca_conf["_selected_pkgs"]:
@@ -92,10 +87,10 @@ def generate_source(
         entry: dict[str, Any] = source_reference(url=url, ref=ref, ref_type=ref_type)
         entry["target_directory"] = f"{package_name}/src/work"
 
-        patches = _package_patches(package_name, vinca_conf, platform)
+        patches = package_patches(package_name, vinca_conf, platform)
         if patches:
             print(patches)
-            entry["patches"] = _relative_patch_paths(patches)
+            entry["patches"] = _recipe_patch_paths(patches)
         sources[package_name] = entry
 
     mutex_recipe = generate_mutex_package_recipe(vinca_conf, distro)
@@ -129,7 +124,7 @@ def generate_source_version(
         package_name = package_names[0]
         entry: dict[str, Any] = source_reference(url=url, ref=ref, ref_type=ref_type)
         entry["target_directory"] = f"{package_name}/src/work"
-        if patches := _package_patches(package_name, vinca_conf, platform):
+        if patches := package_patches(package_name, vinca_conf, platform):
             entry["patches"] = patches
         sources[package_name] = entry
     return sources
