@@ -132,6 +132,16 @@ def main():
             )
             continue
 
+        # A release repository that was removed (e.g. humble's affordance_primitives)
+        # leaves no package.xml in the rosdistro cache to read the dependencies from.
+        if distro.get_release_package_xml(dep) is None:
+            print(
+                "\033[93mPackage '{}' has no package.xml, skipping...\033[0m".format(
+                    dep
+                )
+            )
+            continue
+
         output[dep] = {
             "url": url,
             "version": version,
