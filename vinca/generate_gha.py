@@ -18,6 +18,7 @@ from vinca.utils import (
     NoAliasDumper,
     add_test_requirements,
     build_requirement_graph,
+    built_for_distro,
     extract_dependency_names,
 )
 from vinca.utils import literal_unicode as lu
@@ -117,6 +118,7 @@ def add_additional_recipes(args):
                     pkg["name"] == name
                     and pkg["version"] == version
                     and pkg["build_number"] == bnumber
+                    and built_for_distro(pkg, vinca_conf["ros_distro"])
                 ):
                     skip = True
                     print(f"{name}=={version}=={bnumber} already exists. Skipping.")
