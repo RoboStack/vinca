@@ -28,7 +28,7 @@ colcon build ^
      -DBUILD_TESTING=OFF ^
      -DPYTHON_INSTALL_DIR=%PYTHON_INSTALL_DIR% ^
      -DPYTHON_EXECUTABLE=%PYTHON%
-if errorlevel 1 exit 1
+if %errorlevel% neq 0 exit 1
 
 :: Copy the [de]activate scripts to %PREFIX%\etc\conda\[de]activate.d.
 :: This will allow them to be run on environment activation.
