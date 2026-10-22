@@ -159,12 +159,16 @@ def dump_for_gha(doc, f):
 
 
 def get_stage_name(batch):
-    legacy_prefix = f"ros-{config.ros_distro}-"
+    """Job name: the batch's packages without their ros-<distro>- or ros2- prefix, each
+    once (with package_name_mode: both a package has a recipe under either name)."""
+    prefixes = (f"ros-{config.ros_distro}-", "ros2-")
     stage_name = []
     for pkg in batch:
-        if pkg.startswith(legacy_prefix):
-            stage_name.append(pkg[len(legacy_prefix) :])
-        else:
+        for prefix in prefixes:
+            if pkg.startswith(prefix):
+                pkg = pkg[len(prefix) :]
+                break
+        if pkg not in stage_name:
             stage_name.append(pkg)
     return " ".join(stage_name)
 

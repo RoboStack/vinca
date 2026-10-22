@@ -27,19 +27,21 @@ def rolling_distro():
     [
         ("ros-rolling-rclcpp", "rclcpp"),
         ("ros-rolling-ament-package", "ament-package"),
-        ("ros2-rclcpp", "ros2-rclcpp"),
-        ("ros2-ament-package", "ros2-ament-package"),
-        ("ros2-distro-mutex", "ros2-distro-mutex"),
+        ("ros2-rclcpp", "rclcpp"),
+        ("ros2-ament-package", "ament-package"),
+        ("ros2-distro-mutex", "distro-mutex"),
+        ("ros2-ros2-control", "ros2-control"),
+        ("ros2cli", "ros2cli"),
         ("ros-humble-rclcpp", "ros-humble-rclcpp"),
     ],
 )
-def test_get_stage_name_strips_only_the_legacy_prefix(package, expected):
+def test_get_stage_name_strips_the_package_prefix(package, expected):
     assert get_stage_name([package]) == expected
 
 
-def test_get_stage_name_joins_a_batch():
-    batch = ["ros-rolling-rclcpp", "ros2-ament-package"]
-    assert get_stage_name(batch) == "rclcpp ros2-ament-package"
+def test_get_stage_name_joins_a_batch_and_lists_each_package_once():
+    batch = ["ros2-rclcpp", "ros-rolling-rclcpp", "ros2-ament-package"]
+    assert get_stage_name(batch) == "rclcpp ament-package"
 
 
 def test_unix_pipeline_sets_up_pixi(tmp_path):
