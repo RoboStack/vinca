@@ -28,8 +28,11 @@ pushd build
 
 set SKIP_TESTING=@(skip_testing)
 
+:: Name intermediate directories and object files by short hashes (CMake >= 4.2): long
+:: package names otherwise push object paths past MSVC's 260 characters (error C1083).
 cmake ^
     -G "Ninja" ^
+    -DCMAKE_INTERMEDIATE_DIR_STRATEGY=SHORT ^
     --compile-no-warning-as-error ^
     -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ^
     -DCMAKE_BUILD_TYPE=Release ^

@@ -24,6 +24,7 @@ colcon build ^
     --cmake-args ^
     --compile-no-warning-as-error ^
      -G Ninja ^
+     -DCMAKE_INTERMEDIATE_DIR_STRATEGY=SHORT ^
      -DCMAKE_BUILD_TYPE=Release ^
      -DBUILD_TESTING=OFF ^
      -DPYTHON_INSTALL_DIR=%PYTHON_INSTALL_DIR% ^
