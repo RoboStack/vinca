@@ -27,6 +27,12 @@ def _chunks(items: list[str], size: int) -> list[list[str]]:
     return [items[index : index + size] for index in range(0, len(items), size)]
 
 
+def default_runners(platform: str) -> int:
+    """GitHub's default limit on concurrent jobs with its hosted runners (the Free plan):
+    20 in total, of which 5 macOS."""
+    return 5 if platform.startswith("osx") else 20
+
+
 @dataclass(frozen=True)
 class BuildTimings:
     """Measured build times, for packing each stage's packages into jobs by time.
@@ -34,16 +40,18 @@ class BuildTimings:
     ``recipes`` maps package names to their build (and upload) seconds; packages
     without a measurement count as ``default`` seconds. ``job_overhead`` is the fixed
     cost of a CI job (checkout, environment setup, dispatch). ``runners`` is the number
-    of jobs that can run at once.
+    of jobs that can run at once (default: GitHub's limit, see default_runners).
     """
 
     recipes: Mapping[str, float]
     default: float = 20.0
     job_overhead: float = 30.0
-    runners: int = 8
+    runners: int = 20
 
     @classmethod
-    def from_file(cls, path: str | Path, runners: int | None = None) -> BuildTimings:
+    def from_file(
+        cls, path: str | Path, runners: int | None = None, platform: str = ""
+    ) -> BuildTimings:
         """Read a JSON file ``{"recipes": {name: seconds}, "default": s, "job_overhead": s}``."""
         with Path(path).open(encoding="utf-8") as stream:
             data = json.load(stream)
@@ -57,7 +65,7 @@ class BuildTimings:
             recipes=recipes,
             default=float(default),
             job_overhead=float(data.get("job_overhead", cls.job_overhead)),
-            runners=runners or int(data.get("runners", cls.runners)),
+            runners=runners or int(data.get("runners", default_runners(platform))),
         )
 
     def seconds(self, package: str) -> float:

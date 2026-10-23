@@ -145,6 +145,9 @@ def test_build_timings_from_file(tmp_path):
     assert timings.seconds("c") == 100
     assert timings.seconds("unknown") == 7  # the median
     assert (timings.job_overhead, timings.runners) == (12, 3)
+    # GitHub's default limits on concurrent jobs
+    assert BuildTimings.from_file(path, platform="linux-64").runners == 20
+    assert BuildTimings.from_file(path, platform="osx-arm64").runners == 5
 
 
 def test_batch_stages_builds_followers_right_after_their_leader(tmp_path):

@@ -101,7 +101,8 @@ def parse_command_line(argv):
         dest="runners",
         default=None,
         type=int,
-        help="With --timings: how many jobs can run at once (default 8, or the file's)",
+        help="With --timings: how many jobs can run at once (default: the file's, else "
+        "GitHub's limit for hosted runners, 20, or 5 on macOS)",
     )
 
     arguments = parser.parse_args(argv[1:])
@@ -584,7 +585,9 @@ def main():
             filtered_stages.append(filtered)
 
     timings = (
-        BuildTimings.from_file(args.timings, args.runners) if args.timings else None
+        BuildTimings.from_file(args.timings, args.runners, args.platform)
+        if args.timings
+        else None
     )
     followers = compatibility_followers(filtered_stages) if timings else None
     stages = batch_stages(
