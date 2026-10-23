@@ -106,7 +106,7 @@ def test_setup_pixi_versions_must_not_be_empty():
         get_setup_pixi_step(setup_pixi_version="  ")
 
 
-def test_win_pipeline_inlines_the_repository_build_script(tmp_path, monkeypatch):
+def test_win_pipeline_calls_the_repository_build_script(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".scripts").mkdir()
     (tmp_path / ".scripts" / "build_win.bat").write_text("echo repository script\n")
@@ -116,7 +116,8 @@ def test_win_pipeline_inlines_the_repository_build_script(tmp_path, monkeypatch)
 
     workflow = pytest.importorskip("yaml").safe_load(outfile.read_text())
     steps = workflow["jobs"]["stage_0_job_0"]["steps"]
-    assert "echo repository script" in steps[-1]["run"]
+    assert steps[-1]["run"] == "call .scripts\\build_win.bat"
+    assert steps[-1]["env"]["CURRENT_RECIPES"] == "ros2-rclcpp"
 
 
 def test_win_pipeline_requires_the_repository_build_script(tmp_path, monkeypatch):

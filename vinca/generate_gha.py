@@ -16,6 +16,7 @@ from vinca.main import get_conda_subdir, read_vinca_yaml
 from vinca.pipeline import (
     BuildTimings,
     batch_stages,
+    default_runners,
     get_all_ancestors,
     get_skip_existing,
 )
@@ -182,8 +183,16 @@ def dump_for_gha(doc, f):
 
     workflow_size = os.path.getsize(f)
     if workflow_size > MAX_WORKFLOW_SIZE_BYTES:
-        raise RuntimeError(
-            f"Generated workflow {f} is {workflow_size / 1024:.1f} KiB, exceeding "
+        raise WorkflowTooLarge(workflow_size, f)
+
+
+class WorkflowTooLarge(RuntimeError):
+    """GitHub refuses workflow files over MAX_WORKFLOW_SIZE_BYTES."""
+
+    def __init__(self, size: int, path: str):
+        self.size = size
+        super().__init__(
+            f"Generated workflow {path} is {size / 1024:.1f} KiB, exceeding "
             f"the {MAX_WORKFLOW_SIZE_BYTES / 1024:.0f} KiB limit. Increase "
             "--batch_size to reduce the number of generated jobs."
         )
@@ -324,7 +333,7 @@ def build_unix_pipeline(
                 DISABLE_GIT_MAINTENANCE_STEP,
                 get_setup_pixi_step(setup_pixi_version, pixi_version),
                 {
-                    "name": f"Build {' '.join([pkg for pkg in batch])}",
+                    "name": "Build",
                     "env": build_env,
                     "run": script,
                 },
@@ -423,14 +432,14 @@ def build_win_pipeline(
     if workflow is None:
         workflow = blurb
 
-    # The build script is the repository's own; it is inlined into the workflow.
+    # The build script is the repository's own: each job calls it from its checkout
+    # (inlining its text into every job made the workflow too large for many jobs).
     if not os.path.exists(WINDOWS_BUILD_SCRIPT):
         raise FileNotFoundError(
             f"{WINDOWS_BUILD_SCRIPT} not found in {os.getcwd()}: the Windows workflow "
             "runs the repository's build script, run vinca-gha where it exists"
         )
-    with open(WINDOWS_BUILD_SCRIPT, encoding="utf-8") as fi:
-        script = lu(fi.read())
+    script = "call " + WINDOWS_BUILD_SCRIPT.replace("/", "\\")
 
     prev_batch_keys = []
     for i, s in enumerate(stages):
@@ -467,7 +476,7 @@ def build_win_pipeline(
                     "shell": "cmd",
                     "run": script,
                     "env": build_env,
-                    "name": f"Build {' '.join([pkg for pkg in batch])}",
+                    "name": "Build",
                 },
                 *keep_file_steps(),
             ]
@@ -618,13 +627,9 @@ def main():
     timings = (
         BuildTimings.from_file(args.timings, args.runners, args.platform)
         if args.timings
-        else None
+        else BuildTimings(recipes={}, runners=args.runners or default_runners(platform))
     )
-    followers = compatibility_followers(filtered_stages) if timings else None
-    stages = batch_stages(
-        filtered_stages, args.batch_size, timings=timings, followers=followers
-    )
-    print(stages)
+    followers = compatibility_followers(filtered_stages)
 
     with open("buildorder.txt", "w", encoding="utf-8") as fo:
         order = []
@@ -635,6 +640,32 @@ def main():
 
         fo.write("\n".join(order))
 
+    # as many jobs as fit GitHub's workflow size limit: when the workflow is too large,
+    # batch again with a job budget scaled down by how much it's over
+    budget = None
+    for _ in range(8):
+        stages = batch_stages(
+            filtered_stages,
+            args.batch_size,
+            timings=timings,
+            followers=followers,
+            job_budget=budget,
+        )
+        try:
+            write_pipeline(args, stages, platform, setup_pixi_version, pixi_version)
+            break
+        except WorkflowTooLarge as error:
+            jobs = sum(len(stage) for stage in stages)
+            if budget is not None and jobs > budget:
+                raise  # can't get smaller: the batch size limits the jobs
+            budget = max(1, int(jobs * MAX_WORKFLOW_SIZE_BYTES / error.size * 0.95))
+            print(f"{error}; batching again with at most {budget} jobs")
+    else:
+        raise RuntimeError("could not fit the workflow into GitHub's size limit")
+
+
+def write_pipeline(args, stages, platform, setup_pixi_version, pixi_version):
+    """Write the platform's staged workflow for these stages."""
     if args.platform == "linux-64":
         build_unix_pipeline(
             stages,
