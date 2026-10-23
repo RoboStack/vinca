@@ -13,7 +13,12 @@ from rich import print
 
 from vinca import config
 from vinca.main import get_conda_subdir, read_vinca_yaml
-from vinca.pipeline import batch_stages, get_all_ancestors, get_skip_existing
+from vinca.pipeline import (
+    BuildTimings,
+    batch_stages,
+    get_all_ancestors,
+    get_skip_existing,
+)
 from vinca.utils import (
     NoAliasDumper,
     add_test_requirements,
@@ -80,6 +85,23 @@ def parse_command_line(argv):
         default=5,
         type=int,
         help="How many packages to build at most per stage",
+    )
+
+    parser.add_argument(
+        "--timings",
+        dest="timings",
+        default=None,
+        help='JSON file of measured build times ({"recipes": {name: seconds}, "default": '
+        'seconds, "job_overhead": seconds}): pack each stage\'s packages into jobs by '
+        "time instead of by count",
+    )
+
+    parser.add_argument(
+        "--runners",
+        dest="runners",
+        default=None,
+        type=int,
+        help="With --timings: how many jobs can run at once (default 8, or the file's)",
     )
 
     arguments = parser.parse_args(argv[1:])
@@ -548,7 +570,10 @@ def main():
         if len(filtered):
             filtered_stages.append(filtered)
 
-    stages = batch_stages(filtered_stages, args.batch_size)
+    timings = (
+        BuildTimings.from_file(args.timings, args.runners) if args.timings else None
+    )
+    stages = batch_stages(filtered_stages, args.batch_size, timings=timings)
     print(stages)
 
     with open("buildorder.txt", "w", encoding="utf-8") as fo:
