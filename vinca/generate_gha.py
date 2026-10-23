@@ -13,7 +13,12 @@ from rich import print
 
 from vinca import config
 from vinca.main import get_conda_subdir, read_vinca_yaml
-from vinca.pipeline import batch_stages, get_all_ancestors, get_skip_existing
+from vinca.pipeline import (
+    BuildTimings,
+    batch_stages,
+    get_all_ancestors,
+    get_skip_existing,
+)
 from vinca.utils import (
     NoAliasDumper,
     add_test_requirements,
@@ -80,6 +85,32 @@ def parse_command_line(argv):
         default=5,
         type=int,
         help="How many packages to build at most per stage",
+    )
+
+    parser.add_argument(
+        "--timings",
+        dest="timings",
+        default=None,
+        help='JSON file of measured build times ({"recipes": {name: seconds}, "default": '
+        'seconds, "job_overhead": seconds}): pack each stage\'s packages into jobs by '
+        "time instead of by count",
+    )
+
+    parser.add_argument(
+        "--keep-file",
+        dest="keep_file",
+        default=None,
+        help="Keep this file of each build job (relative to the checkout) as an artifact "
+        "named after the job, e.g. build times it recorded",
+    )
+
+    parser.add_argument(
+        "--runners",
+        dest="runners",
+        default=None,
+        type=int,
+        help="With --timings: how many jobs can run at once (default: the file's, else "
+        "GitHub's limit for hosted runners, 20, or 5 on macOS)",
     )
 
     arguments = parser.parse_args(argv[1:])
@@ -173,6 +204,40 @@ def get_stage_name(batch):
     return " ".join(stage_name)
 
 
+def keep_file_steps() -> list[dict[str, Any]]:
+    """With --keep-file: a last step that keeps that file of the job (e.g. the build
+    times it recorded) as an artifact, also when the build failed."""
+    path = getattr(config.parsed_args, "keep_file", None)
+    if not path:
+        return []
+    return [
+        {
+            "name": "Keep " + os.path.basename(path),
+            "if": "always()",
+            "uses": "actions/upload-artifact@v6",
+            "with": {
+                "name": "${{ github.job }}-${{ github.run_attempt }}",
+                "path": path,
+                "if-no-files-found": "ignore",
+                "retention-days": 30,
+            },
+        }
+    ]
+
+
+def compatibility_followers(stages: list[list[str]]) -> dict[str, list[str]]:
+    """With package_name_mode: both, each ros-<distro>-<name> compatibility package only
+    depends on ros2-<name> (and the mutex, which that needs as well): it is built right
+    after it, in the same job, instead of in a stage of its own."""
+    prefix = f"ros-{config.ros_distro}-"
+    packages = {package for stage in stages for package in stage}
+    return {
+        f"ros2-{package[len(prefix) :]}": [package]
+        for package in sorted(packages)
+        if package.startswith(prefix) and f"ros2-{package[len(prefix) :]}" in packages
+    }
+
+
 def normalize_version(version: str) -> str:
     """Normalize a release while leaving action refs such as commit SHAs intact."""
     version = str(version).strip()
@@ -263,6 +328,7 @@ def build_unix_pipeline(
                     "env": build_env,
                     "run": script,
                 },
+                *keep_file_steps(),
             ]
 
             job = {
@@ -403,6 +469,7 @@ def build_win_pipeline(
                     "env": build_env,
                     "name": f"Build {' '.join([pkg for pkg in batch])}",
                 },
+                *keep_file_steps(),
             ]
 
             job = {
@@ -548,7 +615,15 @@ def main():
         if len(filtered):
             filtered_stages.append(filtered)
 
-    stages = batch_stages(filtered_stages, args.batch_size)
+    timings = (
+        BuildTimings.from_file(args.timings, args.runners, args.platform)
+        if args.timings
+        else None
+    )
+    followers = compatibility_followers(filtered_stages) if timings else None
+    stages = batch_stages(
+        filtered_stages, args.batch_size, timings=timings, followers=followers
+    )
     print(stages)
 
     with open("buildorder.txt", "w", encoding="utf-8") as fo:
