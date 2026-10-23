@@ -172,7 +172,10 @@ def add_additional_recipes(args):
 #       - '*.yaml'
 
 
-MAX_WORKFLOW_SIZE_BYTES = 500 * 1024
+MAX_WORKFLOW_SIZE_BYTES = 500 * 1024  # GitHub refuses larger workflow files
+# what the generated workflow stays under: room for what callers add to the file
+# afterwards (RoboStack adds a few lines to every job, ~5 KiB for 150 jobs)
+WORKFLOW_SIZE_MARGIN_BYTES = 10 * 1024
 
 
 def dump_for_gha(doc, f):
@@ -182,7 +185,7 @@ def dump_for_gha(doc, f):
         fo.write(s)
 
     workflow_size = os.path.getsize(f)
-    if workflow_size > MAX_WORKFLOW_SIZE_BYTES:
+    if workflow_size > MAX_WORKFLOW_SIZE_BYTES - WORKFLOW_SIZE_MARGIN_BYTES:
         raise WorkflowTooLarge(workflow_size, f)
 
 
@@ -193,7 +196,8 @@ class WorkflowTooLarge(RuntimeError):
         self.size = size
         super().__init__(
             f"Generated workflow {path} is {size / 1024:.1f} KiB, exceeding "
-            f"the {MAX_WORKFLOW_SIZE_BYTES / 1024:.0f} KiB limit. Increase "
+            f"the {MAX_WORKFLOW_SIZE_BYTES / 1024:.0f} KiB limit (less a "
+            f"{WORKFLOW_SIZE_MARGIN_BYTES / 1024:.0f} KiB margin). Increase "
             "--batch_size to reduce the number of generated jobs."
         )
 
@@ -658,7 +662,8 @@ def main():
             jobs = sum(len(stage) for stage in stages)
             if budget is not None and jobs > budget:
                 raise  # can't get smaller: the batch size limits the jobs
-            budget = max(1, int(jobs * MAX_WORKFLOW_SIZE_BYTES / error.size * 0.95))
+            target = MAX_WORKFLOW_SIZE_BYTES - WORKFLOW_SIZE_MARGIN_BYTES
+            budget = max(1, int(jobs * target / error.size * 0.95))
             print(f"{error}; batching again with at most {budget} jobs")
     else:
         raise RuntimeError("could not fit the workflow into GitHub's size limit")
