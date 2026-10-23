@@ -56,10 +56,10 @@ def test_batch_stages_does_not_mutate_input(tmp_path):
     batches = batch_stages(stages, 3, config_path=config)
 
     assert stages == original
+    # consecutive short stages share a job, up to the batch size
     assert batches == [
         [["ros-special"]],
-        [["ros-a"]],
-        [["ros-b", "ros-c"]],
+        [["ros-a", "ros-b", "ros-c"]],
         [["ros-d", "ros-e"]],
     ]
 
@@ -78,9 +78,10 @@ def test_batch_stages_splits_large_stages(tmp_path):
     config = tmp_path / "vinca.yaml"
     config.write_text("{}\n")
 
-    assert batch_stages([["a", "b", "c", "d", "e"]], 2, config_path=config) == [
-        [["a", "b"], ["c", "d"], ["e"]]
-    ]
+    # no more than the batch size per job; without timings every package counts the same
+    batches = batch_stages([["a", "b", "c", "d", "e"]], 2, config_path=config)
+    assert len(batches) == 1 and all(len(job) <= 2 for job in batches[0])
+    assert sorted(p for job in batches[0] for p in job) == ["a", "b", "c", "d", "e"]
 
 
 def test_batch_stages_packs_by_time(tmp_path):
@@ -136,6 +137,19 @@ def test_batch_stages_with_timings_shares_jobs_between_short_stages(tmp_path):
     assert batches == [[["a", "b", "c"]], [["long"]], [["d"]]]
 
 
+def test_batch_stages_with_timings_shares_a_job_between_many_short_stages(tmp_path):
+    config = tmp_path / "vinca.yaml"
+    config.write_text("{}\n")
+    timings = BuildTimings(recipes={}, default=100, job_overhead=30, runners=8)
+
+    # each stage is short (100 s), together far longer: they still share jobs, up to
+    # the batch size, since they run one after another anyway
+    stages = [[f"p{i}"] for i in range(7)]
+    batches = batch_stages(stages, 3, config_path=config, timings=timings)
+
+    assert batches == [[["p0", "p1", "p2"]], [["p3", "p4", "p5"]], [["p6"]]]
+
+
 def test_build_timings_from_file(tmp_path):
     path = tmp_path / "timings.json"
     path.write_text('{"recipes": {"a": 5, "b": 7, "c": 100}, "job_overhead": 12}')
@@ -180,3 +194,36 @@ def test_batch_stages_keeps_followers_whose_leader_is_not_built(tmp_path):
     assert batch_stages(
         [["ros-x-a"]], 25, config_path=config, followers={"ros2-a": ["ros-x-a"]}
     ) == [[["ros-x-a"]]]
+
+
+def test_batch_stages_spends_the_job_budget_on_the_slowest_stages(tmp_path):
+    config = tmp_path / "vinca.yaml"
+    config.write_text("{}\n")
+    slow = [f"s{i}" for i in range(8)]
+    fast = [f"f{i}" for i in range(8)]
+    timings = BuildTimings(
+        recipes={**dict.fromkeys(slow, 600), **dict.fromkeys(fast, 30)},
+        job_overhead=10,
+        runners=8,
+    )
+
+    unlimited = batch_stages([slow, fast], 25, config_path=config, timings=timings)
+    budget = batch_stages(
+        [slow, fast], 25, config_path=config, timings=timings, job_budget=5
+    )
+
+    # without a budget both stages are split (the fast one less); with 5 jobs, the slow
+    # stage gets 4 of them, the fast one stays in one job
+    assert len(unlimited[0]) == 8 and len(unlimited[1]) > 1
+    assert [len(stage) for stage in budget] == [4, 1]
+
+
+def test_batch_stages_without_timings_splits_big_stages(tmp_path):
+    config = tmp_path / "vinca.yaml"
+    config.write_text("{}\n")
+
+    batches = batch_stages([[f"p{i}" for i in range(100)]], 25, config_path=config)
+
+    # every package counts the same: as many jobs as runners help (at most 20)
+    assert 4 < len(batches[0]) <= 20
+    assert all(len(job) <= 25 for job in batches[0])

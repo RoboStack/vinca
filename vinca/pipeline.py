@@ -19,7 +19,7 @@ import yaml
 
 from vinca.utils import get_repodata
 
-# with timings: consecutive single-job stages share a job while it stays this short
+# a stage this short is one job, shared with the short stages next to it
 SHARED_JOB_SECONDS = 120.0
 
 
@@ -95,28 +95,12 @@ def _pack(stage: list[str], jobs: int, timings: BuildTimings) -> list[list[str]]
     return [[stage[i] for i in sorted(job)] for job in members if job]
 
 
-def _pack_by_time(
-    stage: list[str], max_batch_size: int, timings: BuildTimings
-) -> list[list[str]]:
-    """The stage's packages in as few jobs as reach the shortest stage (within 1%),
-    given the runners and the overhead of each job; no job gets more than
-    max_batch_size packages."""
-    fewest = -(-len(stage) // max_batch_size)
-    most = max(fewest, min(len(stage), 4 * timings.runners))
-    candidates = []
-    for jobs in range(fewest, most + 1):
-        packed = _pack(stage, jobs, timings)
-        if any(len(job) > max_batch_size for job in packed):
-            continue
-        durations = [
-            timings.job_overhead + sum(map(timings.seconds, job)) for job in packed
-        ]
-        candidates.append((_makespan(durations, timings.runners), packed))
-    if not candidates:
-        return _chunks(stage, max_batch_size)
-    # fewer jobs (a smaller workflow) when that costs at most 1%
-    shortest = min(span for span, _ in candidates)
-    return next(packed for span, packed in candidates if span <= shortest * 1.01)
+def _span(jobs: list[list[str]], timings: BuildTimings) -> float:
+    """How long a stage of these jobs takes on the runners."""
+    return _makespan(
+        [timings.job_overhead + sum(map(timings.seconds, job)) for job in jobs],
+        timings.runners,
+    )
 
 
 def batch_stages(
@@ -126,23 +110,28 @@ def batch_stages(
     config_path: str | Path = "vinca.yaml",
     timings: BuildTimings | None = None,
     followers: Mapping[str, list[str]] | None = None,
+    job_budget: int | None = None,
 ) -> list[list[list[str]]]:
     """Group dependency stages into CI batches without mutating the input.
 
     The outer list preserves sequential dependency stages. Each inner list contains
     batches which can execute in parallel.
 
-    Without timings, a stage is cut into jobs of max_batch_size packages in order, and
-    consecutive small stages share a job. With timings, each stage is packed into jobs
-    by measured build time (longest first), so that no single job holds up the stage;
-    consecutive stages that need just one job share it while it stays short.
+    Each stage first gets as few jobs as max_batch_size (packages per job) allows, and
+    consecutive short stages (one job of at most SHARED_JOB_SECONDS each) share a job.
+    Then, as long as the job budget lasts, the stage whose duration one more job cuts the
+    most gets it, its packages packed into its jobs longest first: the jobs go where they
+    shorten the workflow most, and a smaller budget (e.g. for GitHub's workflow size
+    limit) still leaves the slowest stages split. A stage gets at most one job per
+    runner. Without timings every package counts the same (BuildTimings' default).
 
     followers maps a package to packages that are built right after it in its job (e.g.
     a compatibility package that only depends on it): they leave their own stage, and
-    with timings their time counts towards their leader's.
+    their time counts towards their leader's.
     """
     if max_batch_size < 1:
         raise ValueError("max_batch_size must be at least 1")
+    timings = timings or BuildTimings(recipes={})
 
     stages = [list(stage) for stage in stages]
     present = {package for stage in stages for package in stage}
@@ -155,13 +144,12 @@ def batch_stages(
     if following:
         stages = [[p for p in stage if p not in following] for stage in stages]
         stages = [stage for stage in stages if stage]
-        if timings is not None:
-            recipes = dict(timings.recipes)
-            for leader, members in follow.items():
-                recipes[leader] = timings.seconds(leader) + sum(
-                    map(timings.seconds, members)
-                )
-            timings = replace(timings, recipes=recipes)
+        recipes = dict(timings.recipes)
+        for leader, members in follow.items():
+            recipes[leader] = timings.seconds(leader) + sum(
+                map(timings.seconds, members)
+            )
+        timings = replace(timings, recipes=recipes)
 
     with Path(config_path).open(encoding="utf-8") as stream:
         vinca_conf = yaml.safe_load(stream) or {}
@@ -172,64 +160,94 @@ def batch_stages(
         or []
     )
 
-    result: list[list[list[str]]] = []
-    pending: list[str] = []
-    for original_stage in stages:
-        stage = list(original_stage)
-        own_stage = [package for package in stage if package in build_individually]
-        stage = [package for package in stage if package not in build_individually]
+    # units in order: (packages, splittable); a unit that isn't splittable is one job
+    units: list[tuple[list[str], bool]] = []
+    shared: list[str] = []  # consecutive short stages sharing one job
 
-        if own_stage:
-            if pending:
-                result.append([pending])
-                pending = []
-            for package in own_stage:
-                result.append([[package]])
+    def flush() -> None:
+        nonlocal shared
+        if shared:
+            units.append((shared, False))
+            shared = []
 
-        if timings is not None:
-            if not stage:
-                continue
-            seconds = sum(map(timings.seconds, stage))
-            if seconds <= SHARED_JOB_SECONDS and len(stage) <= max_batch_size:
-                # a short stage: one job, shared with the stages before it while that stays short
-                if (
-                    pending
-                    and len(pending) + len(stage) <= max_batch_size
-                    and sum(map(timings.seconds, pending)) + seconds
-                    <= SHARED_JOB_SECONDS
-                ):
-                    pending.extend(stage)
-                    continue
-                if pending:
-                    result.append([pending])
-                pending = stage
-                continue
-            if pending:
-                result.append([pending])
-                pending = []
-            result.append(_pack_by_time(stage, max_batch_size, timings))
+    for stage in stages:
+        own = [p for p in stage if p in build_individually]
+        stage = [p for p in stage if p not in build_individually]
+        if own:
+            flush()
+            units.extend(([p], False) for p in own)
+        if not stage:
             continue
+        short = sum(map(timings.seconds, stage)) <= SHARED_JOB_SECONDS
+        if short and len(stage) <= max_batch_size:
+            if len(shared) + len(stage) > max_batch_size:
+                flush()
+            shared = shared + stage
+            continue
+        flush()
+        units.append((stage, True))
+    flush()
 
-        if len(stage) >= max_batch_size:
-            if pending:
-                result.append([pending])
-                pending = []
-            result.append(_chunks(stage, max_batch_size))
-        elif len(pending) + len(stage) < max_batch_size:
-            pending.extend(stage)
-        else:
-            if pending:
-                result.append([pending])
-            pending = stage
+    # as few jobs as the batch size allows, then more where they cut the most time
+    jobs: list[list[list[str]]] = []
+    for packages, splittable in units:
+        if not splittable:
+            jobs.append([packages])
+            continue
+        count = -(-len(packages) // max_batch_size)
+        packed = _pack(packages, count, timings)
+        jobs.append(
+            packed
+            if all(len(job) <= max_batch_size for job in packed)
+            else _chunks(packages, max_batch_size)
+        )
 
-    if pending:
-        result.append([pending])
+    def more(index: int) -> tuple[float, list[list[str]]] | None:
+        """The unit's next packing with more jobs that is faster (e.g. 8 equal packages
+        only get faster again at 8 jobs once there are 4), and the time it saves per
+        added job."""
+        packages, splittable = units[index]
+        current = jobs[index]
+        most = min(len(packages), timings.runners)
+        if not splittable:
+            return None
+        span = _span(current, timings)
+        for count in range(len(current) + 1, most + 1):
+            packed = _pack(packages, count, timings)
+            if not all(len(job) <= max_batch_size for job in packed):
+                continue
+            saved = span - _span(packed, timings)
+            # not for a negligible gain: every job makes the workflow larger
+            if saved > 0.01 * span:
+                return saved / (len(packed) - len(current)), packed
+        return None
+
+    total = sum(len(stage) for stage in jobs)
+    candidates = []
+    for index in range(len(units)):
+        if (option := more(index)) is not None:
+            heapq.heappush(candidates, (-option[0], index))
+    while candidates and (job_budget is None or total < job_budget):
+        _, index = heapq.heappop(candidates)
+        option = more(index)  # recomputed: the unit's jobs may have changed
+        if option is None:
+            continue
+        if (
+            job_budget is not None
+            and total + len(option[1]) - len(jobs[index]) > job_budget
+        ):
+            continue
+        total += len(option[1]) - len(jobs[index])
+        jobs[index] = option[1]
+        if (option := more(index)) is not None:
+            heapq.heappush(candidates, (-option[0], index))
+
     if following:
-        result = [
+        jobs = [
             [[q for p in job for q in [p, *follow.get(p, [])]] for job in stage]
-            for stage in result
+            for stage in jobs
         ]
-    return result
+    return jobs
 
 
 def get_skip_existing(vinca_conf: Mapping[str, Any], platform: str) -> list[dict]:
