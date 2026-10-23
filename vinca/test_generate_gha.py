@@ -3,6 +3,7 @@
 import sys
 
 import pytest
+import yaml
 
 from vinca import config, generate_gha
 from vinca.generate_gha import (
@@ -202,3 +203,34 @@ def test_compatibility_followers():
     assert compatibility_followers(
         [["ros2-a", "ros2-distro-mutex"], ["ros-rolling-a", "ros-rolling-b"]]
     ) == {"ros2-a": ["ros-rolling-a"]}
+
+
+def test_keep_file_adds_an_artifact_step(tmp_path, monkeypatch):
+    import argparse
+
+    outfile = tmp_path / "linux.yml"
+    monkeypatch.setattr(
+        config, "parsed_args", argparse.Namespace(keep_file="work/times.jsonl")
+    )
+
+    build_unix_pipeline(
+        [[["ros-rolling-rclcpp"]]], "buildbranch_linux", outfile=str(outfile)
+    )
+
+    step = yaml.safe_load(outfile.read_text())["jobs"]["stage_0_job_0"]["steps"][-1]
+    assert step["uses"].startswith("actions/upload-artifact@")
+    assert step["if"] == "always()" and step["with"]["path"] == "work/times.jsonl"
+
+
+def test_no_artifact_step_without_keep_file(tmp_path, monkeypatch):
+    import argparse
+
+    outfile = tmp_path / "linux.yml"
+    monkeypatch.setattr(config, "parsed_args", argparse.Namespace())
+
+    build_unix_pipeline(
+        [[["ros-rolling-rclcpp"]]], "buildbranch_linux", outfile=str(outfile)
+    )
+
+    steps = yaml.safe_load(outfile.read_text())["jobs"]["stage_0_job_0"]["steps"]
+    assert not any("upload-artifact" in step.get("uses", "") for step in steps)

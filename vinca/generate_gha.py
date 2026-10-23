@@ -97,6 +97,14 @@ def parse_command_line(argv):
     )
 
     parser.add_argument(
+        "--keep-file",
+        dest="keep_file",
+        default=None,
+        help="Keep this file of each build job (relative to the checkout) as an artifact "
+        "named after the job, e.g. build times it recorded",
+    )
+
+    parser.add_argument(
         "--runners",
         dest="runners",
         default=None,
@@ -194,6 +202,27 @@ def get_stage_name(batch):
         if pkg not in stage_name:
             stage_name.append(pkg)
     return " ".join(stage_name)
+
+
+def keep_file_steps() -> list[dict[str, Any]]:
+    """With --keep-file: a last step that keeps that file of the job (e.g. the build
+    times it recorded) as an artifact, also when the build failed."""
+    path = getattr(config.parsed_args, "keep_file", None)
+    if not path:
+        return []
+    return [
+        {
+            "name": "Keep " + os.path.basename(path),
+            "if": "always()",
+            "uses": "actions/upload-artifact@v6",
+            "with": {
+                "name": "${{ github.job }}-${{ github.run_attempt }}",
+                "path": path,
+                "if-no-files-found": "ignore",
+                "retention-days": 30,
+            },
+        }
+    ]
 
 
 def compatibility_followers(stages: list[list[str]]) -> dict[str, list[str]]:
@@ -299,6 +328,7 @@ def build_unix_pipeline(
                     "env": build_env,
                     "run": script,
                 },
+                *keep_file_steps(),
             ]
 
             job = {
@@ -439,6 +469,7 @@ def build_win_pipeline(
                     "env": build_env,
                     "name": f"Build {' '.join([pkg for pkg in batch])}",
                 },
+                *keep_file_steps(),
             ]
 
             job = {
