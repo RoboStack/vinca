@@ -11,7 +11,7 @@ from __future__ import annotations
 import heapq
 import json
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +20,7 @@ import yaml
 from vinca.utils import get_repodata
 
 # with timings: consecutive single-job stages share a job while it stays this short
-SHARED_JOB_SECONDS = 300.0
+SHARED_JOB_SECONDS = 120.0
 
 
 def _chunks(items: list[str], size: int) -> list[list[str]]:
@@ -90,9 +90,9 @@ def _pack(stage: list[str], jobs: int, timings: BuildTimings) -> list[list[str]]
 def _pack_by_time(
     stage: list[str], max_batch_size: int, timings: BuildTimings
 ) -> list[list[str]]:
-    """The stage's packages in as few jobs as reach the shortest stage (within 1% or one
-    job's overhead), given the runners and the overhead of each job; no job gets more
-    than max_batch_size packages."""
+    """The stage's packages in as few jobs as reach the shortest stage (within 1%),
+    given the runners and the overhead of each job; no job gets more than
+    max_batch_size packages."""
     fewest = -(-len(stage) // max_batch_size)
     most = max(fewest, min(len(stage), 4 * timings.runners))
     candidates = []
@@ -106,10 +106,9 @@ def _pack_by_time(
         candidates.append((_makespan(durations, timings.runners), packed))
     if not candidates:
         return _chunks(stage, max_batch_size)
-    # fewer jobs (a smaller workflow) when that costs at most 1% or one job's overhead
+    # fewer jobs (a smaller workflow) when that costs at most 1%
     shortest = min(span for span, _ in candidates)
-    slack = max(shortest * 0.01, timings.job_overhead)
-    return next(packed for span, packed in candidates if span <= shortest + slack)
+    return next(packed for span, packed in candidates if span <= shortest * 1.01)
 
 
 def batch_stages(
@@ -118,6 +117,7 @@ def batch_stages(
     *,
     config_path: str | Path = "vinca.yaml",
     timings: BuildTimings | None = None,
+    followers: Mapping[str, list[str]] | None = None,
 ) -> list[list[list[str]]]:
     """Group dependency stages into CI batches without mutating the input.
 
@@ -128,9 +128,32 @@ def batch_stages(
     consecutive small stages share a job. With timings, each stage is packed into jobs
     by measured build time (longest first), so that no single job holds up the stage;
     consecutive stages that need just one job share it while it stays short.
+
+    followers maps a package to packages that are built right after it in its job (e.g.
+    a compatibility package that only depends on it): they leave their own stage, and
+    with timings their time counts towards their leader's.
     """
     if max_batch_size < 1:
         raise ValueError("max_batch_size must be at least 1")
+
+    stages = [list(stage) for stage in stages]
+    present = {package for stage in stages for package in stage}
+    follow = {
+        leader: [f for f in members if f in present]
+        for leader, members in (followers or {}).items()
+        if leader in present
+    }
+    following = {f for members in follow.values() for f in members}
+    if following:
+        stages = [[p for p in stage if p not in following] for stage in stages]
+        stages = [stage for stage in stages if stage]
+        if timings is not None:
+            recipes = dict(timings.recipes)
+            for leader, members in follow.items():
+                recipes[leader] = timings.seconds(leader) + sum(
+                    map(timings.seconds, members)
+                )
+            timings = replace(timings, recipes=recipes)
 
     with Path(config_path).open(encoding="utf-8") as stream:
         vinca_conf = yaml.safe_load(stream) or {}
@@ -193,6 +216,11 @@ def batch_stages(
 
     if pending:
         result.append([pending])
+    if following:
+        result = [
+            [[q for p in job for q in [p, *follow.get(p, [])]] for job in stage]
+            for stage in result
+        ]
     return result
 
 

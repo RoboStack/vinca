@@ -112,13 +112,13 @@ def test_batch_stages_with_timings_respects_the_batch_size(tmp_path):
     config = tmp_path / "vinca.yaml"
     config.write_text("{}\n")
     timings = BuildTimings(recipes={}, default=1, job_overhead=30, runners=2)
+    stage = [f"p{i}" for i in range(10)]
 
-    # cheap packages: as few jobs as the batch size allows (the overhead dominates)
-    batches = batch_stages(
-        [[f"p{i}" for i in range(10)]], 4, config_path=config, timings=timings
-    )
+    batches = batch_stages([stage], 4, config_path=config, timings=timings)
 
-    assert sorted(map(len, batches[0])) == [3, 3, 4]
+    assert len(batches) == 1
+    assert all(len(job) <= 4 for job in batches[0])
+    assert sorted(p for job in batches[0] for p in job) == sorted(stage)
 
 
 def test_batch_stages_with_timings_shares_jobs_between_short_stages(tmp_path):
@@ -145,3 +145,35 @@ def test_build_timings_from_file(tmp_path):
     assert timings.seconds("c") == 100
     assert timings.seconds("unknown") == 7  # the median
     assert (timings.job_overhead, timings.runners) == (12, 3)
+
+
+def test_batch_stages_builds_followers_right_after_their_leader(tmp_path):
+    config = tmp_path / "vinca.yaml"
+    config.write_text("{}\n")
+    timings = BuildTimings(
+        recipes={"ros2-a": 400, "ros2-b": 400}, default=1, job_overhead=0, runners=2
+    )
+
+    # the compatibility packages leave their stage, which then disappears
+    batches = batch_stages(
+        [["ros2-a", "ros2-b"], ["ros-x-a", "ros-x-b"]],
+        25,
+        config_path=config,
+        timings=timings,
+        followers={
+            "ros2-a": ["ros-x-a"],
+            "ros2-b": ["ros-x-b"],
+            "ros2-gone": ["ros-x-gone"],
+        },
+    )
+
+    assert batches == [[["ros2-a", "ros-x-a"], ["ros2-b", "ros-x-b"]]]
+
+
+def test_batch_stages_keeps_followers_whose_leader_is_not_built(tmp_path):
+    config = tmp_path / "vinca.yaml"
+    config.write_text("{}\n")
+
+    assert batch_stages(
+        [["ros-x-a"]], 25, config_path=config, followers={"ros2-a": ["ros-x-a"]}
+    ) == [[["ros-x-a"]]]

@@ -194,3 +194,11 @@ def test_only_later_stages_declare_needs(tmp_path, monkeypatch):
         assert "needs" not in jobs["stage_0_job_0"]
         assert "needs" not in jobs["stage_0_job_1"]
         assert jobs["stage_1_job_2"]["needs"] == ["stage_0_job_0", "stage_0_job_1"]
+
+
+def test_compatibility_followers():
+    from vinca.generate_gha import compatibility_followers
+
+    assert compatibility_followers(
+        [["ros2-a", "ros2-distro-mutex"], ["ros-rolling-a", "ros-rolling-b"]]
+    ) == {"ros2-a": ["ros-rolling-a"]}

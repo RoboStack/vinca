@@ -195,6 +195,19 @@ def get_stage_name(batch):
     return " ".join(stage_name)
 
 
+def compatibility_followers(stages: list[list[str]]) -> dict[str, list[str]]:
+    """With package_name_mode: both, each ros-<distro>-<name> compatibility package only
+    depends on ros2-<name> (and the mutex, which that needs as well): it is built right
+    after it, in the same job, instead of in a stage of its own."""
+    prefix = f"ros-{config.ros_distro}-"
+    packages = {package for stage in stages for package in stage}
+    return {
+        f"ros2-{package[len(prefix) :]}": [package]
+        for package in sorted(packages)
+        if package.startswith(prefix) and f"ros2-{package[len(prefix) :]}" in packages
+    }
+
+
 def normalize_version(version: str) -> str:
     """Normalize a release while leaving action refs such as commit SHAs intact."""
     version = str(version).strip()
@@ -573,7 +586,10 @@ def main():
     timings = (
         BuildTimings.from_file(args.timings, args.runners) if args.timings else None
     )
-    stages = batch_stages(filtered_stages, args.batch_size, timings=timings)
+    followers = compatibility_followers(filtered_stages) if timings else None
+    stages = batch_stages(
+        filtered_stages, args.batch_size, timings=timings, followers=followers
+    )
     print(stages)
 
     with open("buildorder.txt", "w", encoding="utf-8") as fo:
