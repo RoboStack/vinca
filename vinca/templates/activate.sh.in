@@ -20,6 +20,8 @@ case "$OSTYPE" in
     elif ! command -v cygpath > /dev/null 2>&1; then
       echo "Not activating ROS: cygpath not found" >&2
     else
+      # Keep an absolute path: a .dsv assignment may remove cygpath from PATH.
+      _ros_cygpath="$(command -v cygpath)"
       _ros_prefix_w="$(cygpath -w "$CONDA_PREFIX")"
       _ros_python="$(cygpath -u "$_ros_prefix_w\\python.exe")"
       _ros_util="$(cygpath -u "$_ros_prefix_w\\Library\\_local_setup_util.py")"
@@ -30,22 +32,27 @@ case "$OSTYPE" in
       if [ -f "$_ros_util" ]; then
         while IFS= read -r _ros_line; do
           case "$_ros_line" in
-            "export PATH=\""*";\$PATH\"")
-              # prepend: convert C:\...\bin to /c/.../bin and use ':'
-              _ros_value="${_ros_line#export PATH=\"}"
-              _ros_value="${_ros_value%;\$PATH\"}"
-              export PATH="$(cygpath -u "$_ros_value"):$PATH"
-              ;;
-            "export PATH="*)
-              # anything else touching PATH: skip rather than corrupt it
-              ;;
             "export "*"#:}")
               # strip a leading separator: ';' on Windows, not ':'
-              eval "${_ros_line%#:\}}#;}"
+              _ros_line="${_ros_line%#:\}}#;}"
               ;;
             "export "*"%:}")
               # strip a trailing separator: ';' on Windows, not ':'
-              eval "${_ros_line%\%:\}}%;}"
+              _ros_line="${_ros_line%\%:\}}%;}"
+              ;;
+          esac
+          case "$_ros_line" in
+            "export PATH="*)
+              # ament emits Windows lists even in sh mode. Evaluate against a
+              # Windows PATH in a subshell, then convert the complete result.
+              # This handles prepends, appends and assignments without mixing
+              # semicolons, drive-letter colons and Bash's ':' separators.
+              _ros_value="$(
+                PATH="$("$_ros_cygpath" -w -p "$PATH")"
+                eval "$_ros_line"
+                printf '%s' "$PATH"
+              )"
+              export PATH="$("$_ros_cygpath" -u -p "$_ros_value")"
               ;;
             "export "*)
               eval "$_ros_line"
@@ -60,7 +67,7 @@ EOF
       export ROS_ETC_DIR="$_ros_prefix_w\\Library\\etc\\ros"
       export AMENT_PREFIX_PATH="$_ros_prefix_w\\Library"
       export AMENT_PYTHON_EXECUTABLE="$_ros_prefix_w\\python.exe"
-      unset _ros_prefix_w _ros_python _ros_util _ros_line _ros_value
+      unset _ros_prefix_w _ros_python _ros_util _ros_line _ros_value _ros_cygpath
     fi
     ;;
   *)
