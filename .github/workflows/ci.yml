@@ -34,3 +34,16 @@ jobs:
 
     - name: Run tests
       run: pixi run test
+
+    - name: Install Windows ROS activation test environment
+      if: runner.os == 'Windows'
+      run: >-
+        pixi exec --spec conda -- conda env create --yes
+        --prefix "${{ runner.temp }}/vinca-ros-activation"
+        --file tests/windows/environment.yml
+
+    - name: Test ROS activation with conda and Git Bash
+      if: runner.os == 'Windows'
+      env:
+        VINCA_WINDOWS_ROS_PREFIX: ${{ runner.temp }}/vinca-ros-activation
+      run: pixi run pytest -v vinca/test_windows_activation.py

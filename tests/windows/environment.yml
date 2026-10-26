@@ -1,0 +1,11 @@
+name: vinca-ros-activation
+channels:
+  - robostack-jazzy
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - conda
+  - ros-jazzy-ros-workspace
+  - ros-jazzy-ros-environment
+  - ros-jazzy-ament-index-python
