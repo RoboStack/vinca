@@ -6,6 +6,7 @@ import argparse
 import glob
 import os
 import sys
+from pathlib import Path
 from typing import Any, Optional
 
 import catkin_pkg
@@ -38,6 +39,7 @@ from .platforms import get_conda_subdir as detect_conda_subdir
 from .recipes import generate_output as build_output
 from .recipes import get_depmods as get_depmods
 from .resolve import resolve_pkgname
+from .skip_existing import published_builds, remove_built_recipes
 from .sources import (
     generate_fat_source as build_fat_source,
 )
@@ -709,8 +711,12 @@ def main():
             write_recipe(sources, outputs, vinca_conf, distro)
 
     else:
+        # (name, version, build string) of the published builds; None: skip nothing
+        published = None
         if arguments.skip_already_built_repodata or vinca_conf.get("skip_existing"):
+            published = set()
             skip_built_packages = set()
+            vinca_conf["skip_built_packages"] = skip_built_packages
             fn = arguments.skip_already_built_repodata
             if not fn:
                 fn = vinca_conf.get("skip_existing")
@@ -745,6 +751,10 @@ def main():
 
                 print(f"Fetching repodata: {fn}")
                 repodata = get_repodata(fn, get_conda_subdir())
+                if arguments.multiple_file:
+                    # compared by exact build string once the recipes are written
+                    published |= published_builds([repodata], vinca_conf["ros_distro"])
+                    continue
                 # currently we don't check the build numbers of local repodatas,
                 # only URLs
                 if "://" in fn:
@@ -801,6 +811,16 @@ def main():
 
         if arguments.multiple_file:
             write_recipe(source, outputs, vinca_conf, distro, False)
+            if published is not None:
+                variant_config = Path(base_dir) / "conda_build_config.yaml"
+                removed = remove_built_recipes(
+                    Path("recipes").absolute(),
+                    get_conda_subdir(),
+                    variant_config if variant_config.is_file() else None,
+                    published,
+                )
+                print(f"Skipping {len(removed)} recipes whose builds are all published")
+                outputs = [o for o in outputs if o["package"]["name"] not in removed]
         else:
             write_recipe(source, outputs, vinca_conf, distro)
 

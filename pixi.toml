@@ -17,6 +17,7 @@ pyrefly = "*"
 pytest = "*"
 ruff = "*"
 vinca.path = "."
+rattler-build = ">=0.77.0,<0.78"
 
 [package.build]
 backend.name = "pixi-build-python"
