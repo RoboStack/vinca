@@ -19,3 +19,14 @@ unset ROS_OS_OVERRIDE
 unset ROS_LOCALHOST_ONLY
 unset ament_python_executable
 unset RMW_IMPLEMENTATION
+
+case "$OSTYPE" in
+  msys*|cygwin*)
+    # Windows (Git Bash / MSYS2 / Cygwin): also undo what activate.sh sets
+    # there, as deactivate.bat does.
+    unset PYTHONHOME
+    unset PYTHONPATH
+    unset QT_PLUGIN_PATH
+    unset AMENT_PYTHON_EXECUTABLE
+    ;;
+esac
