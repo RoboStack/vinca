@@ -558,3 +558,22 @@ def test_dummy_constraint_uses_pin_depth_and_override_version():
 def test_dummy_constraint_validates_required_settings(config, message):
     with pytest.raises(RuntimeError, match=message):
         _dummy_constraint(config, "1.0.0", "demo_vendor")
+
+
+def test_python_free_output_gets_contents_guard():
+    output = build_conditional("demo", depends=[("build_depend", "rclcpp")])
+
+    assert output["tests"] == [recipes._PYTHON_FREE_CONTENTS_TEST]
+    assert output["tests"][0] is not recipes._PYTHON_FREE_CONTENTS_TEST
+
+
+def test_python_output_gets_no_contents_guard():
+    output = build_conditional("demo", depends=[("exec_depend", "rclpy")])
+
+    assert "tests" not in output
+
+
+def test_no_contents_guard_without_conditional_python():
+    output = build("demo", depends=[("build_depend", "rclcpp")])
+
+    assert "tests" not in output

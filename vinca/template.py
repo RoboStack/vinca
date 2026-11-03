@@ -151,7 +151,7 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
                 test_content = evaluate_distro_selectors(
                     yaml.safe_load(text), ros_distro=config.ros_distro
                 )
-                meta["tests"] = test_content["tests"]
+                meta["tests"] = list(meta.get("tests") or []) + test_content["tests"]
 
             recipe_dir = (Path("recipes") / package_name).absolute()
             os.makedirs(recipe_dir, exist_ok=True)
