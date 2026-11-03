@@ -342,6 +342,22 @@ def test_needs_python_ignores_test_only_rosidl_default_generators():
     assert _host_run_python_markers(output) == (False, False, False, False)
 
 
+@pytest.mark.parametrize(
+    "tag, dependency",
+    [
+        # rosidl_cmake, ament_cmake_test, angles, srdfdom, ...: ament_cmake packages
+        # that install their own Python modules through ament_cmake_python
+        ("buildtool_depend", "ament_cmake_python"),
+        # rosidl_generator_rs: a generator whose Python code runs downstream
+        ("buildtool_export_depend", "rosidl_pycommon"),
+    ],
+)
+def test_needs_python_buildtool_marker_gets_python_dependency(tag, dependency):
+    output = build_conditional("demo", depends=[(tag, dependency)])
+
+    assert _host_run_python_markers(output) == (True, True, True, True)
+
+
 def test_mimick_vendor_moves_from_host_to_build():
     output = build("demo", depends=[("build_depend", "mimick_vendor")])
 

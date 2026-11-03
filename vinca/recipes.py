@@ -113,6 +113,7 @@ _PYTHON_DEPENDENCY_MARKERS = frozenset(
         "pybind11",
         "python_cmake_module",
         "ament_cmake_python",
+        "rosidl_pycommon",
     }
 )
 
@@ -139,13 +140,15 @@ def _package_needs_python(package: catkin_pkg.package.Package, build_type: str) 
       python3-*/python-* rosdep naming conventions along with pybind11
       variants), needs Python.
 
-    ``buildtool_depend``/``buildtool_export_depend`` are deliberately NOT
-    scanned: by ROS's own convention that tag means "a tool needed to invoke
-    the build system" (e.g. many ament_cmake packages declare a plain
+    ``buildtool_depend``/``buildtool_export_depend`` are only scanned for the
+    known markers: by ROS's own convention that tag means "a tool needed to
+    invoke the build system" (e.g. many ament_cmake packages declare a plain
     ``<buildtool_depend>python3</buildtool_depend>`` purely so a codegen
-    script can run at build time), never "this package's shipped artifact
-    contains Python content" -- and build-time-only Python is already covered
-    by the ``python_min``-pinned ``_BUILD_TIME_PYTHON`` every recipe gets.
+    script can run at build time), and build-time-only Python is already
+    covered by the ``python_min``-pinned ``_BUILD_TIME_PYTHON`` every recipe
+    gets. ``ament_cmake_python`` is the exception that matters: it is how an
+    ament_cmake package installs its own Python modules, and it is declared
+    as a buildtool_depend (rosidl_cmake, ament_cmake_test, angles, ...).
 
     Everything else -- the vast majority of ROS packages, which are plain C/
     C++ libraries and nodes -- does not, and skips the Python host/run
@@ -168,6 +171,15 @@ def _package_needs_python(package: catkin_pkg.package.Package, build_type: str) 
         )
     }
     if dependency_names & _PYTHON_DEPENDENCY_MARKERS:
+        return True
+    buildtool_names = {
+        dependency.name
+        for dependency in (
+            *package.buildtool_depends,
+            *package.buildtool_export_depends,
+        )
+    }
+    if buildtool_names & _PYTHON_DEPENDENCY_MARKERS:
         return True
     return any(
         "python" in name or name.startswith("pybind") for name in dependency_names
