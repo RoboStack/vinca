@@ -305,6 +305,27 @@ def test_needs_python_ament_python_build_type_gets_python_dependency():
     assert _host_run_python_markers(output) == (True, True, True, True)
 
 
+def test_needs_python_override_forces_python_dependency():
+    # e.g. plotjuggler: embeds libpython without a Python-flavored dependency
+    output = build_conditional(
+        "demo",
+        depends=[("build_depend", "rclcpp")],
+        _pkg_additional_info={"demo": {"needs_python": True}},
+    )
+
+    assert _host_run_python_markers(output) == (True, True, True, True)
+
+
+def test_needs_python_override_drops_python_dependency():
+    output = build_conditional(
+        "demo",
+        build_type="ament_python",
+        _pkg_additional_info={"demo": {"needs_python": False}},
+    )
+
+    assert _host_run_python_markers(output) == (False, False, False, False)
+
+
 def test_needs_python_test_only_dependency_still_counts():
     # A test-only dependency still means Python must be importable to run
     # the test suite during the build, so it counts too.

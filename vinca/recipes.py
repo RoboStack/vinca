@@ -186,6 +186,20 @@ def _package_needs_python(package: catkin_pkg.package.Package, build_type: str) 
     )
 
 
+def _needs_python(
+    shortname: str,
+    package: catkin_pkg.package.Package,
+    build_type: str,
+    vinca_conf: dict[str, Any],
+) -> bool:
+    """``needs_python`` in pkg_additional_info.yaml wins over the heuristic, for
+    what package.xml can't show (e.g. a package that embeds libpython)."""
+    override = get_pkg_additional_info(shortname, vinca_conf).get("needs_python")
+    if override is not None:
+        return bool(override)
+    return _package_needs_python(package, build_type)
+
+
 def get_depmods(
     vinca_conf: dict[str, Any], package_name: str, distro: Distro
 ) -> tuple[Requirements, Requirements]:
@@ -471,7 +485,7 @@ def generate_output(
 
     conditional_python = _conditional_python(vinca_conf)
     if not conditional_python or (
-        not is_dummy and _package_needs_python(package, build_type)
+        not is_dummy and _needs_python(shortname, package, build_type, vinca_conf)
     ):
         python_dependencies = resolve_pkgname("python", vinca_conf, distro)
         output["requirements"]["run"].extend(python_dependencies)
