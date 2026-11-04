@@ -83,7 +83,9 @@ _BASE_REQUIREMENTS = {
 # pinned to python_min rather than a bare "python": a fully resolved version
 # constraint is invisible to rattler-build's variant scan (confirmed with
 # `rattler-build build --render-only`: one variant instead of one per pinned Python),
-# so a package without Python content is not rebuilt per Python version.
+# so a package without Python content is not rebuilt per Python version. A package
+# built per Python keeps the bare one: cross-compiling, its build environment also
+# gets the variant's python for cross-python, which the pin would contradict.
 # `default('3.11')` covers a conda_build_config.yaml without python_min, which would
 # otherwise render the invalid spec "python .*".
 _BUILD_TIME_PYTHON = "python ${{ python_min | default('3.11') }}.*"
@@ -236,10 +238,6 @@ def _initial_output(
     if not is_dummy_metapackage(shortname, vinca_conf):
         requirements = copy.deepcopy(_BASE_REQUIREMENTS)
         if _conditional_python(vinca_conf):
-            requirements["build"] = [
-                _BUILD_TIME_PYTHON if r == "python" else r
-                for r in requirements["build"]
-            ]
             requirements["host"] = [
                 r for r in requirements["host"] if r not in _HOST_PYTHON
             ]
@@ -323,6 +321,18 @@ def _replace_with_selector(
     (destination if destination is not None else requirements).append(
         {"if": condition, "then": [dependency]}
     )
+
+
+def _pin_build_python(requirements: list[Any]) -> None:
+    """Replace the bare build ``python``, including the cross-compilation one,
+    with _BUILD_TIME_PYTHON."""
+    for i, requirement in enumerate(requirements):
+        if requirement == "python":
+            requirements[i] = _BUILD_TIME_PYTHON
+        elif isinstance(requirement, dict) and "python" in requirement["then"]:
+            requirement["then"] = [
+                _BUILD_TIME_PYTHON if r == "python" else r for r in requirement["then"]
+            ]
 
 
 def _adjust_requirements(requirements: Requirements, package_prefix: str) -> None:
@@ -591,6 +601,10 @@ def generate_output(
 
     removed, added = get_depmods(vinca_conf, package.name, distro)
     _apply_depmods(output["requirements"], removed, added)
+    # after dependencies.yaml, which can add python to a package without Python
+    # dependencies (e.g. one that embeds the interpreter)
+    if conditional_python and "python" not in output["requirements"]["host"]:
+        _pin_build_python(output["requirements"]["build"])
     _adjust_requirements(output["requirements"], package_prefix)
     if dependencies_only:
         return output["requirements"]

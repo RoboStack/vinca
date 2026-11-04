@@ -270,6 +270,43 @@ def test_needs_python_plain_cpp_package_gets_no_python_dependency():
     assert "python" not in output["requirements"]["build"]
 
 
+def _cross_python_block(output):
+    return next(
+        r["then"]
+        for r in output["requirements"]["build"]
+        if isinstance(r, dict) and any("cross-python" in d for d in r["then"])
+    )
+
+
+def test_python_free_output_pins_cross_compilation_python():
+    output = build_conditional("demo", depends=[("build_depend", "rclcpp")])
+
+    block = _cross_python_block(output)
+    assert "python" not in block
+    assert recipes._BUILD_TIME_PYTHON in block
+
+
+def test_python_output_keeps_cross_compilation_python():
+    output = build_conditional("demo", depends=[("exec_depend", "rclpy")])
+
+    assert "python" in _cross_python_block(output)
+    # the cross-compilation python is the variant's, so the build one must be too
+    assert "python" in output["requirements"]["build"]
+    assert recipes._BUILD_TIME_PYTHON not in output["requirements"]["build"]
+
+
+def test_python_added_in_dependencies_yaml_keeps_cross_compilation_python():
+    # e.g. plotjuggler: embeds libpython without a Python-flavored dependency
+    output = build_conditional(
+        "demo",
+        depends=[("build_depend", "rclcpp")],
+        depmods={"demo": {"add_host": ["python"]}},
+    )
+
+    assert "python" in _cross_python_block(output)
+    assert recipes._BUILD_TIME_PYTHON not in output["requirements"]["build"]
+
+
 def test_needs_python_rosidl_interface_package_gets_python_dependency():
     # msg/srv/action packages declare membership in rosidl_interface_packages;
     # rosidl_generator_py always compiles Python bindings for these,
