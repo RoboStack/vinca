@@ -44,6 +44,22 @@ def test_write_recipe_emits_pruned_variants_in_local_mode(tmp_path, monkeypatch)
     assert YAML(typ="safe").load(variants_path) == {"python": ["3.12"]}
 
 
+def test_write_recipe_appends_test_file_to_generated_tests(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    test_file = tmp_path / "ros-jazzy-demo.yaml"
+    test_file.write_text("tests:\n  - script:\n      - demo --help\n")
+    conf = config("global")
+    conf["_tests"] = {"ros-jazzy-demo": test_file}
+    generated = {"package_contents": {"files": {"not_exists": ["**/*.pyd"]}}}
+
+    write_recipe(
+        {}, [{**output(), "tests": [generated]}], conf, FakeDistro(), single_file=False
+    )
+
+    recipe = YAML(typ="safe").load(Path("recipes/ros-jazzy-demo/recipe.yaml"))
+    assert recipe["tests"] == [generated, {"script": ["demo --help"]}]
+
+
 def test_write_recipe_does_not_emit_variants_in_global_mode(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 

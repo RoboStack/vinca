@@ -94,6 +94,24 @@ def _conditional_python(vinca_conf: dict[str, Any]) -> bool:
     return bool(vinca_conf.get("conditional_python_dependency", False))
 
 
+# Installed into every Python-free output's tests (conditional_python_dependency):
+# such an output is built once, against no particular Python, so Python modules or
+# extensions in it would only be importable by the interpreter it happened to be
+# built with. Byte-compiled launch files (share/<pkg>/launch/__pycache__) are fine.
+_PYTHON_FREE_CONTENTS_TEST = {
+    "package_contents": {
+        "strict": False,
+        "files": {
+            "not_exists": [
+                "**/site-packages/**",
+                "**/*.cpython-*.so",
+                "**/*.pyd",
+            ]
+        },
+    }
+}
+
+
 # Dependency names that indicate a package's own recipe genuinely needs a
 # Python interpreter/ABI in host/run (as opposed to Python merely being a
 # build-time tool for ament's own scripts, see _BUILD_TIME_PYTHON).
@@ -592,6 +610,12 @@ def generate_output(
     removed, added = get_depmods(vinca_conf, package.name, distro)
     _apply_depmods(output["requirements"], removed, added)
     _adjust_requirements(output["requirements"], package_prefix)
+    if (
+        conditional_python
+        and not is_dummy
+        and "python" not in output["requirements"]["host"]
+    ):
+        output["tests"] = [copy.deepcopy(_PYTHON_FREE_CONTENTS_TEST)]
     if dependencies_only:
         return output["requirements"]
     _add_metadata(output, package, shortname, distro)
