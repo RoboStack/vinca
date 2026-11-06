@@ -14,7 +14,7 @@ Usage
 from __future__ import annotations
 
 import copy
-from typing import Any, Mapping, MutableMapping, Sequence
+from typing import Any, Callable, Mapping, MutableMapping, Sequence
 
 import jinja2
 
@@ -85,6 +85,7 @@ def _platform_flags(platform: str | None) -> dict[str, bool | str]:
 # Core                                                                         #
 # -----------------------------------------------------------------------------#
 _ENV = jinja2.Environment()
+_STRICT_ENV = jinja2.Environment(undefined=jinja2.StrictUndefined)
 
 
 def _eval_condition(expr: str, ctx: Mapping[str, Any]) -> bool:
@@ -97,10 +98,21 @@ def _eval_condition(expr: str, ctx: Mapping[str, Any]) -> bool:
         return False
 
 
-def _process_node(node: Any, ctx: Mapping[str, Any]) -> Any | None:
+def _strict_condition(expr: str, ctx: Mapping[str, Any]) -> bool | None:
+    """The selector expression's value, or ``None`` if it uses an unknown variable
+    or cannot be evaluated."""
+    try:
+        fn = _STRICT_ENV.compile_expression(expr, undefined_to_none=False)
+        return bool(fn(ctx))
+    except Exception:
+        return None
+
+
+def _process_node(node: Any, condition: Callable[[str], bool | None]) -> Any | None:
     """
     Recursively walk *node*,
-    resolving any dict that has at least an ``"if"`` and ``"then"`` key.
+    resolving any dict that has at least an ``"if"`` and ``"then"`` key with
+    *condition*, which returns ``None`` to keep both branches.
 
     Returns
     -------
@@ -109,17 +121,26 @@ def _process_node(node: Any, ctx: Mapping[str, Any]) -> Any | None:
     """
     # Selector handling --------------------------------------------------------
     if isinstance(node, Mapping) and "if" in node and "then" in node:
-        cond = str(node["if"])
-        branch = "then" if _eval_condition(cond, ctx) else "else"
+        value = condition(str(node["if"]))
+        if value is None:
+            both: list[Any] = []
+            for branch in ("then", "else"):
+                new = _process_node(node.get(branch), condition)
+                if isinstance(new, list):
+                    both.extend(new)
+                elif new is not None:
+                    both.append(new)
+            return both or None
+        branch = "then" if value else "else"
         if branch in node:  # recurse into chosen branch
-            return _process_node(node[branch], ctx)
+            return _process_node(node[branch], condition)
         return None  # nothing chosen – drop
 
     # Recursion – dict ---------------------------------------------------------
     if isinstance(node, MutableMapping):
         mapping_out: dict[str, Any] = {}
         for k, v in node.items():
-            new = _process_node(v, ctx)
+            new = _process_node(v, condition)
             if new is not None:
                 mapping_out[k] = new
         return mapping_out
@@ -128,7 +149,7 @@ def _process_node(node: Any, ctx: Mapping[str, Any]) -> Any | None:
     if isinstance(node, Sequence) and not isinstance(node, (str, bytes)):
         sequence_out: list[Any] = []
         for item in node:
-            new = _process_node(item, ctx)
+            new = _process_node(item, condition)
             if new is None:
                 continue
             # Flatten lists returned from selectors so the example in docs works
@@ -167,7 +188,15 @@ def evaluate_selectors(
     """
     ctx = _platform_flags(target_platform)
 
-    return _process_node(copy.deepcopy(data), ctx)
+    return _process_node(copy.deepcopy(data), lambda expr: _eval_condition(expr, ctx))
+
+
+def evaluate_target_selectors(data: Any, *, target_platform: str) -> Any:
+    """Return *data* with everything it can contain on *target_platform*: the
+    selectors that only test the target platform are evaluated, and any other
+    (e.g. on ``build_platform``) keeps both branches."""
+    ctx = _platform_flags(target_platform)
+    return _process_node(copy.deepcopy(data), lambda expr: _strict_condition(expr, ctx))
 
 
 def _process_distro_node(node: Any, ctx: Mapping[str, Any]) -> Any | None:
