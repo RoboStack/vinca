@@ -49,14 +49,14 @@ def _channel(location):
     return rattler.Channel(str(Path(location).resolve()))
 
 
-def get_channel_records(channel, platform):
-    """The package records of *channel*, a URL or local path, for *platform*, as
-    repodata.json records; none if the channel has no valid repodata for it."""
+def _subdir_records(channel, subdir):
+    """The package records of *channel*'s *subdir*, as repodata.json records; none
+    if the channel has no valid repodata for it."""
     try:
         [repodata] = asyncio.run(
             rattler.fetch_repo_data(
                 channels=[_channel(channel)],
-                platforms=[rattler.Subdir(platform)],
+                platforms=[rattler.Subdir(subdir)],
                 cache_path=REPODATA_CACHE,
                 callback=None,
             )
@@ -66,17 +66,25 @@ def get_channel_records(channel, platform):
         # network failures raise the same type
         if not str(exc).startswith("repodata not found"):
             raise
-        print(
-            f"No {platform} repodata found at {channel}, assuming no existing packages"
-        )
+        print(f"No {subdir} repodata found at {channel}, assuming no existing packages")
         return []
     except OSError:
         print(
-            f"No valid {platform} repodata found at {channel}, "
+            f"No valid {subdir} repodata found at {channel}, "
             "assuming no existing packages"
         )
         return []
     return [json.loads(record.to_json()) for record in records]
+
+
+def get_channel_records(channel, platform):
+    """The package records of *channel*, a URL or local path, for *platform*: those
+    of its platform and noarch subdirs."""
+    return [
+        record
+        for subdir in (platform, "noarch")
+        for record in _subdir_records(channel, subdir)
+    ]
 
 
 def ensure_name_is_without_distro_prefix_and_with_underscores(name, vinca_conf):
