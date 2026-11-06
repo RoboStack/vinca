@@ -180,6 +180,57 @@ def test_stages_are_derived_from_the_generated_recipes(tmp_path, monkeypatch):
     ]
 
 
+@pytest.mark.parametrize(
+    "condition,platform,outfile,needs",
+    [
+        ("linux", "linux-64", "linux.yml", True),
+        ("linux", "osx-arm64", "osx_arm64.yml", False),
+        # where the recipe is built is unknown: both branches order the stages
+        ("build_platform == target_platform", "linux-64", "linux.yml", True),
+        ("build_platform != target_platform", "linux-64", "linux.yml", True),
+    ],
+)
+def test_stages_follow_the_requirements_of_the_platform(
+    tmp_path, monkeypatch, condition, platform, outfile, needs
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "vinca.yaml").write_text("{}\n")
+    recipes = {
+        "ros2-ament-cmake": {"requirements": {"host": ["cmake"]}},
+        "ros2-ament-cmake-gmock": {
+            "tests": [
+                {
+                    "if": condition,
+                    "then": {
+                        "script": ["./build/test_mock"],
+                        "requirements": {"run": ["ros2-ament-cmake"]},
+                    },
+                }
+            ],
+        },
+    }
+    for name, recipe in recipes.items():
+        (tmp_path / "recipes" / name).mkdir(parents=True)
+        recipe = {"package": {"name": name, "version": "1.0.0"}, **recipe}
+        (tmp_path / "recipes" / name / "recipe.yaml").write_text(yaml.safe_dump(recipe))
+    monkeypatch.setattr(generate_gha, "load_configuration", lambda: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["vinca-gha", "-d", "./recipes", "-t", "branch", "-p", platform, "-b", "1"],
+    )
+
+    generate_gha.main()
+
+    jobs = yaml.safe_load((tmp_path / outfile).read_text())["jobs"].values()
+    gmock = next(
+        job
+        for job in jobs
+        if job["steps"][-1]["env"]["CURRENT_RECIPES"] == "ros2-ament-cmake-gmock"
+    )
+    assert ("needs" in gmock) == needs
+
+
 def test_only_later_stages_declare_needs(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".scripts").mkdir()

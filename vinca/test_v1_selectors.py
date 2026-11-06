@@ -50,6 +50,21 @@ def test_then_else_branch():
     assert v1_selectors.evaluate_selectors(data, target_platform="win-64") == [{"k": 2}]
 
 
+def test_target_selectors_keep_both_branches_of_other_conditions():
+    data = [
+        {"if": "unknown_variable", "then": ["a", "b"], "else": "c"},
+        {"if": "build_platform != target_platform", "then": "d"},
+        {"if": "win", "then": "e", "else": "f"},
+    ]
+    out = v1_selectors.evaluate_target_selectors(data, target_platform="linux-64")
+    assert out == ["a", "b", "c", "d", "f"]
+    assert v1_selectors.evaluate_selectors(data, target_platform="linux-64") == [
+        "c",
+        "d",
+        "f",
+    ]
+
+
 def test_spliced_list():
     src = """
     host:
