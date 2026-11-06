@@ -244,7 +244,7 @@ def test_both_mode_generates_legacy_compatibility_output():
 
     assert compatibility_output == {
         "package": {"name": "ros-humble-my-package", "version": "1.2.3"},
-        "build": {"script": ""},
+        "build": {"script": "", "noarch": "generic"},
         "requirements": {"run": ["ros2-my-package ==1.2.3"]},
         "about": {"summary": "Compatibility package for ros2-my-package"},
     }

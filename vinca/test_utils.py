@@ -120,3 +120,31 @@ def test_get_repodata_ignores_invalid_cached_repodata(tmp_path, monkeypatch):
 
     with patch("vinca.utils.requests.get", return_value=response):
         assert get_repodata(url) == repodata
+
+
+def test_get_repodata_includes_the_noarch_subdir(tmp_path):
+    compat = {"name": "ros-lyrical-foo", "version": "1.0", "build": "h0_31"}
+    native = {"name": "ros2-foo", "version": "1.0", "build": "h1_31"}
+    for subdir, record in (("noarch", compat), ("linux-64", native)):
+        (tmp_path / subdir).mkdir()
+        (tmp_path / subdir / "repodata.json").write_text(
+            json.dumps(
+                {"packages": {}, "packages.conda": {f"{record['name']}.conda": record}}
+            )
+        )
+
+    assert get_repodata(str(tmp_path), "linux-64") == {
+        "packages": {},
+        "packages.conda": {"ros-lyrical-foo.conda": compat, "ros2-foo.conda": native},
+    }
+
+
+def test_get_repodata_without_a_noarch_subdir(tmp_path):
+    repodata = {
+        "packages": {"ros2-foo.tar.bz2": {"name": "ros2-foo"}},
+        "packages.conda": {},
+    }
+    (tmp_path / "linux-64").mkdir()
+    (tmp_path / "linux-64" / "repodata.json").write_text(json.dumps(repodata))
+
+    assert get_repodata(str(tmp_path), "linux-64") == repodata

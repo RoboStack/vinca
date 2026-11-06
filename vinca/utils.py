@@ -40,10 +40,17 @@ class NoAliasDumper(yaml.SafeDumper):
 
 
 def get_repodata(url_or_path, platform=None):
+    """The repodata at *url_or_path*; with *platform*, the records of the channel's
+    platform and noarch subdirs, as one repodata."""
     if platform:
-        if not url_or_path.endswith("/"):
-            url_or_path += "/"
-        url_or_path += f"{platform}/repodata.json"
+        repodata = {"packages": {}, "packages.conda": {}}
+        for subdir in (platform, "noarch"):
+            subdir_repodata = get_repodata(
+                f"{url_or_path.rstrip('/')}/{subdir}/repodata.json"
+            )
+            for key in repodata:
+                repodata[key].update(subdir_repodata.get(key, {}))
+        return repodata
 
     if "://" not in url_or_path:
         if not os.path.exists(url_or_path):
