@@ -225,17 +225,16 @@ def add_package_name_variants(entries, ros_distro):
 
 
 def get_pkg_additional_info(pkg_name, vinca_conf):
-    normalized_name = ensure_name_is_without_distro_prefix_and_with_underscores(
-        pkg_name, vinca_conf
-    )
-    pkg_additional_info_all = vinca_conf["_pkg_additional_info"]
-    if pkg_additional_info_all is None:
-        pkg_additional_info = {}
-    else:
-        pkg_additional_info = vinca_conf.get("_pkg_additional_info", {}).get(
-            normalized_name, {}
+    """The pkg_additional_info.yaml entry of a package, given its ROS name (ros2_pulse)
+    or its conda name (ros2-ros2-pulse, ros-humble-ros2-pulse). A ROS name is used as
+    it is: normalizing it again would strip a ROS name's own ros2_/ros_ prefix."""
+    pkg_additional_info_all = vinca_conf.get("_pkg_additional_info") or {}
+    name = pkg_name.replace("-", "_")
+    if name not in pkg_additional_info_all:
+        name = ensure_name_is_without_distro_prefix_and_with_underscores(
+            pkg_name, vinca_conf
         )
-    return pkg_additional_info
+    return pkg_additional_info_all.get(name, {})
 
 
 def get_pkg_build_number(default_build_number, pkg_name, vinca_conf):

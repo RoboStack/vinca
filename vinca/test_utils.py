@@ -8,6 +8,8 @@ from vinca.utils import (
     add_test_requirements,
     build_requirement_graph,
     extract_dependency_names,
+    get_pkg_additional_info,
+    get_pkg_build_number,
     get_repodata,
 )
 
@@ -120,3 +122,36 @@ def test_get_repodata_ignores_invalid_cached_repodata(tmp_path, monkeypatch):
 
     with patch("vinca.utils.requests.get", return_value=response):
         assert get_repodata(url) == repodata
+
+
+ADDITIONAL_INFO_CONF = {
+    "ros_distro": "humble",
+    "_pkg_additional_info": {
+        "ros2_pulse": {"build_number": 7, "additional_cmake_args": "-DX=1"},
+        "rtabmap_odom": {"build_number": 5},
+    },
+}
+
+
+@pytest.mark.parametrize(
+    "name", ["ros2_pulse", "ros2-ros2-pulse", "ros-humble-ros2-pulse"]
+)
+def test_additional_info_of_a_ros2_prefixed_package(name):
+    # a ROS name starting with ros2_/ros_ was normalized twice (ros2_pulse -> pulse)
+    assert get_pkg_additional_info(name, ADDITIONAL_INFO_CONF) == {
+        "build_number": 7,
+        "additional_cmake_args": "-DX=1",
+    }
+    assert get_pkg_build_number(0, name, ADDITIONAL_INFO_CONF) == 7
+
+
+@pytest.mark.parametrize(
+    "name", ["rtabmap_odom", "ros2-rtabmap-odom", "ros-humble-rtabmap-odom"]
+)
+def test_additional_info_by_ros_or_conda_name(name):
+    assert get_pkg_build_number(0, name, ADDITIONAL_INFO_CONF) == 5
+
+
+def test_additional_info_of_a_package_without_an_entry():
+    assert get_pkg_additional_info("ros2-rclcpp", ADDITIONAL_INFO_CONF) == {}
+    assert get_pkg_additional_info("rclcpp", {"_pkg_additional_info": None}) == {}
