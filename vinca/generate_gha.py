@@ -28,6 +28,7 @@ from vinca.utils import (
     extract_dependency_names,
 )
 from vinca.utils import literal_unicode as lu
+from vinca.v1_selectors import evaluate_target_selectors
 
 # Use the v0 version of setup-pixi by default, which should give you the last major release
 DEFAULT_SETUP_PIXI_VERSION = "v0"
@@ -564,7 +565,14 @@ def main():
     all_recipes = sorted(glob.glob(os.path.join(args.dir, "**", "*.yaml")))
     for f in all_recipes:
         with open(f, encoding="utf-8") as fi:
-            metas.append(yaml.safe_load(fi.read()))
+            # Only the target platform is known here, not where the recipe is built:
+            # a condition on anything else, e.g. build_platform, keeps both branches,
+            # so all its possible requirements order the stages.
+            metas.append(
+                evaluate_target_selectors(
+                    yaml.safe_load(fi.read()), target_platform=args.platform
+                )
+            )
 
     platform = args.platform
 
