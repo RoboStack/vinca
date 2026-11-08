@@ -40,7 +40,12 @@ def render_outputs(
     recipes_dir: Path, target_platform: str, variant_config: Optional[Path]
 ) -> dict[str, list[Build]]:
     """Render every recipe in *recipes_dir*, grouped by package name (the name of
-    the recipe's directory, see template.write_recipe)."""
+    the recipe's directory, see template.write_recipe).
+
+    Rendered as built natively (build platform = target platform), as the packages
+    are: the build platform is part of the variant hash, so rendering on another
+    machine (e.g. one linux-64 runner generating every platform's recipes) gives
+    build strings that never match the published ones."""
     cmd = [
         "rattler-build",
         "build",
@@ -48,6 +53,8 @@ def render_outputs(
         "--recipe-dir",
         str(recipes_dir),
         "--target-platform",
+        target_platform,
+        "--build-platform",
         target_platform,
     ]
     if variant_config is not None:
