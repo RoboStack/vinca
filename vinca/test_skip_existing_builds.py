@@ -1,6 +1,7 @@
 """Tests for skipping recipes whose exact builds are already published."""
 
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -124,3 +125,20 @@ def test_render_outputs_gives_one_build_string_per_variant(tmp_path: Path):
     assert sorted(b[2][:5] for b in rendered["ros2-py"]) == ["py312", "py314"]
     assert len(rendered["ros2-cpp"]) == 1
     assert "py" not in rendered["ros2-cpp"][0][2]
+
+
+def test_render_outputs_renders_as_a_native_build(tmp_path: Path, monkeypatch):
+    # the build platform is part of the variant hash: rendered for another platform
+    # than the one it runs on, the build strings didn't match the published ones
+    calls = []
+
+    def fake_run(cmd, **_kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="[]", stderr="")
+
+    monkeypatch.setattr(skip_existing.subprocess, "run", fake_run)
+    render_outputs(tmp_path, "linux-aarch64", None)
+
+    (cmd,) = calls
+    assert cmd[cmd.index("--target-platform") + 1] == "linux-aarch64"
+    assert cmd[cmd.index("--build-platform") + 1] == "linux-aarch64"
