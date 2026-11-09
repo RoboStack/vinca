@@ -13,7 +13,7 @@ class PackageNameMode(str, Enum):
     NEW = "new"
 
 
-def get_package_name_mode(vinca_conf):
+def get_package_name_mode(vinca_conf) -> PackageNameMode:
     """Return the configured package name mode, defaulting to legacy names."""
     value = vinca_conf.get("package_name_mode", PackageNameMode.LEGACY.value)
     try:
@@ -32,17 +32,17 @@ def get_package_prefix(distro, vinca_conf):
     return distro.get_package_prefix()
 
 
-def get_new_package_name(pkg_shortname, distro):
+def get_new_package_name(pkg_shortname, distro) -> str:
     """Return the ROS-major-version package name."""
     return f"{distro.get_package_prefix()}-{pkg_shortname.replace('_', '-')}"
 
 
-def get_legacy_package_name(pkg_shortname, distro):
+def get_legacy_package_name(pkg_shortname, distro) -> str:
     """Return the distro-qualified package name."""
     return f"{distro.get_legacy_package_prefix()}-{pkg_shortname.replace('_', '-')}"
 
 
-def get_package_name(pkg_shortname, distro, vinca_conf):
+def get_package_name(pkg_shortname, distro, vinca_conf) -> str:
     """Return the primary generated name for a ROS package."""
     if get_package_name_mode(vinca_conf) is PackageNameMode.LEGACY:
         return get_legacy_package_name(pkg_shortname, distro)
