@@ -17,7 +17,7 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
-from vinca.utils import get_repodata
+from vinca.utils import get_channel_records
 
 # a stage this short is one job, shared with the short stages next to it
 SHARED_JOB_SECONDS = 120.0
@@ -251,13 +251,13 @@ def batch_stages(
 
 
 def get_skip_existing(vinca_conf: Mapping[str, Any], platform: str) -> list[dict]:
-    """Fetch repodata files configured for skip-existing checks."""
+    """Fetch the package records of the channels configured for skip-existing checks."""
     repositories = vinca_conf.get("skip_existing") or []
-    repodatas = []
+    records = []
     for repository in repositories:
         print(f"Fetching repodata: {repository}")
-        repodatas.append(get_repodata(repository, platform))
-    return repodatas
+        records += get_channel_records(repository, platform)
+    return records
 
 
 def get_all_ancestors(graph: Mapping[str, Iterable[str]], node: str) -> set[str]:

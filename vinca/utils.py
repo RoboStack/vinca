@@ -1,11 +1,15 @@
-import hashlib
+import asyncio
 import json
-import os
-import time
+import tempfile
+from pathlib import Path
+from urllib.parse import urlsplit
 
 import networkx as nx
-import requests
+import rattler
+from rattler.exceptions import FetchRepoDataError
 from ruamel.yaml.representer import SafeRepresenter
+
+REPODATA_CACHE = Path(tempfile.gettempdir()) / "vinca-repodata"
 
 
 class folded_unicode(str):
@@ -37,56 +41,42 @@ NoAliasRepresenter.add_representer(folded_unicode, folded_unicode_representer)
 NoAliasRepresenter.add_representer(literal_unicode, literal_unicode_representer)
 
 
-def get_repodata(url_or_path, platform=None):
-    if platform:
-        if not url_or_path.endswith("/"):
-            url_or_path += "/"
-        url_or_path += f"{platform}/repodata.json"
+def _channel(location):
+    # rattler reads a bare name as an anaconda.org channel; a single-letter scheme
+    # is a Windows drive
+    if len(urlsplit(location).scheme) > 1:
+        return rattler.Channel(location)
+    return rattler.Channel(str(Path(location).resolve()))
 
-    if "://" not in url_or_path:
-        if not os.path.exists(url_or_path):
-            print(f"No repodata found at {url_or_path}, assuming no existing packages")
-            return {"packages": {}, "packages.conda": {}}
-        with open(url_or_path, encoding="utf-8") as fi:
-            return json.load(fi)
-    print("Downloading repodata from ", url_or_path)
 
-    m = hashlib.md5(url_or_path.encode("utf-8")).hexdigest()[:10]
-    # print(tempfile.gettempdir())
-    fn = f"vinca_{m}.json"
-    if os.path.exists(fn):
-        st = os.stat(fn)
-        age = time.time() - st.st_mtime
-        print(f"Found cached repodata, age: {age}")
-        max_age = 100_000  # seconds == 27 hours
-        if age < max_age:
-            try:
-                with open(fn, encoding="utf-8") as fi:
-                    return json.load(fi)
-            except json.JSONDecodeError:
-                print(f"Ignoring invalid cached repodata at {fn}")
-                os.remove(fn)
-
-    repodata = requests.get(url_or_path)
-    if repodata.status_code == 404:
-        print(f"No repodata found at {url_or_path}, assuming no existing packages")
-        return {"packages": {}, "packages.conda": {}}
-    repodata.raise_for_status()
-    content = repodata.content
-    if not content.strip():
-        print(f"No repodata found at {url_or_path}, assuming no existing packages")
-        return {"packages": {}, "packages.conda": {}}
+def get_channel_records(channel, platform):
+    """The package records of *channel*, a URL or local path, for *platform*, as
+    repodata.json records; none if the channel has no valid repodata for it."""
     try:
-        parsed_repodata = json.loads(content)
-    except json.JSONDecodeError:
-        print(
-            f"No valid repodata found at {url_or_path}, assuming no existing packages"
+        [repodata] = asyncio.run(
+            rattler.fetch_repo_data(
+                channels=[_channel(channel)],
+                platforms=[rattler.Subdir(platform)],
+                cache_path=REPODATA_CACHE,
+                callback=None,
+            )
         )
-        return {"packages": {}, "packages.conda": {}}
-
-    with open(fn, "w", encoding="utf-8") as fcache:
-        fcache.write(content.decode("utf-8"))
-    return parsed_repodata
+        records = repodata.load_all_records()
+    except FetchRepoDataError as exc:
+        # network failures raise the same type
+        if not str(exc).startswith("repodata not found"):
+            raise
+        print(
+            f"No {platform} repodata found at {channel}, assuming no existing packages"
+        )
+        return []
+    except OSError:
+        print(
+            f"No valid {platform} repodata found at {channel}, "
+            "assuming no existing packages"
+        )
+        return []
+    return [json.loads(record.to_json()) for record in records]
 
 
 def ensure_name_is_without_distro_prefix_and_with_underscores(name, vinca_conf):

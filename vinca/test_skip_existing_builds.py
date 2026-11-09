@@ -23,27 +23,21 @@ def _record(name, version, build, mutex=LYRICAL_MUTEX):
 
 
 def test_published_builds_are_name_version_and_build_string():
-    repodata = {
-        "packages": {"a.tar.bz2": _record("ros2-rcl", "10.2.0", "hb2aaf94_30")},
-        "packages.conda": {
-            "b.conda": _record("ros2-rclpy", "10.0.1", "np2py314h40712d6_30")
-        },
-    }
+    records = [
+        _record("ros2-rcl", "10.2.0", "hb2aaf94_30"),
+        _record("ros2-rclpy", "10.0.1", "np2py314h40712d6_30"),
+    ]
 
-    assert published_builds([repodata], "lyrical") == {
+    assert published_builds(records, "lyrical") == {
         ("ros2-rcl", "10.2.0", "hb2aaf94_30"),
         ("ros2-rclpy", "10.0.1", "np2py314h40712d6_30"),
     }
 
 
 def test_published_builds_leave_out_other_distributions():
-    repodata = {
-        "packages.conda": {
-            "a.conda": _record("ros2-rcl", "10.2.0", "h1_30", ROLLING_MUTEX)
-        }
-    }
+    records = [_record("ros2-rcl", "10.2.0", "h1_30", ROLLING_MUTEX)]
 
-    assert published_builds([repodata], "lyrical") == set()
+    assert published_builds(records, "lyrical") == set()
 
 
 def test_recipe_with_every_output_published_is_built():

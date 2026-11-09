@@ -1,19 +1,22 @@
+import functools
 import json
-from unittest.mock import Mock, patch
+import socket
+import threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
+from rattler.exceptions import FetchRepoDataError
 
+from vinca import utils
 from vinca.utils import (
     CyclicTestRequirement,
     add_test_requirements,
     build_requirement_graph,
     extract_dependency_names,
+    get_channel_records,
     get_pkg_additional_info,
     get_pkg_build_number,
-    get_repodata,
 )
-
-EMPTY_REPODATA = {"packages": {}, "packages.conda": {}}
 
 
 def test_extract_dependency_names_handles_conditional_requirements():
@@ -86,42 +89,90 @@ def test_build_requirement_graph_rejects_cyclic_test_requirements():
     assert "ros2-b" in str(excinfo.value)
 
 
-def test_get_repodata_returns_empty_for_missing_local_repodata(tmp_path):
-    assert get_repodata(str(tmp_path), "osx-arm64") == EMPTY_REPODATA
+@pytest.fixture
+def channel(tmp_path, monkeypatch):
+    monkeypatch.setattr(utils, "REPODATA_CACHE", tmp_path / "cache")
+    return tmp_path / "channel"
 
 
-def test_get_repodata_returns_empty_for_missing_remote_repodata(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    response = Mock(status_code=404, content=b"Not Found")
-
-    with patch("vinca.utils.requests.get", return_value=response):
-        assert (
-            get_repodata("https://example.com/channel", "osx-arm64") == EMPTY_REPODATA
-        )
-
-
-def test_get_repodata_returns_empty_for_non_json_remote_repodata(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    response = Mock(status_code=200, content=b"Not Found")
-    response.raise_for_status.return_value = None
-
-    with patch("vinca.utils.requests.get", return_value=response):
-        assert (
-            get_repodata("https://example.com/channel", "osx-arm64") == EMPTY_REPODATA
-        )
+@pytest.fixture
+def served_channel(channel):
+    channel.mkdir()
+    handler = functools.partial(SimpleHTTPRequestHandler, directory=channel)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield channel, f"http://127.0.0.1:{server.server_port}/"
+    server.shutdown()
+    server.server_close()
 
 
-def test_get_repodata_ignores_invalid_cached_repodata(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    url = "https://example.com/channel/osx-arm64/repodata.json"
-    cache_name = "vinca_d7e1ca2423.json"
-    (tmp_path / cache_name).write_text("Not Found")
-    repodata = {"packages": {"pkg.tar.bz2": {"name": "pkg"}}, "packages.conda": {}}
-    response = Mock(status_code=200, content=json.dumps(repodata).encode("utf-8"))
-    response.raise_for_status.return_value = None
+def _write_repodata(channel, subdir, content):
+    (channel / subdir).mkdir(parents=True)
+    (channel / subdir / "repodata.json").write_text(content)
 
-    with patch("vinca.utils.requests.get", return_value=response):
-        assert get_repodata(url) == repodata
+
+def _repodata(*records):
+    return json.dumps(
+        {
+            "packages": {},
+            "packages.conda": {
+                f"{r['name']}-{r['version']}-{r['build']}.conda": r for r in records
+            },
+        }
+    )
+
+
+FOO = {"name": "ros2-foo", "version": "1.0", "build": "h1_31", "build_number": 31}
+
+
+def _names_and_builds(records):
+    return [(r["name"], r["version"], r["build"], r["build_number"]) for r in records]
+
+
+def test_get_channel_records_of_a_local_channel(channel):
+    _write_repodata(channel, "linux-64", _repodata(FOO))
+
+    for location in (str(channel), channel.as_uri()):
+        records = get_channel_records(location, "linux-64")
+        assert _names_and_builds(records) == [("ros2-foo", "1.0", "h1_31", 31)]
+        assert records[0]["fn"] == "ros2-foo-1.0-h1_31.conda"
+
+
+def test_get_channel_records_of_a_remote_channel(served_channel):
+    channel, url = served_channel
+    _write_repodata(channel, "linux-64", _repodata(FOO))
+
+    records = get_channel_records(url, "linux-64")
+    assert _names_and_builds(records) == [("ros2-foo", "1.0", "h1_31", 31)]
+
+
+def test_get_channel_records_returns_no_records_for_missing_local_repodata(channel):
+    assert get_channel_records(str(channel), "osx-arm64") == []
+
+
+def test_get_channel_records_returns_no_records_for_missing_remote_repodata(
+    served_channel,
+):
+    _, url = served_channel
+    assert get_channel_records(url, "osx-arm64") == []
+
+
+@pytest.mark.parametrize("content", ["Not Found", ""])
+def test_get_channel_records_returns_no_records_for_invalid_remote_repodata(
+    served_channel, content
+):
+    channel, url = served_channel
+    _write_repodata(channel, "osx-arm64", content)
+    assert get_channel_records(url, "osx-arm64") == []
+
+
+def test_get_channel_records_raises_when_the_channel_is_unreachable(channel):
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+
+    with pytest.raises(FetchRepoDataError):
+        get_channel_records(f"http://127.0.0.1:{port}/", "linux-64")
 
 
 ADDITIONAL_INFO_CONF = {

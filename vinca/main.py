@@ -14,7 +14,7 @@ import catkin_pkg
 import ruamel.yaml
 
 from vinca import __version__, config
-from vinca.utils import built_for_distro, get_pkg_build_number, get_repodata
+from vinca.utils import built_for_distro, get_channel_records, get_pkg_build_number
 
 from .configuration import read_snapshot as read_snapshot
 from .configuration import read_vinca_yaml as load_vinca_yaml
@@ -751,19 +751,17 @@ def main() -> None:
                 selected_bn = None
 
                 print(f"Fetching repodata: {fn}")
-                repodata = get_repodata(fn, get_conda_subdir())
+                records = get_channel_records(fn, get_conda_subdir())
                 if arguments.multiple_file:
                     # compared by exact build string once the recipes are written
-                    published |= published_builds([repodata], vinca_conf["ros_distro"])
+                    published |= published_builds(records, vinca_conf["ros_distro"])
                     continue
                 # currently we don't check the build numbers of local repodatas,
                 # only URLs
                 if "://" in fn:
                     selected_bn = vinca_conf.get("build_number", 0)
 
-                all_pkgs = repodata.get("packages", {})
-                all_pkgs.update(repodata.get("packages.conda", {}))
-                for _, pkg in all_pkgs.items():
+                for pkg in records:
                     is_built = False
                     if not built_for_distro(pkg, vinca_conf["ros_distro"]):
                         # e.g. a channel shared by several distributions

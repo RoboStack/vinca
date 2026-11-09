@@ -14,7 +14,7 @@ from vinca import config
 from vinca.distro import Distro
 
 from .naming import PackageNameMode, get_package_name_mode, get_package_prefix
-from .utils import get_repodata
+from .utils import get_channel_records
 
 distro_version = None
 ros_prefix = None
@@ -53,9 +53,7 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch) -> 
     legacy_prefix = distro.get_legacy_package_prefix()
     package_name_mode = get_package_name_mode(vinca_conf)
 
-    repodata = get_repodata(url, arch)
-
-    packages = repodata["packages"]
+    packages = {record["fn"]: record for record in get_channel_records(url, arch)}
     to_migrate = set()
     ros_pkgs = set()
     for pkey in packages:
