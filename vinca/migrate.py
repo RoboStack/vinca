@@ -9,7 +9,6 @@ from distutils.dir_util import copy_tree
 
 import networkx as nx
 import ruamel.yaml
-import yaml
 
 from vinca import config
 from vinca.distro import Distro
@@ -213,7 +212,7 @@ def main() -> None:
 
     mfile = os.path.join(args.dir + "/migration.yaml")
     with open(mfile, encoding="utf-8") as fi:
-        migration = yaml.safe_load(fi)
+        migration = ruamel.yaml.YAML(typ="safe").load(fi)
         print(migration)
         create_migration_instructions(
             args.platform, migration.get("packages", []), args.trigger_branch

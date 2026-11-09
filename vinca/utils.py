@@ -5,7 +5,7 @@ import time
 
 import networkx as nx
 import requests
-import yaml
+from ruamel.yaml.representer import SafeRepresenter
 
 
 class folded_unicode(str):
@@ -17,26 +17,24 @@ class literal_unicode(str):
 
 
 def folded_unicode_representer(dumper, data):
-    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=">")
+    return dumper.represent_scalar("tag:yaml.org,2002:str", str(data), style=">")
 
 
 def literal_unicode_representer(dumper, data):
-    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+    return dumper.represent_scalar("tag:yaml.org,2002:str", str(data), style="|")
 
 
-yaml.add_representer(folded_unicode, folded_unicode_representer)
-yaml.add_representer(literal_unicode, literal_unicode_representer)
-
-
-class NoAliasDumper(yaml.SafeDumper):
+class NoAliasRepresenter(SafeRepresenter):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
-        self.add_representer(folded_unicode, folded_unicode_representer)
-        self.add_representer(literal_unicode, literal_unicode_representer)
+        self.sort_base_mapping_type_on_output = False
 
     def ignore_aliases(self, data) -> bool:
         return True
+
+
+NoAliasRepresenter.add_representer(folded_unicode, folded_unicode_representer)
+NoAliasRepresenter.add_representer(literal_unicode, literal_unicode_representer)
 
 
 def get_repodata(url_or_path, platform=None):

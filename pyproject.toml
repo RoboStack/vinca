@@ -30,7 +30,7 @@ classifiers = [
 
 dependencies = [
   "catkin_pkg >=0.4.16",
-  "ruamel.yaml >=0.16.6,<0.18.0",
+  "ruamel.yaml >=0.19.1,<0.20.0",
   "rosdistro >=0.8.0",
   "empy >=3.3.4,<4.0.0",
   "requests >=2.24.0",

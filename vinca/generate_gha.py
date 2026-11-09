@@ -1,5 +1,6 @@
 import argparse
 import glob
+import io
 import os
 import re
 import sys
@@ -9,8 +10,8 @@ from importlib import resources
 from typing import Any
 
 import networkx as nx
-import yaml
 from rich import print
+from ruamel.yaml import YAML
 
 from vinca import config
 from vinca.main import get_conda_subdir, read_vinca_yaml
@@ -22,7 +23,7 @@ from vinca.pipeline import (
     get_skip_existing,
 )
 from vinca.utils import (
-    NoAliasDumper,
+    NoAliasRepresenter,
     add_test_requirements,
     build_requirement_graph,
     built_for_distro,
@@ -136,7 +137,7 @@ def add_additional_recipes(args: Namespace):
     additional_recipes = []
     for recipe_path in glob.glob(additional_recipes_path + "/**/recipe.yaml"):
         with open(recipe_path, encoding="utf-8") as recipe:
-            additional_recipe = yaml.safe_load(recipe)
+            additional_recipe = YAML(typ="safe").load(recipe)
 
         name, version, bnumber = (
             additional_recipe["package"]["name"],
@@ -182,8 +183,12 @@ WORKFLOW_SIZE_MARGIN_BYTES = 10 * 1024
 
 
 def dump_for_gha(doc, f) -> None:
-    s = yaml.dump(doc, sort_keys=False, Dumper=NoAliasDumper)
-    s = s.replace("'on':", "on:")
+    yaml = YAML(typ="safe")
+    yaml.Representer = NoAliasRepresenter
+    yaml.default_flow_style = False
+    stream = io.StringIO()
+    yaml.dump(doc, stream)
+    s = stream.getvalue().replace("'on':", "on:")
     with open(f, "w", encoding="utf-8") as fo:
         fo.write(s)
 
@@ -572,7 +577,7 @@ def main() -> None:
             # so all its possible requirements order the stages.
             metas.append(
                 evaluate_target_selectors(
-                    yaml.safe_load(fi.read()), target_platform=args.platform
+                    YAML(typ="safe").load(fi.read()), target_platform=args.platform
                 )
             )
 

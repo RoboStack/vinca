@@ -2,11 +2,13 @@
 
 from unittest.mock import Mock
 
-import yaml
+from ruamel.yaml import YAML
 
 from vinca.main import expected_build_number
 from vinca.mutex import generate_mutex_package_recipe
 from vinca.template import write_recipe
+
+yaml = YAML(typ="safe")
 
 
 def _conf(**extra):
@@ -49,7 +51,7 @@ def test_mutex_recipe_keeps_its_build_number(tmp_path, monkeypatch):
     distro.name = "lyrical"
     recipe = generate_mutex_package_recipe(conf, distro)
     write_recipe({}, [recipe], conf, distro, single_file=False)
-    meta = yaml.safe_load(
+    meta = yaml.load(
         (tmp_path / "recipes" / "ros2-distro-mutex" / "recipe.yaml").read_text()
     )
     assert meta["build"]["number"] == 28
