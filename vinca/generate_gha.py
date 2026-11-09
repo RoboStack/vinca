@@ -204,7 +204,7 @@ class WorkflowTooLarge(RuntimeError):
         )
 
 
-def get_stage_name(batch) -> str:
+def get_stage_name(batch: list[str]) -> str:
     """Job name: the batch's packages without their ros-<distro>- or ros2- prefix, each
     once (with package_name_mode: both a package has a recipe under either name)."""
     prefixes = (f"ros-{config.ros_distro}-", "ros2-")
