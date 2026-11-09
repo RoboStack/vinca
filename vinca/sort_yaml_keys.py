@@ -58,7 +58,7 @@ def sort_mapping_keys(path: Path) -> bool:
     return False
 
 
-def main():
+def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
