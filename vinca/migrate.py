@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import sys
+from argparse import Namespace
 from distutils.dir_util import copy_tree
 
 import networkx as nx
@@ -29,7 +30,7 @@ ros_prefix = None
 # }
 
 
-def to_ros_name(distro, pkg_name):
+def to_ros_name(distro: Distro, pkg_name):
     shortname = pkg_name[len(ros_prefix) + 1 :]
     if distro.check_package(shortname):
         return shortname
@@ -39,7 +40,7 @@ def to_ros_name(distro, pkg_name):
         raise RuntimeError(f"Couldnt convert {pkg_name} to ROS pkg name")
 
 
-def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
+def create_migration_instructions(arch, packages_to_migrate, trigger_branch) -> None:
     url = "https://conda.anaconda.org/robostack/"
 
     yaml = ruamel.yaml.YAML()
@@ -166,7 +167,7 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch):
     )
 
 
-def parse_command_line(argv):
+def parse_command_line(argv: list[str]) -> Namespace:
     parser = argparse.ArgumentParser(
         description="Generate migration recipes and GitHub Actions workflows"
     )
@@ -207,7 +208,7 @@ def parse_command_line(argv):
     return arguments
 
 
-def main():
+def main() -> None:
     args = parse_command_line(sys.argv)
 
     mfile = os.path.join(args.dir + "/migration.yaml")

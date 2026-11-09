@@ -5,6 +5,7 @@ import shutil
 import stat
 from importlib import resources
 from pathlib import Path
+from typing import TextIO
 
 from ruamel import yaml
 
@@ -62,7 +63,7 @@ post_process_items = [
 ]
 
 
-def write_recipe_package(recipe):
+def write_recipe_package(recipe) -> None:
     file = yaml.YAML()
     file.width = 4096
     file.indent(mapping=2, sequence=4, offset=2)
@@ -73,7 +74,7 @@ def write_recipe_package(recipe):
         file.dump(recipe, stream)
 
 
-def copyfile_with_exec_permissions(source_file, destination_file):
+def copyfile_with_exec_permissions(source_file, destination_file) -> None:
     shutil.copyfile(source_file, destination_file)
 
     # It seems that rattler-build requires script to have executable permissions
@@ -87,7 +88,7 @@ def copyfile_with_exec_permissions(source_file, destination_file):
         )
 
 
-def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
+def write_recipe(source, outputs, vinca_conf, distro, single_file: bool = True) -> None:
     # single_file = False
     if single_file:
         file = yaml.YAML()
@@ -238,7 +239,7 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file=True):
                 generate_activation_scripts_for_recipe(recipe_dir)
 
 
-def generate_template(template_in, template_out, extra_globals=None):
+def generate_template(template_in, template_out: TextIO, extra_globals=None) -> None:
     import em
 
     from vinca.config import ros_distro, skip_testing
@@ -274,7 +275,7 @@ def generate_build_script_for_recipe(
     ros_package_prefix,
     additional_cmake_args="",
     additional_folder="",
-):
+) -> None:
     """Generate a specific build script directly in the recipe directory."""
 
     # Map script names to their template files
@@ -315,7 +316,7 @@ def generate_build_script_for_recipe(
         print(f"Warning: Unknown build script template for {script_name}")
 
 
-def generate_activation_scripts_for_recipe(recipe_dir):
+def generate_activation_scripts_for_recipe(recipe_dir) -> None:
     """Generate activation scripts directly in the recipe directory."""
 
     activation_templates = {

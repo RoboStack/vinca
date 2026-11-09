@@ -9,6 +9,8 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Iterable, Optional
 
 import requests
+from catkin_pkg.package import Url
+from requests.models import Response
 from rosdistro import get_cached_distribution, get_index, get_index_url
 from rosdistro.dependency_walker import DependencyWalker
 from rosdistro.manifest_provider import get_release_tag
@@ -92,7 +94,7 @@ def _resolve_member(*, entries, member):
     raise KeyError(member)
 
 
-def _read_archive_member(*, payload, url, member):
+def _read_archive_member(*, payload, url, member) -> str:
     """Return the text of member inside the archive payload, stripping its common root."""
     member = _normalize_member(member)
     if zipfile.is_zipfile(io.BytesIO(payload)):
@@ -121,7 +123,7 @@ class Distro(object):
         snapshot=None,
         additional_packages_snapshot=None,
         distribution_cache=None,
-    ):
+    ) -> None:
         index = get_index(get_index_url())
         self._distro = get_cached_distribution(
             index, distro_name, cache=distribution_cache
@@ -161,7 +163,7 @@ class Distro(object):
     def name(self):
         return self.distro_name
 
-    def add_packages(self, packages):
+    def add_packages(self, packages) -> None:
         self.build_packages = set(packages)
 
     def get_depends(
@@ -273,7 +275,7 @@ class Distro(object):
         self._direct_depends_cache[pkg] = set(direct)
         return direct
 
-    def _get_snapshot_package_info(self, pkg_name):
+    def _get_snapshot_package_info(self, pkg_name: str):
         if not self.snapshot:
             return None
         for name in (pkg_name, pkg_name.replace("_", "-")):
@@ -310,7 +312,7 @@ class Distro(object):
         release_tag = get_release_tag(repo, pkg_name)
         return repo.url, release_tag, "tag"
 
-    def get_repository_url(self, pkg_name, package_urls=()):
+    def get_repository_url(self, pkg_name, package_urls: Iterable[Url] = ()):
         """Return the best declared upstream repository for a package."""
         pkg_info = self._get_snapshot_package_info(pkg_name)
         if pkg_info is not None:
@@ -342,7 +344,7 @@ class Distro(object):
                 return _strip_git_suffix(package_url.url)
         return None
 
-    def check_package(self, pkg_name):
+    def check_package(self, pkg_name: str):
         # If the package is in the additional_packages_snapshot, it is always considered valid
         # even if it is not in the released packages, as it is an additional
         # package specified in rosdistro_additional_recipes.yaml
@@ -413,15 +415,15 @@ class Distro(object):
     def check_ros1(self):
         return self._distribution_type == "ros1"
 
-    def get_ros_version(self):
+    def get_ros_version(self) -> str:
         """Get ROS version number (1 or 2)"""
         return "1" if self.check_ros1() else "2"
 
-    def get_package_prefix(self):
+    def get_package_prefix(self) -> str:
         """Get the package name prefix (ros for ROS1, ros2 for ROS2)."""
         return "ros" if self.check_ros1() else "ros2"
 
-    def get_legacy_package_prefix(self):
+    def get_legacy_package_prefix(self) -> str:
         """Get the legacy distro-qualified package name prefix."""
         return f"ros-{self.name}"
 
@@ -476,7 +478,7 @@ class Distro(object):
                 return {"Authorization": f"token {token}"}
         return {}
 
-    def _get(self, url):
+    def _get(self, url) -> Response:
         """Fetch url, letting requests apply the ambient credentials and proxy settings.
 
         requests also drops the Authorization header when a redirect leaves the original
@@ -564,7 +566,7 @@ class Distro(object):
 
     # Based on https://github.com/ros-infrastructure/rosdistro/blob/fad8d9f647631945847cb18bc1d1f43008d7a282/src/rosdistro/manifest_provider/github.py#L51C1-L69C29
     # But with the option to specify the name of the package.xml file in case the repo uses a non-standard name
-    def _construct_raw_url_github(self, pkg_info):
+    def _construct_raw_url_github(self, pkg_info) -> str:
         # Build raw GitHub URL for package.xml
         raw_url_base = pkg_info.get("url")
         if raw_url_base.endswith(".git"):
@@ -597,7 +599,7 @@ class Distro(object):
         return raw_url
 
     # format (checked against GitLab 19.x): https://gitlab.com/<NAMESPACE>/-/raw/<REV>/<PATH>
-    def _construct_raw_url_gitlab(self, pkg_info):
+    def _construct_raw_url_gitlab(self, pkg_info) -> str:
         raw_url_base = pkg_info.get("url")
         if raw_url_base.endswith(".git"):
             raw_url_base = raw_url_base[:-4]

@@ -16,7 +16,7 @@ from .distro import Distro
 ROSDISTRO_RAW_URL = "https://raw.githubusercontent.com/ros/rosdistro"
 
 
-def load_distribution_cache(distro_name, rosdistro_ref=None):
+def load_distribution_cache(distro_name, rosdistro_ref=None) -> DistributionCache:
     """The rosdistro distribution cache, optionally for a git ref of ros/rosdistro.
 
     The published cache (repo.ros2.org) always follows rosdistro's default branch.
@@ -46,7 +46,7 @@ def load_distribution_cache(distro_name, rosdistro_ref=None):
     return cache
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Dependency snapshotting tool for ROS packages"
     )

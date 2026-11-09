@@ -6,6 +6,7 @@ import argparse
 import glob
 import os
 import sys
+from argparse import Namespace
 from pathlib import Path
 from typing import Any, Optional
 
@@ -66,13 +67,13 @@ def ensure_list(obj):
     return obj
 
 
-def get_conda_subdir():
+def get_conda_subdir() -> str:
     """Return the configured target platform, or detect the host platform."""
     selected = getattr(config.parsed_args, "platform", None)
     return detect_conda_subdir(selected)
 
 
-def parse_command_line(argv):
+def parse_command_line(argv: list[str]) -> Namespace:
     """
     Parse command line argument. See -h option.
     :param argv: the actual program arguments
@@ -153,7 +154,7 @@ def parse_command_line(argv):
     return arguments
 
 
-def read_vinca_yaml(filepath):
+def read_vinca_yaml(filepath: str | Path):
     """Load configuration for the currently selected conda platform."""
     return load_vinca_yaml(filepath, target_platform=get_conda_subdir())
 
@@ -169,8 +170,8 @@ def should_skip_output(output, vinca_conf):
 
 
 def append_output_with_compatibility(
-    outputs, output, pkg_shortname, distro, vinca_conf
-):
+    outputs, output, pkg_shortname, distro: Distro, vinca_conf
+) -> None:
     """Append canonical and compatibility outputs, filtering each independently."""
     candidate_outputs = [output]
     compatibility_output = generate_legacy_compatibility_output(
@@ -249,10 +250,10 @@ def generate_dependency_requirements(
     return requirements
 
 
-def generate_outputs(distro, vinca_conf):
+def generate_outputs(distro: Distro, vinca_conf):
     outputs = []
 
-    def get_pkg(pkg_name):
+    def get_pkg(pkg_name: str):
         pkg = catkin_pkg.package.parse_package_string(
             distro.get_release_package_xml(pkg_name)
         )
@@ -299,7 +300,7 @@ def generate_outputs(distro, vinca_conf):
     return outputs
 
 
-def generate_outputs_version(distro, vinca_conf):
+def generate_outputs_version(distro: Distro, vinca_conf):
     outputs = []
     for pkg_shortname in vinca_conf["_selected_pkgs"]:
         if not distro.check_package(pkg_shortname):
@@ -316,17 +317,17 @@ def generate_outputs_version(distro, vinca_conf):
     return outputs
 
 
-def _source_reference(*, url, ref, ref_type):
+def _source_reference(*, url, ref, ref_type) -> dict[str, str]:
     """Backward-compatible entry point for source reference generation."""
     return source_reference(url=url, ref=ref, ref_type=ref_type)
 
 
-def generate_source(distro, vinca_conf):
+def generate_source(distro: Distro, vinca_conf):
     """Backward-compatible entry point that defaults to the selected platform."""
     return build_source(distro, vinca_conf, get_conda_subdir())
 
 
-def generate_source_version(distro, vinca_conf):
+def generate_source_version(distro: Distro, vinca_conf):
     """Backward-compatible entry point that defaults to the selected platform."""
     return build_source_version(distro, vinca_conf, get_conda_subdir())
 
@@ -336,7 +337,7 @@ def generate_fat_source(distro, vinca_conf):
     return build_fat_source(distro, vinca_conf)
 
 
-def conda_index_shadowed_packages(distro, vinca_conf):
+def conda_index_shadowed_packages(distro: Distro, vinca_conf):
     """ROS packages of the distribution that a conda_index maps to conda packages."""
     names = set()
     for index in vinca_conf.get("_conda_indexes") or []:
@@ -354,7 +355,7 @@ def expected_build_number(default_build_number, pkg_name, vinca_conf):
     return get_pkg_build_number(default_build_number, pkg_name, vinca_conf)
 
 
-def get_selected_packages(distro, vinca_conf):
+def get_selected_packages(distro: Distro, vinca_conf):
     selected_packages = set()
     skipped_packages = set()
 
@@ -455,7 +456,7 @@ def get_selected_packages(distro, vinca_conf):
     return result
 
 
-def parse_package(pkg, distro, vinca_conf, path):
+def parse_package(pkg, distro: Distro, vinca_conf, path):
     name = pkg["name"].replace("_", "-")
     final_name = get_package_name(name, distro, vinca_conf)
 
@@ -581,7 +582,7 @@ def parse_package(pkg, distro, vinca_conf, path):
     return recipe
 
 
-def print_generation_summary(distro, vinca_conf, outputs):
+def print_generation_summary(distro: Distro, vinca_conf, outputs) -> None:
     """Print a summary of the generated recipes and, for each, *why* it was
     generated: whether it was requested directly by the config and which
     already-selected packages depend on it."""
@@ -648,7 +649,7 @@ def print_generation_summary(distro, vinca_conf, outputs):
     console.print(f"Total generated recipes: [bold]{len(rows) + len(leftovers)}[/bold]")
 
 
-def main():
+def main() -> None:
     global distro, unsatisfied_deps
 
     arguments = parse_command_line(sys.argv)

@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 from urllib.request import urlopen
 
 from vinca import config
@@ -54,7 +55,7 @@ def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
     return None
 
 
-def should_skip_pkg(pkg_shortname, vinca_conf):
+def should_skip_pkg(pkg_shortname, vinca_conf) -> Optional[bool]:
     skip = vinca_conf.get("_remove_from_deps", vinca_conf.get("packages_exclude"))
     if not skip:
         return False
@@ -65,7 +66,7 @@ def should_skip_pkg(pkg_shortname, vinca_conf):
         return True
 
 
-def resolve_pkgname(pkg_shortname, vinca_conf, distro, is_rundep=False):
+def resolve_pkgname(pkg_shortname, vinca_conf, distro, is_rundep: bool = False):
     pkg_names = resolve_pkgname_from_indexes(
         pkg_shortname, vinca_conf["_conda_indexes"]
     )
