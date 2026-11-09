@@ -3,6 +3,7 @@ import glob
 import os
 import re
 import sys
+from argparse import Namespace
 from distutils.dir_util import copy_tree
 from importlib import resources
 from typing import Any
@@ -26,6 +27,7 @@ from vinca.utils import (
     build_requirement_graph,
     built_for_distro,
     extract_dependency_names,
+    literal_unicode,
 )
 from vinca.utils import literal_unicode as lu
 
@@ -34,7 +36,7 @@ DEFAULT_SETUP_PIXI_VERSION = "v0"
 DEFAULT_PIXI_VERSION = "latest"
 
 
-def read_ci_script(fn):
+def read_ci_script(fn: str):
     return (resources.files("vinca") / "ci_templates" / fn).read_text(encoding="utf-8")
 
 
@@ -43,7 +45,7 @@ WINDOWS_BUILD_SCRIPT = ".scripts/build_win.bat"
 windows_preconfig_script = lu(read_ci_script("windows_preconfig.bat"))
 
 
-def parse_command_line(argv):
+def parse_command_line(argv: list[str]) -> Namespace:
     parser = argparse.ArgumentParser(
         description="GitHub Actions workflow generator for ROS package recipes"
     )
@@ -119,7 +121,7 @@ def parse_command_line(argv):
     return arguments
 
 
-def add_additional_recipes(args):
+def add_additional_recipes(args: Namespace):
     additional_recipes_path = os.path.abspath(
         os.path.join(args.dir, "..", "additional_recipes")
     )
@@ -178,7 +180,7 @@ MAX_WORKFLOW_SIZE_BYTES = 500 * 1024  # GitHub refuses larger workflow files
 WORKFLOW_SIZE_MARGIN_BYTES = 10 * 1024
 
 
-def dump_for_gha(doc, f):
+def dump_for_gha(doc, f) -> None:
     s = yaml.dump(doc, sort_keys=False, Dumper=NoAliasDumper)
     s = s.replace("'on':", "on:")
     with open(f, "w", encoding="utf-8") as fo:
@@ -192,7 +194,7 @@ def dump_for_gha(doc, f):
 class WorkflowTooLarge(RuntimeError):
     """GitHub refuses workflow files over MAX_WORKFLOW_SIZE_BYTES."""
 
-    def __init__(self, size: int, path: str):
+    def __init__(self, size: int, path: str) -> None:
         self.size = size
         super().__init__(
             f"Generated workflow {path} is {size / 1024:.1f} KiB, exceeding "
@@ -202,7 +204,7 @@ class WorkflowTooLarge(RuntimeError):
         )
 
 
-def get_stage_name(batch):
+def get_stage_name(batch) -> str:
     """Job name: the batch's packages without their ros-<distro>- or ros2- prefix, each
     once (with package_name_mode: both a package has a recipe under either name)."""
     prefixes = (f"ros-{config.ros_distro}-", "ros2-")
@@ -306,7 +308,7 @@ def build_unix_pipeline(
     target="",
     setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
     pixi_version: str = DEFAULT_PIXI_VERSION,
-):
+) -> None:
     blurb: dict[str, Any] = {"jobs": {}, "name": pipeline_name}
 
     if workflow is None:
@@ -373,14 +375,14 @@ def build_unix_pipeline(
 def build_linux_pipeline(
     stages,
     trigger_branch,
-    script=unix_build_script,
+    script: literal_unicode = unix_build_script,
     workflow=None,
-    runs_on="ubuntu-latest",
-    outfile="linux.yml",
-    pipeline_name="build_linux",
+    runs_on: str = "ubuntu-latest",
+    outfile: str = "linux.yml",
+    pipeline_name: str = "build_linux",
     setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
     pixi_version: str = DEFAULT_PIXI_VERSION,
-):
+) -> None:
     build_unix_pipeline(
         stages,
         trigger_branch,
@@ -406,7 +408,7 @@ def build_osx_pipeline(
     pipeline_name="build_osx64",
     setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
     pixi_version: str = DEFAULT_PIXI_VERSION,
-):
+) -> None:
     build_unix_pipeline(
         stages,
         trigger_branch,
@@ -428,7 +430,7 @@ def build_win_pipeline(
     workflow=None,
     setup_pixi_version: str = DEFAULT_SETUP_PIXI_VERSION,
     pixi_version: str = DEFAULT_PIXI_VERSION,
-):
+) -> None:
     vm_imagename = "windows-2022"
     # Build Win pipeline
     blurb: dict[str, Any] = {"jobs": {}, "name": "build_win"}
@@ -544,7 +546,7 @@ def get_recipe_requirements(recipes):
     return requirements
 
 
-def main():
+def main() -> None:
     args = parse_command_line(sys.argv)
 
     load_configuration()
@@ -669,7 +671,13 @@ def main():
         raise RuntimeError("could not fit the workflow into GitHub's size limit")
 
 
-def write_pipeline(args, stages, platform, setup_pixi_version, pixi_version):
+def write_pipeline(
+    args: Namespace,
+    stages: list[list[list[str]]],
+    platform,
+    setup_pixi_version: str,
+    pixi_version: str,
+) -> None:
     """Write the platform's staged workflow for these stages."""
     if args.platform == "linux-64":
         build_unix_pipeline(
