@@ -243,7 +243,7 @@ def sort_vinca_lists(path: Path) -> bool:
     return changed
 
 
-def main():
+def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
