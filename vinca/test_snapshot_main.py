@@ -1,8 +1,10 @@
 import sys
 
-import yaml
+from ruamel.yaml import YAML
 
 from vinca import snapshot
+
+yaml = YAML(typ="safe")
 
 
 class FakeDistro:
@@ -40,7 +42,7 @@ def test_snapshot_skips_package_without_package_xml(tmp_path, monkeypatch, capsy
 
     snapshot.main()
 
-    written = yaml.safe_load(output.read_text(encoding="utf-8"))
+    written = yaml.load(output.read_text(encoding="utf-8"))
     assert set(written) == {"kept"}
     assert written["kept"]["dependencies"] == ["rclcpp"]
     assert "Package 'gone' has no package.xml" in capsys.readouterr().out

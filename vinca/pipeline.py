@@ -15,7 +15,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-import yaml
+from ruamel.yaml import YAML
 
 from vinca.utils import get_repodata
 
@@ -152,7 +152,7 @@ def batch_stages(
         timings = replace(timings, recipes=recipes)
 
     with Path(config_path).open(encoding="utf-8") as stream:
-        vinca_conf = yaml.safe_load(stream) or {}
+        vinca_conf = YAML(typ="safe").load(stream) or {}
     build_individually = set(
         vinca_conf.get("build_in_own_stage")
         # Accepted for compatibility with configurations written for the Azure generator.

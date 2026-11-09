@@ -4,15 +4,9 @@ import sys
 from typing import Any
 
 import networkx as nx
-import yaml
+from ruamel.yaml import YAML
 
 from vinca.utils import extract_dependency_names
-
-try:
-    from yaml import CDumper as Dumper
-    from yaml import CLoader as Loader
-except ImportError:
-    from yaml import Dumper, Loader
 
 # def setup_yaml():
 #   """ https://stackoverflow.com/a/8661021 """
@@ -36,12 +30,14 @@ build:
 
 
 def main() -> None:
+    yaml = YAML(typ="safe")
+    yaml.default_flow_style = False
     metas = []
 
     for f in glob.glob(os.path.join(sys.argv[1], "*.yaml")):
         print(f)
         with open(f, encoding="utf-8") as fi:
-            metas.append(yaml.load(fi.read(), Loader=Loader))
+            metas.append(yaml.load(fi.read()))
 
     requirements = {}
 
@@ -103,4 +99,4 @@ def main() -> None:
     gitlab_template["stages"] = stage_names
 
     with open(".gitlab-ci.yml", "w", encoding="utf-8") as fo:
-        fo.write(yaml.dump(gitlab_template, Dumper=Dumper))
+        yaml.dump(gitlab_template, fo)

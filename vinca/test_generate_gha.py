@@ -3,7 +3,7 @@
 import sys
 
 import pytest
-import yaml
+from ruamel.yaml import YAML
 
 from vinca import config, generate_gha
 from vinca.generate_gha import (
@@ -13,6 +13,8 @@ from vinca.generate_gha import (
     get_setup_pixi_step,
     get_stage_name,
 )
+
+yaml = YAML(typ="safe")
 
 
 @pytest.fixture(autouse=True)
@@ -56,7 +58,7 @@ def test_unix_pipeline_sets_up_pixi(tmp_path):
         target="linux-64",
     )
 
-    workflow = pytest.importorskip("yaml").safe_load(outfile.read_text())
+    workflow = yaml.load(outfile.read_text())
     steps = workflow["jobs"]["stage_0_job_0"]["steps"]
     assert steps[1]["name"] == "Disable git auto-maintenance"
     assert "maintenance.auto false" in steps[1]["run"]
@@ -114,7 +116,7 @@ def test_win_pipeline_calls_the_repository_build_script(tmp_path, monkeypatch):
 
     build_win_pipeline([[["ros2-rclcpp"]]], "buildbranch_win", outfile=outfile)
 
-    workflow = pytest.importorskip("yaml").safe_load(outfile.read_text())
+    workflow = yaml.load(outfile.read_text())
     steps = workflow["jobs"]["stage_0_job_0"]["steps"]
     assert steps[-1]["run"] == "call .scripts\\build_win.bat"
     assert steps[-1]["env"]["CURRENT_RECIPES"] == "ros2-rclcpp"
@@ -145,7 +147,6 @@ def test_recipe_requirements_are_host_and_run_names():
 
 
 def test_stages_are_derived_from_the_generated_recipes(tmp_path, monkeypatch):
-    yaml = pytest.importorskip("yaml")
     monkeypatch.chdir(tmp_path)
     (tmp_path / "vinca.yaml").write_text("{}\n")
     recipes = {
@@ -160,7 +161,7 @@ def test_stages_are_derived_from_the_generated_recipes(tmp_path, monkeypatch):
             "package": {"name": name, "version": "1.0.0"},
             "requirements": {"host": deps, "run": deps},
         }
-        (tmp_path / "recipes" / name / "recipe.yaml").write_text(yaml.safe_dump(recipe))
+        yaml.dump(recipe, tmp_path / "recipes" / name / "recipe.yaml")
     # no resolution of the ROS distribution: only the recipes are read
     monkeypatch.setattr(generate_gha, "load_configuration", lambda: None)
     monkeypatch.setattr(
@@ -172,7 +173,7 @@ def test_stages_are_derived_from_the_generated_recipes(tmp_path, monkeypatch):
 
     generate_gha.main()
 
-    jobs = yaml.safe_load((tmp_path / "linux.yml").read_text())["jobs"]
+    jobs = yaml.load((tmp_path / "linux.yml").read_text())["jobs"]
     assert [job["steps"][-1]["env"]["CURRENT_RECIPES"] for job in jobs.values()] == [
         "ros2-a",
         "ros2-b",
@@ -212,7 +213,7 @@ def test_stages_follow_the_requirements_of_the_platform(
     for name, recipe in recipes.items():
         (tmp_path / "recipes" / name).mkdir(parents=True)
         recipe = {"package": {"name": name, "version": "1.0.0"}, **recipe}
-        (tmp_path / "recipes" / name / "recipe.yaml").write_text(yaml.safe_dump(recipe))
+        yaml.dump(recipe, tmp_path / "recipes" / name / "recipe.yaml")
     monkeypatch.setattr(generate_gha, "load_configuration", lambda: None)
     monkeypatch.setattr(
         sys,
@@ -222,7 +223,7 @@ def test_stages_follow_the_requirements_of_the_platform(
 
     generate_gha.main()
 
-    jobs = yaml.safe_load((tmp_path / outfile).read_text())["jobs"].values()
+    jobs = yaml.load((tmp_path / outfile).read_text())["jobs"].values()
     gmock = next(
         job
         for job in jobs
@@ -236,13 +237,12 @@ def test_only_later_stages_declare_needs(tmp_path, monkeypatch):
     (tmp_path / ".scripts").mkdir()
     (tmp_path / ".scripts" / "build_win.bat").write_text("echo build\n")
     stages = [[["ros2-a"], ["ros2-b"]], [["ros2-c"]]]
-    yaml = pytest.importorskip("yaml")
 
     build_unix_pipeline(stages, "branch", outfile=tmp_path / "linux.yml")
     build_win_pipeline(stages, "branch", outfile=tmp_path / "win.yml")
 
     for outfile in ("linux.yml", "win.yml"):
-        jobs = yaml.safe_load((tmp_path / outfile).read_text())["jobs"]
+        jobs = yaml.load((tmp_path / outfile).read_text())["jobs"]
         # actionlint rejects `needs: []`
         assert "needs" not in jobs["stage_0_job_0"]
         assert "needs" not in jobs["stage_0_job_1"]
@@ -269,7 +269,7 @@ def test_keep_file_adds_an_artifact_step(tmp_path, monkeypatch):
         [[["ros-rolling-rclcpp"]]], "buildbranch_linux", outfile=str(outfile)
     )
 
-    step = yaml.safe_load(outfile.read_text())["jobs"]["stage_0_job_0"]["steps"][-1]
+    step = yaml.load(outfile.read_text())["jobs"]["stage_0_job_0"]["steps"][-1]
     assert step["uses"].startswith("actions/upload-artifact@")
     assert step["if"] == "always()" and step["with"]["path"] == "work/times.jsonl"
 
@@ -284,5 +284,5 @@ def test_no_artifact_step_without_keep_file(tmp_path, monkeypatch):
         [[["ros-rolling-rclcpp"]]], "buildbranch_linux", outfile=str(outfile)
     )
 
-    steps = yaml.safe_load(outfile.read_text())["jobs"]["stage_0_job_0"]["steps"]
+    steps = yaml.load(outfile.read_text())["jobs"]["stage_0_job_0"]["steps"]
     assert not any("upload-artifact" in step.get("uses", "") for step in steps)
