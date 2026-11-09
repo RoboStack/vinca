@@ -1,6 +1,5 @@
 import argparse
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -9,6 +8,7 @@ from distutils.dir_util import copy_tree
 
 import networkx as nx
 import ruamel.yaml
+from rattler import Version
 
 from vinca import config
 from vinca.distro import Distro
@@ -77,20 +77,10 @@ def create_migration_instructions(arch, packages_to_migrate, trigger_branch) -> 
     latest = {}
     for pkg in ros_pkgs:
         current = None
-        current_version: tuple[int, ...] | None = None
+        current_version: Version | None = None
         for pkey in packages:
             if packages[pkey]["name"] == pkg:
-                parts = packages[pkey]["version"].split(".")
-                version = []
-                for element in parts:
-                    if element.isdecimal():
-                        version.append(int(element))
-                    else:
-                        match = re.search(r"[^0-9]", element)
-                        if match is not None:
-                            version.append(int(element[: match.start()]))
-
-                parsed_version = tuple(version)
+                parsed_version = Version(packages[pkey]["version"])
 
                 if current_version is None or parsed_version > current_version:
                     current_version = parsed_version

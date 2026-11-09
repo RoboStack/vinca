@@ -267,6 +267,17 @@ def test_cfep9_key_add_updates_zip_group():
     assert merged["is_python_min"] == [True, False, False]
 
 
+def test_cfep9_key_add_orders_values_as_conda_versions():
+    migration = {
+        "__migrator": {"operation": "key_add", "primary_key": "python"},
+        "python": ["3.9.* *_cpython"],
+    }
+
+    merged = variant_add({"python": ["3.10.* *_cpython"]}, migration)
+
+    assert merged["python"] == ["3.9.* *_cpython", "3.10.* *_cpython"]
+
+
 def test_cfep9_merges_pin_run_as_build_and_zip_keys():
     merged = variant_add(
         {

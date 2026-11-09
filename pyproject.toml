@@ -38,7 +38,6 @@ dependencies = [
   "rich >=10",
   "jinja2 >=3.0.0",
   "license-expression >=30.0.0",
-  "packaging >=23.0",
   "py-rattler >=0.28.1,<0.29",
 ]
 

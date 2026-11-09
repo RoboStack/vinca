@@ -12,7 +12,8 @@ import re
 from copy import deepcopy
 from typing import Any, MutableMapping, Optional
 
-from packaging.version import InvalidVersion, Version
+from rattler import Version
+from rattler.exceptions import InvalidVersionError
 from ruamel.yaml.comments import CommentedSeq
 
 _SELECTOR_RE = re.compile(r"#\s*\[(.+)]")
@@ -37,7 +38,7 @@ def _version_order(value: Any, ordering: Any = None) -> tuple[int, Any]:
     normalized = str(value).replace(" ", ".").replace("*", "1")
     try:
         return (1, Version(normalized))
-    except InvalidVersion:
+    except InvalidVersionError:
         return (0, normalized)
 
 
