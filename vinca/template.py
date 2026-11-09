@@ -150,7 +150,7 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file: bool = True) 
                 print("Using test: ", test)
                 text = test.read_text(encoding="utf-8")
                 test_content = evaluate_distro_selectors(
-                    yaml.safe_load(text), ros_distro=config.ros_distro
+                    yaml.YAML(typ="safe").load(text), ros_distro=config.ros_distro
                 )
                 meta["tests"] = list(meta.get("tests") or []) + test_content["tests"]
 

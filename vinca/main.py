@@ -505,7 +505,7 @@ def parse_package(pkg, distro: Distro, vinca_conf, path):
         # parse as yaml
         text = test.read_text(encoding="utf-8")
         test_content = evaluate_distro_selectors(
-            ruamel.yaml.safe_load(text), ros_distro=config.ros_distro
+            ruamel.yaml.YAML(typ="safe").load(text), ros_distro=config.ros_distro
         )
         recipe["test"] = test_content
 
