@@ -36,7 +36,7 @@ DEFAULT_SETUP_PIXI_VERSION = "v0"
 DEFAULT_PIXI_VERSION = "latest"
 
 
-def read_ci_script(fn: str):
+def read_ci_script(fn: str) -> str:
     return (resources.files("vinca") / "ci_templates" / fn).read_text(encoding="utf-8")
 
 
@@ -298,7 +298,7 @@ def get_setup_pixi_step(
 
 
 def build_unix_pipeline(
-    stages,
+    stages: list[list[list[str]]],
     trigger_branch,
     script=unix_build_script,
     workflow=None,
@@ -398,7 +398,7 @@ def build_linux_pipeline(
 
 
 def build_osx_pipeline(
-    stages,
+    stages: list[list[list[str]]],
     trigger_branch,
     vm_imagename="macos-15-intel",
     outfile="osx.yml",
@@ -424,7 +424,7 @@ def build_osx_pipeline(
 
 
 def build_win_pipeline(
-    stages,
+    stages: list[list[list[str]]],
     trigger_branch,
     outfile="win.yml",
     workflow=None,
