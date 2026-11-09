@@ -29,13 +29,13 @@ yaml.add_representer(literal_unicode, literal_unicode_representer)
 
 
 class NoAliasDumper(yaml.SafeDumper):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
         self.add_representer(folded_unicode, folded_unicode_representer)
         self.add_representer(literal_unicode, literal_unicode_representer)
 
-    def ignore_aliases(self, data):
+    def ignore_aliases(self, data) -> bool:
         return True
 
 
@@ -106,11 +106,11 @@ def ensure_name_is_without_distro_prefix_and_with_underscores(name, vinca_conf):
     return newname
 
 
-def extract_dependency_names(requirements):
+def extract_dependency_names(requirements) -> list[str]:
     """Extract dependency names from strings and conditional requirement structures."""
     names = []
 
-    def visit(value):
+    def visit(value) -> None:
         if isinstance(value, str):
             if value:
                 names.append(value.split()[0])
@@ -203,7 +203,7 @@ def build_requirement_graph(requirements, test_requirements):
     return G
 
 
-def add_package_name_variants(entries, ros_distro):
+def add_package_name_variants(entries, ros_distro) -> None:
     """Make package-specific config entries available under old and new names."""
     legacy_prefix = f"ros-{ros_distro}-"
     for name, value in list(entries.items()):
@@ -245,7 +245,7 @@ def get_pkg_build_number(default_build_number, pkg_name, vinca_conf):
 
 # Return true if the package is actually provided in conda-forge, and so we generate
 # only a recipe with a run dependency on the conda forge package
-def is_dummy_metapackage(pkg_name, vinca_conf):
+def is_dummy_metapackage(pkg_name, vinca_conf) -> bool:
     pkg_additional_info = get_pkg_additional_info(pkg_name, vinca_conf)
     if pkg_additional_info.get("generate_dummy_package_with_run_deps"):
         return True
