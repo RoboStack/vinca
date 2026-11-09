@@ -9,33 +9,28 @@ on top of it, and local overrides.  This module turns that small file into the
 from __future__ import annotations
 
 import argparse
+import asyncio
 import io
-import json
 import os
 import re
 import sys
-import tarfile
-import zipfile
+import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator, Literal, Mapping, Optional, Sequence, Union, cast
+from typing import Any, Iterator, Mapping, Optional, Sequence, Union, cast
 from urllib.parse import quote
 
+import rattler
 import requests
 import ruamel.yaml
-import zstandard
+from rattler.exceptions import ExtractError, GatewayError
+from rattler.package_streaming import download_and_extract
 
 from vinca.v1_selectors import _eval_condition, _platform_flags
 from vinca.variant_algebra import variant_add
 
 PINNING_PACKAGE = "conda-forge-pinning"
-ANACONDA_RELEASE_URL = (
-    "https://api.anaconda.org/release/conda-forge/conda-forge-pinning/{version}"
-)
-CURRENT_REPODATA_URL = (
-    "https://conda.anaconda.org/conda-forge/noarch/current_repodata.json.zst"
-)
 MIGRATION_STATUS_URL = (
     "https://raw.githubusercontent.com/regro/cf-graph-countyfair/master/"
     "status/migration_json/{migration}.json"
@@ -66,129 +61,54 @@ def _yaml() -> Any:
     return yaml
 
 
-def _request(url: str, *, timeout: int = 120) -> Any:
+def _newest_pinning_record(spec: str) -> Any:
+    """The newest noarch conda-forge record matching *spec*."""
     try:
-        response = requests.get(url, timeout=timeout)
-        response.raise_for_status()
-    except requests.RequestException as exc:
-        raise PinningError(f"Could not download {url}: {exc}") from exc
-    return response
-
-
-def _load_zstd_json(payload: bytes) -> Any:
-    try:
-        decompressed = zstandard.ZstdDecompressor().decompress(payload)
-    except zstandard.ZstdError as exc:
-        raise PinningError("Could not decompress conda-forge repodata") from exc
-    return json.loads(decompressed)
+        [records] = asyncio.run(
+            rattler.Gateway().query(
+                [rattler.Channel("conda-forge")], ["noarch"], [spec], recursive=False
+            )
+        )
+    except GatewayError as exc:
+        raise PinningError(f"Could not query conda-forge for {spec}: {exc}") from exc
+    if not records:
+        raise PinningError(f"No {spec} package found on conda-forge")
+    return max(records, key=lambda record: (record.version, record.build_number))
 
 
 def get_latest_pinning_distribution() -> tuple[str, str]:
     """Return the newest conda-forge-pinning version and artifact URL."""
-    repodata = _load_zstd_json(_request(CURRENT_REPODATA_URL).content)
-    records = []
-    for section in ("packages", "packages.conda"):
-        for filename, record in repodata.get(section, {}).items():
-            if record.get("name") == PINNING_PACKAGE:
-                records.append((record.get("timestamp", 0), filename, record))
-    if not records:
-        raise PinningError(
-            f"No {PINNING_PACKAGE} package found in conda-forge current repodata"
-        )
-    _, filename, record = max(records)
-    url = f"https://conda.anaconda.org/conda-forge/noarch/{quote(filename)}"
-    return str(record["version"]), url
+    record = _newest_pinning_record(PINNING_PACKAGE)
+    return str(record.version), record.url
 
 
 def get_pinning_distribution(version: str) -> str:
     """Return the artifact URL for an exact conda-forge-pinning version."""
-    release = _request(ANACONDA_RELEASE_URL.format(version=quote(str(version)))).json()
-    distributions = [
-        item
-        for item in release.get("distributions", [])
-        if item.get("basename", "").startswith("noarch/")
-        and item.get("basename", "").endswith((".conda", ".tar.bz2"))
-    ]
-    if not distributions:
-        raise PinningError(f"No noarch artifact found for {PINNING_PACKAGE} {version}")
-    distribution = max(
-        distributions,
-        key=lambda item: (
-            item.get("attrs", {}).get("build_number", 0),
-            item.get("attrs", {}).get("timestamp", 0),
-        ),
-    )
-    url = distribution.get("download_url")
-    if not url:
-        basename = distribution["basename"].split("/", 1)[1]
-        url = "https://conda.anaconda.org/conda-forge/noarch/" + quote(basename)
-    elif url.startswith("//"):
-        url = "https:" + url
-    return url
-
-
-def _read_tar_members(
-    fileobj: Any, *, mode: Literal["r|", "r:bz2"]
-) -> dict[str, bytes]:
-    """Extract only the base config and migration YAML files from a package tarball."""
-    files = {}
-    with tarfile.open(fileobj=fileobj, mode=mode) as archive:
-        for member in archive:
-            if not member.isfile():
-                continue
-            name = member.name.lstrip("./")
-            if name == "conda_build_config.yaml" or (
-                name.startswith("share/conda-forge/migrations/")
-                and name.endswith(".yaml")
-            ):
-                extracted = archive.extractfile(member)
-                if extracted is not None:
-                    files[name] = extracted.read()
-    return files
-
-
-def _read_pinning_package(payload: bytes) -> tuple[bytes, dict[str, bytes]]:
-    """Parse supported pinning artifacts into base-config bytes and named migrations.
-
-    Raises ``PinningError`` when the artifact lacks the required package members.
-    """
-    stream = io.BytesIO(payload)
-    if zipfile.is_zipfile(stream):
-        with zipfile.ZipFile(stream) as archive:
-            package_members = [
-                name
-                for name in archive.namelist()
-                if name.startswith("pkg-") and name.endswith(".tar.zst")
-            ]
-            if len(package_members) != 1:
-                raise PinningError("Invalid .conda artifact: package archive not found")
-            compressed = archive.read(package_members[0])
-        reader = zstandard.ZstdDecompressor().stream_reader(io.BytesIO(compressed))
-        with reader:
-            files = _read_tar_members(reader, mode="r|")
-    else:
-        try:
-            files = _read_tar_members(io.BytesIO(payload), mode="r:bz2")
-        except tarfile.TarError as exc:
-            raise PinningError("Unsupported conda-forge-pinning artifact") from exc
-
-    base = files.pop("conda_build_config.yaml", None)
-    if base is None:
-        raise PinningError("conda_build_config.yaml is missing from pinning artifact")
-    migrations = {
-        Path(name).stem: content
-        for name, content in files.items()
-        if Path(name).suffix == ".yaml"
-    }
-    return base, migrations
+    return _newest_pinning_record(f"{PINNING_PACKAGE}=={version}").url
 
 
 def download_pinning_package(
     version: str, *, artifact_url: Optional[str] = None
 ) -> tuple[bytes, dict[str, bytes]]:
-    """Download and parse a versioned pinning artifact, or the supplied artifact URL."""
+    """Download a versioned pinning artifact, or the supplied artifact URL, into its
+    base config and named migrations."""
     url = artifact_url or get_pinning_distribution(version)
-    return _read_pinning_package(_request(url).content)
+    with tempfile.TemporaryDirectory() as tmp:
+        dest = Path(tmp)
+        try:
+            asyncio.run(download_and_extract(rattler.Client(), url, dest))
+        except (ExtractError, OSError) as exc:
+            raise PinningError(f"Could not download {url}: {exc}") from exc
+        base = dest / "conda_build_config.yaml"
+        if not base.is_file():
+            raise PinningError(
+                "conda_build_config.yaml is missing from pinning artifact"
+            )
+        migrations = {
+            path.stem: path.read_bytes()
+            for path in (dest / "share/conda-forge/migrations").glob("*.yaml")
+        }
+        return base.read_bytes(), migrations
 
 
 def _pinning_spec_fields(

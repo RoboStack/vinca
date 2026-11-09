@@ -1,19 +1,17 @@
 import io
 import re
 import tarfile
-import zipfile
 from unittest.mock import patch
 
 import pytest
 import ruamel.yaml
-import zstandard
 
 from vinca.pinning import (
     PinningError,
     _migration_applies_to_platforms,
-    _read_pinning_package,
     dependencies_from_recipes,
     dependencies_from_vinca,
+    download_pinning_package,
     render_pinning,
     select_completed_migrations,
     update_pinning,
@@ -38,35 +36,45 @@ migrator_ts: 1234
 """
 
 
-def _conda_package(files):
-    tar_payload = io.BytesIO()
-    with tarfile.open(fileobj=tar_payload, mode="w") as archive:
+def _pinning_package(path, files):
+    with tarfile.open(path, mode="w:bz2") as archive:
         for name, content in files.items():
             info = tarfile.TarInfo(name)
             info.size = len(content)
             archive.addfile(info, io.BytesIO(content))
-    compressed = zstandard.ZstdCompressor().compress(tar_payload.getvalue())
-    conda_payload = io.BytesIO()
-    with zipfile.ZipFile(conda_payload, mode="w") as archive:
-        archive.writestr("metadata.json", '{"conda_pkg_format_version": 2}')
-        archive.writestr("pkg-test.tar.zst", compressed)
-        archive.writestr("info-test.tar.zst", b"")
-    return conda_payload.getvalue()
+    return path.as_uri()
 
 
-def test_read_pinning_conda_package():
-    payload = _conda_package(
+def test_download_pinning_package(tmp_path):
+    url = _pinning_package(
+        tmp_path / "conda-forge-pinning-1-0.tar.bz2",
         {
             "conda_build_config.yaml": BASE_CONFIG,
             "share/conda-forge/migrations/libboost190.yaml": BOOST_MIGRATION,
             "ignored.txt": b"not part of the pinning inputs",
-        }
+        },
     )
 
-    base, migrations = _read_pinning_package(payload)
+    base, migrations = download_pinning_package("1", artifact_url=url)
 
     assert base == BASE_CONFIG
     assert migrations == {"libboost190": BOOST_MIGRATION}
+
+
+def test_download_pinning_package_without_a_base_config(tmp_path):
+    url = _pinning_package(
+        tmp_path / "conda-forge-pinning-1-0.tar.bz2", {"ignored.txt": b""}
+    )
+
+    with pytest.raises(PinningError, match="conda_build_config.yaml is missing"):
+        download_pinning_package("1", artifact_url=url)
+
+
+def test_download_pinning_package_that_does_not_exist(tmp_path):
+    url = (tmp_path / "conda-forge-pinning-1-0.tar.bz2").as_uri()
+
+    with pytest.raises(PinningError, match="Could not download"):
+        download_pinning_package("1", artifact_url=url)
 
 
 def test_render_applies_base_migration_then_override(tmp_path):
