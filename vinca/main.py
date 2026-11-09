@@ -170,7 +170,7 @@ def should_skip_output(output, vinca_conf):
 
 
 def append_output_with_compatibility(
-    outputs, output, pkg_shortname, distro, vinca_conf
+    outputs, output, pkg_shortname, distro: Distro, vinca_conf
 ) -> None:
     """Append canonical and compatibility outputs, filtering each independently."""
     candidate_outputs = [output]
@@ -253,7 +253,7 @@ def generate_dependency_requirements(
 def generate_outputs(distro: Distro, vinca_conf):
     outputs = []
 
-    def get_pkg(pkg_name):
+    def get_pkg(pkg_name: str):
         pkg = catkin_pkg.package.parse_package_string(
             distro.get_release_package_xml(pkg_name)
         )
@@ -337,7 +337,7 @@ def generate_fat_source(distro, vinca_conf):
     return build_fat_source(distro, vinca_conf)
 
 
-def conda_index_shadowed_packages(distro, vinca_conf):
+def conda_index_shadowed_packages(distro: Distro, vinca_conf):
     """ROS packages of the distribution that a conda_index maps to conda packages."""
     names = set()
     for index in vinca_conf.get("_conda_indexes") or []:
