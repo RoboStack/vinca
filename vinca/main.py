@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-import argparse
 import glob
 import os
-import sys
 from argparse import Namespace
 from pathlib import Path
-from typing import Any, Optional
+from typing import Annotated, Any, Optional
 
 import catkin_pkg
 import ruamel.yaml
+import typer
 
 from vinca import __version__, config
 from vinca.utils import built_for_distro, get_channel_records, get_pkg_build_number
@@ -73,85 +72,13 @@ def get_conda_subdir() -> str:
     return detect_conda_subdir(selected)
 
 
-def parse_command_line(argv: list[str]) -> Namespace:
-    """
-    Parse command line argument. See -h option.
-    :param argv: the actual program arguments
-    :return: parsed arguments
-    """
-    import textwrap
+app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 
-    default_dir = "."
 
-    example = textwrap.dedent(
-        """
-      Examples:
-        {0} -d ./examples/
-      See: https://github.com/RoboStack/vinca
-    """
-    ).format(os.path.basename(argv[0]))
-    formatter_class = argparse.RawDescriptionHelpFormatter
-    parser = argparse.ArgumentParser(
-        description="Conda recipe generator for ROS packages",
-        epilog=example,
-        formatter_class=formatter_class,
-    )
-    parser.add_argument(
-        "-V", "--version", action="version", version="%(prog)s {}".format(__version__)
-    )
-    parser.add_argument(
-        "-d",
-        "--dir",
-        dest="dir",
-        default=default_dir,
-        help="The directory to process (default: {}).".format(default_dir),
-    )
-    parser.add_argument(
-        "-s",
-        "--skip",
-        dest="skip_already_built_repodata",
-        default=[],
-        help="Skip already built from repodata.",
-    )
-    parser.add_argument(
-        "-m",
-        "--multiple",
-        dest="multiple_file",
-        action="store_const",
-        const=True,
-        default=False,
-        help="Create one recipe for package.",
-    )
-    parser.add_argument(
-        "-n",
-        "--trigger-new-versions",
-        dest="trigger_new_versions",
-        action="store_const",
-        const=True,
-        default=False,
-        help="Trigger the build of packages that have new versions available.",
-    )
-    parser.add_argument(
-        "--source",
-        dest="source",
-        action="store_const",
-        const=True,
-        default=False,
-        help="Create recipe with develop repo.",
-    )
-    parser.add_argument(
-        "-p", "--package", dest="package", default=None, help="The package.xml path."
-    )
-    parser.add_argument(
-        "--platform",
-        dest="platform",
-        default=None,
-        help="The conda platform to check existing recipes for.",
-    )
-    arguments = parser.parse_args(argv[1:])
-    config.parsed_args = arguments
-    config.selected_platform = get_conda_subdir()
-    return arguments
+def print_version(value: bool) -> None:
+    if value:
+        typer.echo(f"vinca {__version__}")
+        raise typer.Exit()
 
 
 def read_vinca_yaml(filepath: str | Path):
@@ -649,24 +576,70 @@ def print_generation_summary(distro: Distro, vinca_conf, outputs) -> None:
     console.print(f"Total generated recipes: [bold]{len(rows) + len(leftovers)}[/bold]")
 
 
-def main() -> None:
+@app.command(
+    epilog="Example: vinca -d ./examples/\n\nSee: https://github.com/RoboStack/vinca"
+)
+def generate(
+    dir: Annotated[
+        str, typer.Option("-d", "--dir", help="The directory to process.")
+    ] = ".",
+    skip_already_built_repodata: Annotated[
+        Optional[list[str]],
+        typer.Option("-s", "--skip", help="Skip already built from repodata."),
+    ] = None,
+    multiple_file: Annotated[
+        bool, typer.Option("-m", "--multiple", help="Create one recipe for package.")
+    ] = False,
+    trigger_new_versions: Annotated[
+        bool,
+        typer.Option(
+            "-n",
+            "--trigger-new-versions",
+            help="Trigger the build of packages that have new versions available.",
+        ),
+    ] = False,
+    source_version: Annotated[
+        bool, typer.Option("--source", help="Create recipe with develop repo.")
+    ] = False,
+    package: Annotated[
+        Optional[str], typer.Option("-p", "--package", help="The package.xml path.")
+    ] = None,
+    platform: Annotated[
+        Optional[str],
+        typer.Option(
+            "--platform", help="The conda platform to check existing recipes for."
+        ),
+    ] = None,
+    version: Annotated[
+        bool,
+        typer.Option(
+            "-V",
+            "--version",
+            callback=print_version,
+            is_eager=True,
+            help="Show the version and exit.",
+        ),
+    ] = False,
+) -> None:
+    """Conda recipe generator for ROS packages."""
     global distro, unsatisfied_deps
 
-    arguments = parse_command_line(sys.argv)
+    config.parsed_args = Namespace(platform=platform)
+    config.selected_platform = get_conda_subdir()
 
-    base_dir = os.path.abspath(arguments.dir)
+    base_dir = os.path.abspath(dir)
     vinca_yaml = os.path.join(base_dir, "vinca.yaml")
     vinca_conf = read_vinca_yaml(vinca_yaml)
 
-    if arguments.trigger_new_versions:
+    if trigger_new_versions:
         vinca_conf["trigger_new_versions"] = True
     else:
         vinca_conf["trigger_new_versions"] = vinca_conf.get(
             "trigger_new_versions", False
         )
 
-    if arguments.package:
-        pkg_files = glob.glob(arguments.package)
+    if package:
+        pkg_files = glob.glob(package)
 
         python_version = None
         if "python_version" in vinca_conf:
@@ -697,13 +670,13 @@ def main() -> None:
             if compatibility_recipe is not None:
                 recipes.append(compatibility_recipe)
 
-            if arguments.multiple_file:
+            if multiple_file:
                 for generated_recipe in recipes:
                     write_recipe_package(generated_recipe)
             else:
                 outputs.extend(recipes)
 
-        if not arguments.multiple_file:
+        if not multiple_file:
             sources = {}
             for output in outputs:
                 source = output.pop("source", None)
@@ -714,13 +687,11 @@ def main() -> None:
     else:
         # (name, version, build string) of the published builds; None: skip nothing
         published = None
-        if arguments.skip_already_built_repodata or vinca_conf.get("skip_existing"):
+        if skip_already_built_repodata or vinca_conf.get("skip_existing"):
             published = set()
             skip_built_packages = set()
             vinca_conf["skip_built_packages"] = skip_built_packages
-            fn = arguments.skip_already_built_repodata
-            if not fn:
-                fn = vinca_conf.get("skip_existing")
+            fns = list(skip_already_built_repodata or vinca_conf["skip_existing"])
 
             yaml = ruamel.yaml.YAML()
             additional_recipe_names = set()
@@ -729,7 +700,7 @@ def main() -> None:
             ):
                 with open(add_rec, encoding="utf-8") as fi:
                     add_rec_y = yaml.load(fi)
-                if arguments.platform == "emscripten-wasm32":
+                if platform == "emscripten-wasm32":
                     additional_recipe_names.add(add_rec_y["package"]["name"])
                 else:
                     if add_rec_y["package"]["name"] not in [
@@ -746,13 +717,12 @@ def main() -> None:
 
             print("Found additional recipes: ", additional_recipe_names)
 
-            fns = list(fn)
             for fn in fns:
                 selected_bn = None
 
                 print(f"Fetching repodata: {fn}")
                 records = get_channel_records(fn, get_conda_subdir())
-                if arguments.multiple_file:
+                if multiple_file:
                     # compared by exact build string once the recipes are written
                     published |= published_builds(records, vinca_conf["ros_distro"])
                     continue
@@ -801,14 +771,14 @@ def main() -> None:
 
         vinca_conf["_selected_pkgs"] = selected_pkgs
 
-        if arguments.source:
+        if source_version:
             source = generate_source_version(distro, vinca_conf)
             outputs = generate_outputs_version(distro, vinca_conf)
         else:
             source = generate_source(distro, vinca_conf)
             outputs = generate_outputs(distro, vinca_conf)
 
-        if arguments.multiple_file:
+        if multiple_file:
             write_recipe(source, outputs, vinca_conf, distro, False)
             if published is not None:
                 variant_config = Path(base_dir) / "conda_build_config.yaml"
@@ -829,3 +799,7 @@ def main() -> None:
             print("Unsatisfied dependencies:", unsatisfied_deps)
 
     print("build scripts are created successfully.")
+
+
+def main() -> None:
+    app()
