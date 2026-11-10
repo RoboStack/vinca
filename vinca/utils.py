@@ -41,7 +41,7 @@ NoAliasRepresenter.add_representer(folded_unicode, folded_unicode_representer)
 NoAliasRepresenter.add_representer(literal_unicode, literal_unicode_representer)
 
 
-def _channel(location):
+def _channel(location) -> rattler.Channel:
     # rattler reads a bare name as an anaconda.org channel; a single-letter scheme
     # is a Windows drive
     if len(urlsplit(location).scheme) > 1:

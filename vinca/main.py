@@ -383,7 +383,7 @@ def get_selected_packages(distro: Distro, vinca_conf):
     return result
 
 
-def parse_package(pkg, distro: Distro, vinca_conf, path):
+def parse_package(pkg, distro: Distro, vinca_conf, path: str):
     name = pkg["name"].replace("_", "-")
     final_name = get_package_name(name, distro, vinca_conf)
 

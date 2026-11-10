@@ -5,7 +5,7 @@ import shutil
 import stat
 from importlib import resources
 from pathlib import Path
-from typing import TextIO
+from typing import TYPE_CHECKING, TextIO
 
 from ruamel import yaml
 
@@ -19,6 +19,10 @@ from vinca.utils import (
 )
 from vinca.v1_selectors import evaluate_distro_selectors
 from vinca.variants import VariantsMode, get_recipe_variants, get_variants_mode
+
+if TYPE_CHECKING:
+    # importlib.resources.abc is new in Python 3.11
+    from importlib.resources.abc import Traversable
 
 TEMPLATE = """\
 # yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
@@ -239,7 +243,9 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file: bool = True) 
                 generate_activation_scripts_for_recipe(recipe_dir)
 
 
-def generate_template(template_in, template_out: TextIO, extra_globals=None) -> None:
+def generate_template(
+    template_in: "Traversable", template_out: TextIO, extra_globals=None
+) -> None:
     import em
 
     from vinca.config import ros_distro, skip_testing
@@ -254,7 +260,7 @@ def generate_template(template_in, template_out: TextIO, extra_globals=None) -> 
         output=template_out, options={em.RAW_OPT: True, em.BUFFERED_OPT: True}
     )
     interpreter.updateGlobals(g)
-    interpreter.file(open(template_in, encoding="utf-8"))
+    interpreter.file(template_in.open(encoding="utf-8"))
     interpreter.shutdown()
 
     # It seems that rattler-build requires script to have executable permissions
