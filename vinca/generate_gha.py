@@ -132,7 +132,7 @@ def add_additional_recipes(args: Namespace):
         return []
 
     vinca_conf = read_vinca_yaml("vinca.yaml")
-    repodatas = get_skip_existing(vinca_conf, args.platform)
+    records = get_skip_existing(vinca_conf, args.platform)
 
     additional_recipes = []
     for recipe_path in glob.glob(additional_recipes_path + "/**/recipe.yaml"):
@@ -146,19 +146,16 @@ def add_additional_recipes(args: Namespace):
         )
         print("Checking if ", name, version, bnumber, " exists")
         skip = False
-        for repo in repodatas:
-            repo_pkgs = repo.get("packages", {})
-            repo_pkgs.update(repo.get("packages.conda", {}))
-            for _, pkg in repo_pkgs.items():
-                if (
-                    pkg["name"] == name
-                    and pkg["version"] == version
-                    and pkg["build_number"] == bnumber
-                    and built_for_distro(pkg, vinca_conf["ros_distro"])
-                ):
-                    skip = True
-                    print(f"{name}=={version}=={bnumber} already exists. Skipping.")
-                    break
+        for pkg in records:
+            if (
+                pkg["name"] == name
+                and pkg["version"] == version
+                and pkg["build_number"] == bnumber
+                and built_for_distro(pkg, vinca_conf["ros_distro"])
+            ):
+                skip = True
+                print(f"{name}=={version}=={bnumber} already exists. Skipping.")
+                break
 
         if not skip:
             print("Adding ", os.path.dirname(recipe_path))

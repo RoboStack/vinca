@@ -23,17 +23,13 @@ from vinca.utils import built_for_distro
 Build = tuple[str, str, str]
 
 
-def published_builds(
-    repodatas: Iterable[Mapping[str, Any]], ros_distro: str
-) -> set[Build]:
+def published_builds(records: Iterable[dict[str, Any]], ros_distro: str) -> set[Build]:
     """(name, version, build string) of every record built for *ros_distro*."""
-    builds = set()
-    for repodata in repodatas:
-        records = {**repodata.get("packages", {}), **repodata.get("packages.conda", {})}
-        for record in records.values():
-            if built_for_distro(record, ros_distro):
-                builds.add((record["name"], record["version"], record["build"]))
-    return builds
+    return {
+        (record["name"], record["version"], record["build"])
+        for record in records
+        if built_for_distro(record, ros_distro)
+    }
 
 
 def render_outputs(
