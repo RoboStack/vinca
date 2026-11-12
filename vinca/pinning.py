@@ -32,7 +32,7 @@ from vinca.variant_algebra import variant_add
 
 PINNING_PACKAGE = "conda-forge-pinning"
 MIGRATION_STATUS_URL = (
-    "https://raw.githubusercontent.com/regro/cf-graph-countyfair/master/"
+    "https://raw.githubusercontent.com/conda-forge/conda-forge-bot-data/main/"
     "status/migration_json/{migration}.json"
 )
 FEEDSTOCK_OUTPUT_URL = (
