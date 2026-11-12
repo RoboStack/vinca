@@ -206,3 +206,22 @@ def test_additional_info_by_ros_or_conda_name(name):
 def test_additional_info_of_a_package_without_an_entry():
     assert get_pkg_additional_info("ros2-rclcpp", ADDITIONAL_INFO_CONF) == {}
     assert get_pkg_additional_info("rclcpp", {"_pkg_additional_info": None}) == {}
+
+
+def test_get_channel_records_includes_the_noarch_subdir(channel):
+    compat = {**FOO, "name": "ros-lyrical-foo", "build": "h0_31"}
+    _write_repodata(channel, "noarch", _repodata(compat))
+    _write_repodata(channel, "linux-64", _repodata(FOO))
+
+    assert _names_and_builds(get_channel_records(str(channel), "linux-64")) == [
+        ("ros2-foo", "1.0", "h1_31", 31),
+        ("ros-lyrical-foo", "1.0", "h0_31", 31),
+    ]
+
+
+def test_get_channel_records_without_a_noarch_subdir(channel):
+    _write_repodata(channel, "linux-64", _repodata(FOO))
+
+    assert _names_and_builds(get_channel_records(str(channel), "linux-64")) == [
+        ("ros2-foo", "1.0", "h1_31", 31)
+    ]
