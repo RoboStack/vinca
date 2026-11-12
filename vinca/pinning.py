@@ -396,7 +396,8 @@ def _normalized(name: str) -> str:
 
 
 def _feedstock_output_url(package: str) -> str:
-    prefix = (package.lower() + "zzz")[:3]
+    # feedstock-outputs shards by the first three alphanumeric characters
+    prefix = ("".join(c for c in package.lower() if c.isalnum()) + "zzz")[:3]
     shards = "/".join(prefix)
     return FEEDSTOCK_OUTPUT_URL.format(
         shards=shards, package=quote(package.lower(), safe="")
