@@ -4,9 +4,8 @@ These cover *why* a recipe gets generated: whether a package was requested
 directly by the config and which already-selected packages depend on it.
 """
 
-from typing import Any
-
 import vinca.main as m
+from vinca.schemas import VincaConfig
 
 
 class FakeDistro:
@@ -34,33 +33,35 @@ def test_provenance_requested_and_required_by():
         {"app": {"libA", "libB"}, "libA": {"libcommon"}, "libB": {"libcommon"}},
         ros1=True,  # keep ROS2 auto-injection out of this assertion
     )
-    conf: dict[str, Any] = {
-        "packages_select_by_deps": ["app", "libA"],
-        "packages_skip": None,
-    }
+    conf = VincaConfig(
+        ros_distro="humble",
+        packages_select_by_deps=["app", "libA"],
+        packages_skip=None,
+    )
 
     selected = m.get_selected_packages(distro, conf)
 
     assert set(selected) == {"app", "libA", "libB", "libcommon"}
 
-    prov = conf["_pkg_provenance"]
+    prov = conf.pkg_provenance
     # both seeds are recorded as requested by config
-    assert prov["requested_by_config"] == {"app", "libA"}
+    assert prov.requested_by_config == {"app", "libA"}
     # libA is requested *and* depended on by app
-    assert prov["required_by"]["libA"] == {"app"}
+    assert prov.required_by["libA"] == {"app"}
     # transitive dep pulled in by the requested seeds
-    assert prov["required_by"]["libcommon"] == {"libA"}
-    assert prov["required_by"]["libB"] == {"app"}
+    assert prov.required_by["libcommon"] == {"libA"}
+    assert prov.required_by["libB"] == {"app"}
     # purely-requested package has no reverse-dep entry
-    assert "app" not in prov["required_by"]
+    assert "app" not in prov.required_by
 
 
 def test_provenance_skip_by_deps_excludes_package():
     distro = FakeDistro({"app": {"libA", "skipme"}}, ros1=True)
-    conf: dict[str, Any] = {
-        "packages_select_by_deps": ["app"],
-        "packages_skip": ["skipme"],
-    }
+    conf = VincaConfig(
+        ros_distro="humble",
+        packages_select_by_deps=["app"],
+        packages_skip=["skipme"],
+    )
 
     selected = m.get_selected_packages(distro, conf)
 
@@ -70,17 +71,18 @@ def test_provenance_skip_by_deps_excludes_package():
 
 def test_ros2_workspace_auto_injected_with_reason():
     distro = FakeDistro({"app": set()}, ros1=False)
-    conf: dict[str, Any] = {
-        "packages_select_by_deps": ["app"],
-        "packages_skip": None,
-    }
+    conf = VincaConfig(
+        ros_distro="humble",
+        packages_select_by_deps=["app"],
+        packages_skip=None,
+    )
 
     selected = m.get_selected_packages(distro, conf)
 
     assert "ros_workspace" in selected
     assert "ros_environment" in selected
-    prov = conf["_pkg_provenance"]
-    assert prov["required_by"]["ros_workspace"] == {"(automatic ROS2 dependency)"}
+    prov = conf.pkg_provenance
+    assert prov.required_by["ros_workspace"] == {"(automatic ROS2 dependency)"}
 
 
 def test_generation_summary_output(monkeypatch, capsys):
@@ -88,11 +90,12 @@ def test_generation_summary_output(monkeypatch, capsys):
         {"app": {"libA", "libB"}, "libA": {"libcommon"}, "libB": {"libcommon"}},
         ros1=True,
     )
-    conf: dict[str, Any] = {
-        "packages_select_by_deps": ["app", "libA"],
-        "packages_skip": None,
-    }
-    conf["_selected_pkgs"] = m.get_selected_packages(distro, conf)
+    conf = VincaConfig(
+        ros_distro="humble",
+        packages_select_by_deps=["app", "libA"],
+        packages_skip=None,
+    )
+    conf.selected_pkgs = m.get_selected_packages(distro, conf)
 
     monkeypatch.setattr(
         m,
@@ -108,7 +111,7 @@ def test_generation_summary_output(monkeypatch, capsys):
     # pretend a recipe was generated for everything except libB, plus a mutex
     outputs = [
         {"package": {"name": "ros-humble-" + s.replace("_", "-")}}
-        for s in conf["_selected_pkgs"]
+        for s in conf.selected_pkgs
         if s != "libB"
     ]
     outputs.append({"package": {"name": "ros-humble-ros2-mutex"}})

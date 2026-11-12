@@ -2,6 +2,7 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
+from vinca.schemas import VincaConfig
 from vinca.template import write_recipe
 
 
@@ -14,17 +15,13 @@ class FakeDistro:
 
 
 def config(variants_mode):
-    return {
-        "ros_distro": "jazzy",
-        "package_name_mode": "legacy",
-        "variants_mode": variants_mode,
-        "build_number": 0,
-        "_tests": {},
-        "_test_folders": {},
-        "_additional_packages_snapshot": {},
-        "_pkg_additional_info": {},
-        "_variant_config": {"python": ["3.12"], "unused": ["1"]},
-    }
+    return VincaConfig(
+        ros_distro="jazzy",
+        package_name_mode="legacy",
+        variants_mode=variants_mode,
+        build_number=0,
+        variant_config={"python": ["3.12"], "unused": ["1"]},
+    )
 
 
 def output():
@@ -49,7 +46,7 @@ def test_write_recipe_appends_test_file_to_generated_tests(tmp_path, monkeypatch
     test_file = tmp_path / "ros-jazzy-demo.yaml"
     test_file.write_text("tests:\n  - script:\n      - demo --help\n")
     conf = config("global")
-    conf["_tests"] = {"ros-jazzy-demo": test_file}
+    conf.tests = {"ros-jazzy-demo": test_file}
     generated = {"package_contents": {"files": {"not_exists": ["**/*.pyd"]}}}
 
     write_recipe(

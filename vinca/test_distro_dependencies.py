@@ -2,6 +2,7 @@ from typing import Any
 from unittest.mock import Mock
 
 from vinca.distro import Distro
+from vinca.schemas import SnapshotEntry
 
 
 def test_dependency_walk_reuses_direct_dependencies_across_roots():
@@ -97,16 +98,22 @@ def test_dependency_walk_excludes_root_from_longer_cycle():
 def test_prefetch_additional_manifests_skips_archives():
     distro = Distro.__new__(Distro)
     distro.additional_packages_snapshot = {
-        "one": {"url": "https://github.com/example/one.git", "rev": "abc"},
-        "two": {"url": "https://gitlab.com/example/two", "tag": "1.0"},
-        "archive": {"url": "https://example.com/source.tar.gz", "sha256": "abc"},
+        "one": SnapshotEntry(
+            url="https://github.com/example/one.git", version="1.0", rev="abc"
+        ),
+        "two": SnapshotEntry(
+            url="https://gitlab.com/example/two", version="1.0", tag="1.0"
+        ),
+        "archive": SnapshotEntry(
+            url="https://example.com/source.tar.gz", version="1.0", sha256="abc"
+        ),
     }
     distro.get_package_xml_for_additional_package = Mock(return_value="<package />")
 
     distro.prefetch_additional_package_xml(max_workers=2)
 
     requested = {
-        call.args[0]["url"]
+        call.args[0].url
         for call in distro.get_package_xml_for_additional_package.call_args_list
     }
     assert requested == {

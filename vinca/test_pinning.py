@@ -1,22 +1,27 @@
 import io
 import re
 import tarfile
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
+import requests
 import ruamel.yaml
 
 from vinca.pinning import (
     PinningError,
-    _feedstock_output_url,
     _migration_applies_to_platforms,
+    _migration_timestamp,
+    _status_sets,
     dependencies_from_recipes,
     dependencies_from_vinca,
     download_pinning_package,
+    get_migration_status,
+    package_feedstocks,
     render_pinning,
     select_completed_migrations,
     update_pinning,
 )
+from vinca.schemas import MigrationStatus, VincaConfig
 from vinca.variant_algebra import _selector_platforms, variant_add
 
 BASE_CONFIG = b"""\
@@ -434,11 +439,7 @@ def test_dependencies_from_vinca_restores_global_platform_configuration(
         patch("vinca.distro.Distro", return_value=distro),
         patch(
             "vinca.main.read_vinca_yaml",
-            return_value={
-                "ros_distro": "rolling",
-                "_snapshot": {},
-                "_additional_packages_snapshot": {},
-            },
+            return_value=VincaConfig(ros_distro="rolling"),
         ),
         patch("vinca.main.get_group_dependency_packages", return_value=[]),
         patch("vinca.main.get_selected_packages", return_value=[]),
@@ -462,11 +463,7 @@ def test_dependencies_from_vinca_restores_global_configuration_on_error(
     with (
         patch(
             "vinca.main.read_vinca_yaml",
-            return_value={
-                "ros_distro": "rolling",
-                "_snapshot": {},
-                "_additional_packages_snapshot": {},
-            },
+            return_value=VincaConfig(ros_distro="rolling"),
         ),
         patch("vinca.distro.Distro", side_effect=RuntimeError("network failure")),
         pytest.raises(RuntimeError, match="network failure"),
@@ -488,11 +485,7 @@ def test_dependencies_from_vinca_reuses_distro_and_group_packages(tmp_path):
             "prefetch_additional_package_xml": lambda self: None,
         },
     )()
-    config = {
-        "ros_distro": "rolling",
-        "_snapshot": {},
-        "_additional_packages_snapshot": {},
-    }
+    config = VincaConfig(ros_distro="rolling")
     requirements = iter(
         [
             [{"host": ["python", "ros2-rclcpp"]}],
@@ -503,7 +496,9 @@ def test_dependencies_from_vinca_reuses_distro_and_group_packages(tmp_path):
 
     with (
         patch("vinca.distro.Distro", return_value=distro) as distro_class,
-        patch("vinca.main.read_vinca_yaml", side_effect=lambda path: dict(config)),
+        patch(
+            "vinca.main.read_vinca_yaml", side_effect=lambda path: config.model_copy()
+        ),
         patch(
             "vinca.main.get_group_dependency_packages", return_value=["group-package"]
         ) as get_groups,
@@ -532,8 +527,8 @@ def test_selects_only_migrations_done_for_all_relevant_dependencies():
         "paused": b"__migrator:\n  paused: true\nignored:\n  - 2\n",
     }
     statuses = {
-        "boost": {"done": ["pcl"], "in-pr": ["vtk"]},
-        "urdfdom": {"done": ["pinocchio"]},
+        "boost": MigrationStatus.model_validate({"done": ["pcl"], "in-pr": ["vtk"]}),
+        "urdfdom": MigrationStatus.model_validate({"done": ["pinocchio"]}),
     }
 
     with (
@@ -553,6 +548,46 @@ def test_selects_only_migrations_done_for_all_relevant_dependencies():
     assert selected == ["urdfdom"]
     assert dict(reports)["boost"].startswith("waiting for vtk")
     assert "paused" not in dict(reports)
+
+
+def test_migration_status_reads_every_state():
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "done": ["pcl"],
+        "in-pr": ["vtk"],
+        "awaiting-parents": ["Gazebo"],
+        "_feedstock_status": {
+            "vtk": {"pr_status": "open", "pr_url": "https://example.invalid/1"}
+        },
+    }
+
+    with patch("vinca.pinning.requests.get", return_value=response):
+        status = get_migration_status("boost")
+
+    assert status is not None
+    assert _status_sets(status) == ({"pcl"}, {"pcl", "vtk", "gazebo"})
+    assert status.feedstock_status["vtk"].pr_url == "https://example.invalid/1"
+
+
+def test_migration_status_with_an_unexpected_shape_is_an_error():
+    response = Mock(status_code=200)
+    response.json.return_value = {"done": "pcl"}
+
+    with (
+        patch("vinca.pinning.requests.get", return_value=response),
+        pytest.raises(PinningError, match="done"),
+    ):
+        get_migration_status("boost")
+
+
+@pytest.mark.parametrize(
+    "migrator_ts,timestamp",
+    [("1234", 1234.0), ("2026-10-26T16:56:35+01:00", 1793030195.0), (None, -1.0)],
+)
+def test_migration_timestamp(migrator_ts, timestamp):
+    payload = b"" if migrator_ts is None else f"migrator_ts: {migrator_ts}\n".encode()
+
+    assert _migration_timestamp(payload) == timestamp
 
 
 def test_migration_platform_selectors_are_respected():
@@ -581,7 +616,7 @@ pinning_overrides:
 """
     )
     package = (BASE_CONFIG, {"boost": BOOST_MIGRATION})
-    pending_status = {"done": [], "in-pr": ["pcl"]}
+    pending_status = MigrationStatus.model_validate({"done": [], "in-pr": ["pcl"]})
 
     with (
         patch("vinca.pinning.download_pinning_package", return_value=package),
@@ -603,14 +638,19 @@ pinning_overrides:
     assert parsed["pinning_overrides"] == {"python": ["3.14.* *_cp314"]}
 
 
+def test_package_feedstocks_are_looked_up_in_feedstock_outputs():
+    with patch("vinca.pinning.package_to_feedstock", return_value=["compilers"]):
+        assert package_feedstocks("c-compiler") == {"compilers"}
+
+
 @pytest.mark.parametrize(
-    "package,shards",
+    "lookup",
     [
-        ("libboost-devel", "l/i/b"),
-        ("r-base", "r/b/a"),
-        ("c-ares", "c/a/r"),
-        ("go", "g/o/z"),
+        {"side_effect": requests.HTTPError("404 Client Error")},
+        {"side_effect": KeyError("feedstocks")},
+        {"return_value": []},
     ],
 )
-def test_feedstock_output_url_shards_by_alphanumeric_characters(package, shards):
-    assert _feedstock_output_url(package).endswith(f"/outputs/{shards}/{package}.json")
+def test_package_feedstocks_fall_back_to_the_package_name(lookup):
+    with patch("vinca.pinning.package_to_feedstock", **lookup):
+        assert package_feedstocks("c-compiler") == {"c-compiler"}

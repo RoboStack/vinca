@@ -1,7 +1,9 @@
 import pytest
+from pydantic import ValidationError
 
 from vinca import recipes
 from vinca.recipes import _dummy_constraint, generate_output
+from vinca.schemas import DummyPackage, VincaConfig
 
 PACKAGE_XML = """<?xml version="1.0"?>
 <package format="3">
@@ -92,14 +94,13 @@ def stub_resolve(monkeypatch):
 
 def make_config(name, **overrides):
     config = {
-        "_selected_pkgs": {name},
-        "_pkg_additional_info": {},
-        "depmods": {},
+        "ros_distro": "rolling",
+        "selected_pkgs": [name],
         "package_name_mode": "new",
         "build_number": 0,
     }
     config.update(overrides)
-    return config
+    return VincaConfig(**config)
 
 
 def build(
@@ -541,7 +542,7 @@ def test_dependencies_only_returns_requirements_without_metadata():
 
 def test_unselected_package_produces_no_output():
     distro = FakeDistro({"demo": package_xml("demo")})
-    config = make_config("demo", _selected_pkgs=set())
+    config = make_config("demo", selected_pkgs=[])
 
     assert generate_output("demo", config, distro, "1.2.3") is None
 
@@ -555,7 +556,7 @@ def test_missing_release_manifest_produces_no_output():
 def test_dummy_metapackage_pins_its_dependency():
     output = build(
         "demo",
-        _pkg_additional_info={
+        pkg_additional_info={
             "demo": {
                 "generate_dummy_package_with_run_deps": {
                     "dep_name": "vendor-library",
@@ -572,13 +573,12 @@ def test_dummy_metapackage_pins_its_dependency():
 
 def test_dummy_constraint_uses_pin_depth_and_override_version():
     version, constraint = _dummy_constraint(
-        {
-            "dep_name": "vendor-library",
-            "upper_bound": "x.x",
-            "override_version": "2.4.1",
-        },
+        DummyPackage(
+            dep_name="vendor-library",
+            upper_bound="x.x",
+            override_version="2.4.1",
+        ),
         "1.0.0",
-        "demo_vendor",
     )
 
     assert version == "2.4.1"
@@ -593,8 +593,8 @@ def test_dummy_constraint_uses_pin_depth_and_override_version():
     ],
 )
 def test_dummy_constraint_validates_required_settings(config, message):
-    with pytest.raises(RuntimeError, match=message):
-        _dummy_constraint(config, "1.0.0", "demo_vendor")
+    with pytest.raises(ValidationError, match=message):
+        DummyPackage(**config)
 
 
 def test_python_free_output_gets_contents_guard():

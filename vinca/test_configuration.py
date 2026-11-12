@@ -1,6 +1,8 @@
 import pytest
+from pydantic import ValidationError
 
 from vinca.configuration import read_snapshot, read_vinca_yaml
+from vinca.schemas import DepMods, SnapshotEntry, VariantsMode, VincaYaml
 
 
 def test_read_vinca_yaml_discovers_companion_files(tmp_path, monkeypatch):
@@ -24,17 +26,17 @@ def test_read_vinca_yaml_discovers_companion_files(tmp_path, monkeypatch):
 
     config = read_vinca_yaml(tmp_path / "vinca.yaml", "linux-64")
 
-    assert config["_patches"]["demo"]["any"] == [str(patches / "demo.patch")]
-    assert config["_patches"]["demo"]["linux"] == [str(patches / "demo.unix.patch")]
-    assert config["_patches"]["demo"]["osx"] == [str(patches / "demo.unix.patch")]
-    assert config["_patches"]["demo"]["win"] == [str(patches / "demo.win.patch")]
-    assert config["_tests"]["demo"] == tests / "demo.yaml"
-    assert config["_tests"]["dotted"] == tests / "dotted.name.yaml"
-    assert config["_test_folders"]["demo"] == tests / "demo"
-    assert config["_pkg_additional_info"]["demo"]["build_number"] == 2
-    assert config["depmods"] == {"demo": {}}
-    assert config["variants_mode"] == "global"
-    assert config["_variant_config"] == {}
+    assert config.patches["demo"]["any"] == [str(patches / "demo.patch")]
+    assert config.patches["demo"]["linux"] == [str(patches / "demo.unix.patch")]
+    assert config.patches["demo"]["osx"] == [str(patches / "demo.unix.patch")]
+    assert config.patches["demo"]["win"] == [str(patches / "demo.win.patch")]
+    assert config.tests["demo"] == tests / "demo.yaml"
+    assert config.tests["dotted"] == tests / "dotted.name.yaml"
+    assert config.test_folders["demo"] == tests / "demo"
+    assert config.pkg_additional_info["demo"].build_number == 2
+    assert config.depmods == {"demo": DepMods()}
+    assert config.variants_mode is VariantsMode.GLOBAL
+    assert config.variant_config == {}
 
 
 def test_read_vinca_yaml_loads_local_variant_config(tmp_path, monkeypatch):
@@ -54,8 +56,8 @@ def test_read_vinca_yaml_loads_local_variant_config(tmp_path, monkeypatch):
 
     config = read_vinca_yaml(tmp_path / "vinca.yaml", "linux-64")
 
-    assert config["variants_mode"] == "local"
-    assert config["_variant_config"] == {
+    assert config.variants_mode is VariantsMode.LOCAL
+    assert config.variant_config == {
         "c_compiler": [
             {"if": "linux", "then": "gcc"},
             {"if": "osx", "then": "clang"},
@@ -73,7 +75,7 @@ def test_read_vinca_yaml_rejects_invalid_variants_mode(tmp_path, monkeypatch):
         "ros_distro: humble\nconda_index: []\npatch_dir: patches\nvariants_mode: other\n"
     )
 
-    with pytest.raises(ValueError, match="Invalid variants_mode 'other'"):
+    with pytest.raises(ValidationError, match=r"(?s)vinca\.yaml.*variants_mode"):
         read_vinca_yaml(tmp_path / "vinca.yaml", "linux-64")
 
 
@@ -91,22 +93,33 @@ def test_read_vinca_yaml_requires_config_for_local_pinning(tmp_path, monkeypatch
 def test_read_snapshot_merges_additional_packages(tmp_path):
     snapshot = tmp_path / "snapshot.yaml"
     additional = tmp_path / "additional.yaml"
-    snapshot.write_text("existing:\n  version: 1\noverridden:\n  version: 1\n")
-    additional.write_text("overridden:\n  version: 2\nnew:\n  version: 1\n")
+    snapshot.write_text(
+        "existing:\n  url: https://github.com/x/existing.git\n  version: 1\n"
+        "overridden:\n  url: https://github.com/x/overridden.git\n  version: 1\n"
+    )
+    additional.write_text(
+        "overridden:\n  url: https://github.com/x/overridden.git\n  version: 2\n"
+        "new:\n  url: https://github.com/x/new.git\n  version: 1\n"
+    )
 
     merged, loaded_additional = read_snapshot(
-        {
-            "rosdistro_snapshot": str(snapshot),
-            "rosdistro_additional_recipes": str(additional),
-        }
+        VincaYaml(
+            ros_distro="humble",
+            rosdistro_snapshot=str(snapshot),
+            rosdistro_additional_recipes=str(additional),
+        )
     )
 
     assert merged == {
-        "existing": {"version": 1},
-        "overridden": {"version": 2},
-        "new": {"version": 1},
+        "existing": SnapshotEntry(url="https://github.com/x/existing.git", version="1"),
+        "overridden": SnapshotEntry(
+            url="https://github.com/x/overridden.git", version="2"
+        ),
+        "new": SnapshotEntry(url="https://github.com/x/new.git", version="1"),
     }
     assert loaded_additional == {
-        "overridden": {"version": 2},
-        "new": {"version": 1},
+        "overridden": SnapshotEntry(
+            url="https://github.com/x/overridden.git", version="2"
+        ),
+        "new": SnapshotEntry(url="https://github.com/x/new.git", version="1"),
     }

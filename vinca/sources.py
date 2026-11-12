@@ -7,7 +7,7 @@ and :func:`generate_source_version` emit one entry per package keyed by conda
 name, while :func:`generate_fat_source` emits a flat list for a single recipe
 containing every package.
 
-``vinca_conf`` is treated as read-only. Patch paths come from ``_patches``, which
+``vinca_conf`` is treated as read-only. Patch paths come from ``patches``, which
 :mod:`vinca.configuration` populates.
 """
 
@@ -19,6 +19,7 @@ from typing import Any
 from vinca.distro import Distro
 from vinca.mutex import generate_mutex_package_recipe, should_skip_mutex_package
 from vinca.resolve import resolve_pkgname
+from vinca.schemas import VincaConfig
 from vinca.utils import is_dummy_metapackage
 
 
@@ -29,22 +30,17 @@ def source_reference(*, url: str, ref: str, ref_type: str) -> dict[str, str]:
     return {"git": url, ref_type: ref}
 
 
-def _is_built(package_name: str, version: str, vinca_conf: dict[str, Any]) -> bool:
+def _is_built(package_name: str, version: str, vinca_conf: VincaConfig) -> bool:
     """Return whether the package is already listed as built and should be skipped."""
-    skipped = vinca_conf.get("skip_built_packages", [])
-    key = (
-        (package_name, version)
-        if vinca_conf.get("trigger_new_versions")
-        else package_name
-    )
-    return key in skipped
+    key = (package_name, version) if vinca_conf.trigger_new_versions else package_name
+    return key in vinca_conf.skip_built_packages
 
 
 def package_patches(
-    package_name: str, vinca_conf: dict[str, Any], platform: str
+    package_name: str, vinca_conf: VincaConfig, platform: str
 ) -> list[str]:
     """Return the generic patches for a package followed by its platform-specific ones."""
-    configured = vinca_conf.get("_patches", {}).get(package_name)
+    configured = vinca_conf.patches.get(package_name)
     if not configured:
         return []
     return [*configured.get("any", []), *configured.get(platform.split("-")[0], [])]
@@ -61,7 +57,7 @@ def _recipe_patch_paths(patches: list[str]) -> list[str]:
 
 
 def generate_source(
-    distro: Distro, vinca_conf: dict[str, Any], platform: str
+    distro: Distro, vinca_conf: VincaConfig, platform: str
 ) -> dict[str, dict[str, Any]]:
     """Generate per-package release sources for a multi-recipe build.
 
@@ -69,7 +65,7 @@ def generate_source(
     rattler-build resolves them relative to the recipe; the template copies them.
     """
     sources: dict[str, dict[str, Any]] = {}
-    for shortname in vinca_conf["_selected_pkgs"]:
+    for shortname in vinca_conf.selected_pkgs:
         if not distro.check_package(shortname):
             print(f"Could not generate source for {shortname}")
             continue
@@ -102,7 +98,7 @@ def generate_source(
 
 
 def generate_source_version(
-    distro: Distro, vinca_conf: dict[str, Any], platform: str
+    distro: Distro, vinca_conf: VincaConfig, platform: str
 ) -> dict[str, dict[str, Any]]:
     """Generate release sources while retaining absolute patch paths.
 
@@ -110,7 +106,7 @@ def generate_source_version(
     it to inspect versions rather than to drive a build.
     """
     sources: dict[str, dict[str, Any]] = {}
-    for shortname in vinca_conf["_selected_pkgs"]:
+    for shortname in vinca_conf.selected_pkgs:
         if not distro.check_package(shortname):
             print(f"Could not generate source for {shortname}")
             continue
@@ -131,11 +127,11 @@ def generate_source_version(
 
 
 def generate_fat_source(
-    distro: Distro, vinca_conf: dict[str, Any]
+    distro: Distro, vinca_conf: VincaConfig
 ) -> list[dict[str, Any]]:
     """Generate sources for a single fat recipe containing all packages."""
     sources: list[dict[str, Any]] = []
-    for shortname in vinca_conf["_selected_pkgs"]:
+    for shortname in vinca_conf.selected_pkgs:
         if not distro.check_package(shortname):
             print(f"Could not generate source for {shortname}")
             continue
@@ -148,8 +144,8 @@ def generate_fat_source(
         entry: dict[str, Any] = source_reference(url=url, ref=ref, ref_type=ref_type)
         entry["target_directory"] = f"src/{package_name}"
 
-        patch_path = Path(vinca_conf["_patch_dir"]) / f"{package_name}.patch"
-        if patch_path.exists():
-            entry["patches"] = [f"{vinca_conf['patch_dir']}/{package_name}.patch"]
+        patch_dir = vinca_conf.patch_dir_path
+        if patch_dir is not None and (patch_dir / f"{package_name}.patch").exists():
+            entry["patches"] = [f"{vinca_conf.patch_dir}/{package_name}.patch"]
         sources.append(entry)
     return sources

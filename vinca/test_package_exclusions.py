@@ -1,12 +1,11 @@
 """Tests for packages_exclude / packages_skip and conda_index-shadowed packages."""
 
-from typing import Any
-
 import pytest
 
 import vinca.main as m
 from vinca.configuration import read_vinca_yaml
 from vinca.resolve import should_skip_pkg
+from vinca.schemas import VincaConfig
 
 
 class FakeDistro:
@@ -55,16 +54,16 @@ packages_skip:
 def test_exclude_and_skip_drop_selected_packages(tmp_path, monkeypatch):
     conf = _config(tmp_path, monkeypatch, BODY)
 
-    assert conf["packages_select_by_deps"] == ["app", "viewer"]
-    assert conf["packages_exclude"] == ["tool"]
-    assert conf["packages_skip"] == ["helper"]
+    assert conf.packages_select_by_deps == ["app", "viewer"]
+    assert conf.packages_exclude == ["tool"]
+    assert conf.packages_skip == ["helper"]
 
 
 def test_exclude_under_selector_applies_on_that_platform_only(tmp_path, monkeypatch):
     conf = _config(tmp_path, monkeypatch, BODY, platform="win-64")
 
-    assert conf["packages_select_by_deps"] == ["app"]
-    assert conf["packages_exclude"] == ["tool", "viewer"]
+    assert conf.packages_select_by_deps == ["app"]
+    assert conf.packages_exclude == ["tool", "viewer"]
 
 
 def test_excluded_packages_are_dropped_from_dependencies(tmp_path, monkeypatch):
@@ -90,12 +89,12 @@ packages_remove_from_deps:
         conf = _config(tmp_path, monkeypatch, body)
 
     # as before: the lists don't change the selection, only traversal and dependencies
-    assert conf["packages_select_by_deps"] == ["app", "tool"]
-    assert conf["_skip_by_deps"] == ["tool", "helper"]
+    assert conf.packages_select_by_deps == ["app", "tool"]
+    assert conf.skip_by_deps == ["tool", "helper"]
     assert should_skip_pkg("tool", conf)
     assert should_skip_pkg("removed", conf)
     assert not should_skip_pkg("helper", conf)
-    assert "packages_skip_by_deps" not in conf
+    assert "packages_skip_by_deps" not in conf.model_dump()
 
 
 def test_conda_index_shadowed_ros_packages_are_not_built():
@@ -103,13 +102,12 @@ def test_conda_index_shadowed_ros_packages_are_not_built():
         {"app": {"tl_expected", "libA"}},
         packages={"app", "libA", "tl_expected"},
     )
-    conf: dict[str, Any] = {
-        "packages_select_by_deps": ["app", "tl_expected"],
-        "packages_skip": None,
-        "_conda_indexes": [
-            {"tl_expected": {"robostack": ["cpp-expected"]}, "eigen": {}}
-        ],
-    }
+    conf = VincaConfig(
+        ros_distro="humble",
+        packages_select_by_deps=["app", "tl_expected"],
+        packages_skip=None,
+        conda_indexes=[{"tl_expected": {"robostack": ["cpp-expected"]}, "eigen": {}}],
+    )
 
     selected = m.get_selected_packages(distro, conf)
 

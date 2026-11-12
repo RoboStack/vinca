@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import os
 from typing import Optional
 from urllib.request import urlopen
 
 from vinca import config
+from vinca.distro import Distro
 from vinca.naming import get_package_name
+from vinca.schemas import CondaIndex, VincaConfig, validate
 
 map_platform_python_to_conda = {
     "linux-64": "linux",
@@ -15,22 +19,25 @@ map_platform_python_to_conda = {
 }
 
 
-def get_conda_index(vinca_conf, base_dir):
+def get_conda_index(indexes: list[str], base_dir: str) -> list[CondaIndex]:
     import ruamel.yaml
 
     yaml = ruamel.yaml.YAML()
     conda_index = []
-    for i in vinca_conf["conda_index"]:
+    for i in indexes:
         ip = os.path.join(base_dir, i)
         if os.path.isfile(ip):
-            rawdata = yaml.load(open(ip, "r"))
+            with open(ip, encoding="utf-8") as stream:
+                rawdata = yaml.load(stream)
         else:
             rawdata = yaml.load(urlopen(i))
-        conda_index.append(rawdata)
+        conda_index.append(validate(CondaIndex, rawdata or {}, i))
     return conda_index
 
 
-def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
+def resolve_pkgname_from_indexes(
+    pkg_shortname: str, conda_index: list[CondaIndex]
+) -> Optional[list[str]]:
     for i in conda_index:
         if pkg_shortname in i:
             selected_platform = config.selected_platform
@@ -39,13 +46,15 @@ def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
                     "A target platform is required to resolve package names"
                 )
             sys_platform = map_platform_python_to_conda[selected_platform]
-            if "robostack" in i[pkg_shortname].keys():
-                if selected_platform in i[pkg_shortname]["robostack"]:
-                    return i[pkg_shortname]["robostack"][selected_platform]
-                elif sys_platform in i[pkg_shortname]["robostack"]:
-                    return i[pkg_shortname]["robostack"][sys_platform]
-                else:
-                    return i[pkg_shortname]["robostack"]
+            packages = i[pkg_shortname].robostack
+            if isinstance(packages, list):
+                return packages
+            if packages is not None:
+                if selected_platform in packages:
+                    return packages[selected_platform]
+                if sys_platform in packages:
+                    return packages[sys_platform]
+                return list(packages)
             raise KeyError(
                 "Missing package for platform {}: {}\nCheck your conda metadata!".format(
                     sys_platform, pkg_shortname
@@ -55,21 +64,18 @@ def resolve_pkgname_from_indexes(pkg_shortname, conda_index):
     return None
 
 
-def should_skip_pkg(pkg_shortname, vinca_conf) -> Optional[bool]:
-    skip = vinca_conf.get("_remove_from_deps", vinca_conf.get("packages_exclude"))
-    if not skip:
-        return False
-
-    if pkg_shortname in skip:
-        return True
-    if pkg_shortname.replace("_", "-") in skip:
-        return True
+def should_skip_pkg(pkg_shortname: str, vinca_conf: VincaConfig) -> bool:
+    skip = vinca_conf.remove_from_deps
+    return pkg_shortname in skip or pkg_shortname.replace("_", "-") in skip
 
 
-def resolve_pkgname(pkg_shortname, vinca_conf, distro, is_rundep: bool = False):
-    pkg_names = resolve_pkgname_from_indexes(
-        pkg_shortname, vinca_conf["_conda_indexes"]
-    )
+def resolve_pkgname(
+    pkg_shortname: str,
+    vinca_conf: VincaConfig,
+    distro: Distro,
+    is_rundep: bool = False,
+) -> list[str]:
+    pkg_names = resolve_pkgname_from_indexes(pkg_shortname, vinca_conf.conda_indexes)
     if pkg_names is None:
         if not distro.check_package(pkg_shortname) or should_skip_pkg(
             pkg_shortname, vinca_conf

@@ -1,6 +1,7 @@
 from typing import Any
 
 from vinca.distro import Distro
+from vinca.schemas import SnapshotEntry
 
 
 def _distro() -> Any:
@@ -14,10 +15,11 @@ def test_tag_ref_uses_explicit_refs_tags_prefix():
     # guess is inconsistently cached across CDN edges (the same URL 404s from
     # some vantage points, including GitHub Actions runners, while resolving
     # fine from others). The explicit refs/tags/<name> form is unambiguous.
-    pkg_info = {
-        "url": "https://github.com/ros2-gbp/ros2_control-release.git",
-        "tag": "release/jazzy/controller_interface/4.47.0-1",
-    }
+    pkg_info = SnapshotEntry(
+        url="https://github.com/ros2-gbp/ros2_control-release.git",
+        version="4.47.0",
+        tag="release/jazzy/controller_interface/4.47.0-1",
+    )
 
     url = _distro()._construct_raw_url_github(pkg_info)
 
@@ -30,10 +32,11 @@ def test_tag_ref_uses_explicit_refs_tags_prefix():
 def test_rev_ref_is_used_as_is():
     # A commit hash is already unambiguous -- it must not get the refs/tags/
     # prefix, since it isn't a tag name.
-    pkg_info = {
-        "url": "https://github.com/ros2-gbp/ros2_control-release.git",
-        "rev": "abc123def456",
-    }
+    pkg_info = SnapshotEntry(
+        url="https://github.com/ros2-gbp/ros2_control-release.git",
+        version="4.47.0",
+        rev="abc123def456",
+    )
 
     url = _distro()._construct_raw_url_github(pkg_info)
 
@@ -44,12 +47,13 @@ def test_rev_ref_is_used_as_is():
 
 
 def test_tag_ref_with_additional_folder_and_custom_xml_name():
-    pkg_info = {
-        "url": "https://github.com/example/some-release.git",
-        "tag": "release/rolling/some_pkg/1.0.0-1",
-        "additional_folder": "some_pkg",
-        "package_xml_name": "package.xml",
-    }
+    pkg_info = SnapshotEntry(
+        url="https://github.com/example/some-release.git",
+        version="1.0.0",
+        tag="release/rolling/some_pkg/1.0.0-1",
+        additional_folder="some_pkg",
+        package_xml_name="package.xml",
+    )
 
     url = _distro()._construct_raw_url_github(pkg_info)
 

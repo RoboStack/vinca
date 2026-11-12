@@ -10,15 +10,17 @@ from typing import TYPE_CHECKING, TextIO
 from ruamel import yaml
 
 from vinca import config
+from vinca.configuration import read_recipe_tests
+from vinca.distro import Distro
 from vinca.naming import get_package_prefix, is_legacy_compatibility_output
+from vinca.schemas import VariantsMode, VincaConfig
 from vinca.sources import package_patches
 from vinca.utils import (
     ensure_name_is_without_distro_prefix_and_with_underscores,
     get_pkg_additional_info,
     get_pkg_build_number,
 )
-from vinca.v1_selectors import evaluate_distro_selectors
-from vinca.variants import VariantsMode, get_recipe_variants, get_variants_mode
+from vinca.variants import get_recipe_variants
 
 if TYPE_CHECKING:
     # importlib.resources.abc is new in Python 3.11
@@ -92,7 +94,9 @@ def copyfile_with_exec_permissions(source_file, destination_file) -> None:
         )
 
 
-def write_recipe(source, outputs, vinca_conf, distro, single_file: bool = True) -> None:
+def write_recipe(
+    source, outputs, vinca_conf: VincaConfig, distro: Distro, single_file: bool = True
+) -> None:
     # single_file = False
     if single_file:
         file = yaml.YAML()
@@ -105,7 +109,7 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file: bool = True) 
         meta["package"]["version"] = f"{datetime.datetime.now():%Y.%m.%d}"
         meta["recipe"] = meta["package"]
         del meta["package"]
-        meta["build"]["number"] = vinca_conf.get("build_number", 0)
+        meta["build"]["number"] = vinca_conf.build_number or 0
         meta["build"]["post_process"] = post_process_items
         with open("recipe.yaml", "w", encoding="utf-8") as stream:
             file.dump(meta, stream)
@@ -142,29 +146,24 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file: bool = True) 
             # an output's own build number (e.g. mutex_package.build_number) wins
             # over the distribution's; pkg_additional_info.yaml overrides both
             meta["build"]["number"] = get_pkg_build_number(
-                o.get("build", {}).get("number", vinca_conf.get("build_number", 0)),
+                o.get("build", {}).get("number", vinca_conf.build_number or 0),
                 package_name,
                 vinca_conf,
             )
             meta["build"]["post_process"] = post_process_items
 
             if not is_compatibility_output and (
-                test := vinca_conf["_tests"].get(package_name)
+                test := vinca_conf.tests.get(package_name)
             ):
                 print("Using test: ", test)
-                text = test.read_text(encoding="utf-8")
-                test_content = evaluate_distro_selectors(
-                    yaml.YAML(typ="safe").load(text), ros_distro=config.ros_distro
-                )
-                meta["tests"] = list(meta.get("tests") or []) + test_content["tests"]
+                test_content = read_recipe_tests(test, config.ros_distro)
+                meta["tests"] = list(meta.get("tests") or []) + test_content.tests
 
             recipe_dir = (Path("recipes") / package_name).absolute()
             os.makedirs(recipe_dir, exist_ok=True)
 
             if not is_compatibility_output and (
-                test_folder_path := vinca_conf.get("_test_folders", {}).get(
-                    package_name
-                )
+                test_folder_path := vinca_conf.test_folders.get(package_name)
             ):
                 # Copy all contents of the test folder to the recipe directory
                 for item in test_folder_path.iterdir():
@@ -180,7 +179,7 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file: bool = True) 
             with open(recipe_dir / "recipe.yaml", "w", encoding="utf-8") as stream:
                 file.dump(meta, stream)
 
-            if get_variants_mode(vinca_conf) is VariantsMode.LOCAL:
+            if vinca_conf.variants_mode is VariantsMode.LOCAL:
                 variants = get_recipe_variants(meta, package_shortname, vinca_conf)
                 with open(
                     recipe_dir / "variants.yaml", "w", encoding="utf-8"
@@ -212,22 +211,18 @@ def write_recipe(source, outputs, vinca_conf, distro, single_file: bool = True) 
                 additional_cmake_args = ""
                 additional_folder = ""
                 if package_shortname:
-                    pkg_additional_info = get_pkg_additional_info(
+                    additional_cmake_args = get_pkg_additional_info(
                         package_shortname, vinca_conf
-                    )
-                    additional_cmake_args = pkg_additional_info.get(
-                        "additional_cmake_args", ""
-                    )
+                    ).additional_cmake_args
 
                     # Check if this package has folder info from additional_packages_snapshot
                     if (
-                        vinca_conf.get("_additional_packages_snapshot")
-                        and package_shortname
-                        in vinca_conf["_additional_packages_snapshot"]
-                    ):
-                        additional_folder = vinca_conf["_additional_packages_snapshot"][
+                        additional_package
+                        := vinca_conf.additional_packages_snapshot.get(
                             package_shortname
-                        ].get("additional_folder", "")
+                        )
+                    ):
+                        additional_folder = additional_package.additional_folder
 
                 generate_build_script_for_recipe(
                     script_filename,
@@ -278,9 +273,9 @@ def generate_template(
 def generate_build_script_for_recipe(
     script_name,
     output_path,
-    ros_package_prefix,
-    additional_cmake_args="",
-    additional_folder="",
+    ros_package_prefix: str,
+    additional_cmake_args: str = "",
+    additional_folder: str = "",
 ) -> None:
     """Generate a specific build script directly in the recipe directory."""
 

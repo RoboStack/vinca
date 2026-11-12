@@ -3,17 +3,19 @@
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
+from vinca import config
 from vinca.distro import Distro
 from vinca.main import append_output_with_compatibility, get_depmods
 from vinca.naming import (
     PackageNameMode,
     generate_legacy_compatibility_output,
     get_package_name,
-    get_package_name_mode,
     is_legacy_compatibility_output,
 )
-from vinca.resolve import resolve_pkgname
+from vinca.resolve import resolve_pkgname, resolve_pkgname_from_indexes
+from vinca.schemas import CondaIndex, VincaConfig, validate
 from vinca.utils import (
     add_package_name_variants,
     ensure_name_is_without_distro_prefix_and_with_underscores,
@@ -62,7 +64,7 @@ def make_distro(distribution_type="ros2", name="humble"):
 )
 def test_package_normalization(input_name, expected_output):
     result = ensure_name_is_without_distro_prefix_and_with_underscores(
-        input_name, {"ros_distro": "humble"}
+        input_name, VincaConfig(ros_distro="humble")
     )
     assert result == expected_output
 
@@ -79,7 +81,7 @@ def test_package_normalization(input_name, expected_output):
 )
 def test_no_hyphens_in_normalized_output(package_name):
     result = ensure_name_is_without_distro_prefix_and_with_underscores(
-        package_name, {"ros_distro": "humble"}
+        package_name, VincaConfig(ros_distro="humble")
     )
     assert "-" not in result
 
@@ -116,7 +118,11 @@ def test_distro_prefixes_and_version(
 def test_package_name_mode_selects_primary_name(mode, expected_name):
     distro = make_distro()
     assert (
-        get_package_name("my_package", distro, {"package_name_mode": mode})
+        get_package_name(
+            "my_package",
+            distro,
+            VincaConfig(ros_distro="humble", package_name_mode=mode),
+        )
         == expected_name
     )
 
@@ -124,8 +130,10 @@ def test_package_name_mode_selects_primary_name(mode, expected_name):
 def test_package_name_mode_defaults_to_legacy():
     distro = make_distro()
 
-    assert get_package_name_mode({}) is PackageNameMode.LEGACY
-    assert get_package_name("my_package", distro, {}) == "ros-humble-my-package"
+    vinca_conf = VincaConfig(ros_distro="humble")
+
+    assert vinca_conf.package_name_mode is PackageNameMode.LEGACY
+    assert get_package_name("my_package", distro, vinca_conf) == "ros-humble-my-package"
 
 
 @pytest.mark.parametrize(
@@ -139,9 +147,35 @@ def test_package_name_mode_defaults_to_legacy():
 def test_dependency_resolution_uses_selected_name_mode(mode, expected_name):
     distro: Any = make_distro()
     distro.check_package = lambda _name: True
-    vinca_conf = {"_conda_indexes": [], "package_name_mode": mode}
+    vinca_conf = VincaConfig(ros_distro="humble", package_name_mode=mode)
 
     assert resolve_pkgname("my_package", vinca_conf, distro) == [expected_name]
+
+
+@pytest.mark.parametrize(
+    "platform,expected_names",
+    [
+        ("linux-64", ["uvloop"]),
+        ("win-64", []),
+        # as before the schemas: a platform without an entry gets the mapping's keys
+        ("emscripten-wasm32", ["linux", "osx", "win64"]),
+    ],
+)
+def test_conda_index_per_platform_mapping(monkeypatch, platform, expected_names):
+    monkeypatch.setattr(config, "selected_platform", platform)
+    conda_index = validate(
+        CondaIndex,
+        {
+            "python3-uvloop": {
+                "robostack": {"linux": ["uvloop"], "osx": ["uvloop"], "win64": []}
+            }
+        },
+        "robostack.yaml",
+    )
+
+    assert (
+        resolve_pkgname_from_indexes("python3-uvloop", [conda_index]) == expected_names
+    )
 
 
 @pytest.mark.parametrize(
@@ -159,10 +193,11 @@ def test_both_mode_filters_new_and_legacy_outputs_independently(
     distro = make_distro()
     output = {"package": {"name": "ros2-my-package", "version": "1.2.3"}}
     outputs = []
-    vinca_conf = {
-        "package_name_mode": "both",
-        "skip_built_packages": skip_built_packages,
-    }
+    vinca_conf = VincaConfig(
+        ros_distro="humble",
+        package_name_mode="both",
+        skip_built_packages=skip_built_packages,
+    )
 
     append_output_with_compatibility(outputs, output, "my_package", distro, vinca_conf)
 
@@ -173,11 +208,12 @@ def test_version_aware_skip_filters_compatibility_output_independently():
     distro = make_distro()
     output = {"package": {"name": "ros2-my-package", "version": "1.2.3"}}
     outputs = []
-    vinca_conf = {
-        "package_name_mode": "both",
-        "trigger_new_versions": True,
-        "skip_built_packages": {("ros-humble-my-package", "1.2.3")},
-    }
+    vinca_conf = VincaConfig(
+        ros_distro="humble",
+        package_name_mode="both",
+        trigger_new_versions=True,
+        skip_built_packages={("ros-humble-my-package", "1.2.3")},
+    )
 
     append_output_with_compatibility(outputs, output, "my_package", distro, vinca_conf)
 
@@ -188,9 +224,10 @@ def test_version_aware_skip_filters_compatibility_output_independently():
 
 def test_depmods_use_selected_name_mode_recursively():
     distro = make_distro()
-    vinca_conf = {
-        "package_name_mode": "new",
-        "depmods": {
+    vinca_conf = VincaConfig(
+        ros_distro="humble",
+        package_name_mode="new",
+        depmods={
             "my_package": {
                 "add_host": [
                     "ros-humble-rclcpp >=1",
@@ -203,7 +240,7 @@ def test_depmods_use_selected_name_mode_recursively():
                 "remove_run": ["ros-humble-tl-expected"],
             }
         },
-    }
+    )
 
     removed, added = get_depmods(vinca_conf, "my_package", distro)
 
@@ -230,8 +267,8 @@ def test_package_config_entries_are_available_under_old_and_new_names():
 
 
 def test_invalid_package_name_mode_is_rejected():
-    with pytest.raises(ValueError, match="Invalid package_name_mode 'invalid'"):
-        get_package_name_mode({"package_name_mode": "invalid"})
+    with pytest.raises(ValidationError, match="package_name_mode"):
+        VincaConfig(ros_distro="humble", package_name_mode="invalid")
 
 
 def test_both_mode_generates_legacy_compatibility_output():
@@ -239,7 +276,10 @@ def test_both_mode_generates_legacy_compatibility_output():
     output = {"package": {"name": "ros2-my-package", "version": "1.2.3"}}
 
     compatibility_output = generate_legacy_compatibility_output(
-        output, "my_package", distro, {"package_name_mode": "both"}
+        output,
+        "my_package",
+        distro,
+        VincaConfig(ros_distro="humble", package_name_mode="both"),
     )
 
     assert compatibility_output == {
@@ -270,7 +310,9 @@ def test_compatibility_output_requires_the_distribution_mutex(
     mutex_package, expected_mutex
 ):
     distro = make_distro()
-    vinca_conf = {"package_name_mode": "both", "mutex_package": mutex_package}
+    vinca_conf = VincaConfig(
+        ros_distro="humble", package_name_mode="both", mutex_package=mutex_package
+    )
     output = {"package": {"name": "ros2-my-package", "version": "1.2.3"}}
 
     compatibility_output = generate_legacy_compatibility_output(
@@ -287,12 +329,11 @@ def test_compatibility_output_requires_the_distribution_mutex(
 @pytest.mark.parametrize("mode", ["legacy", "new"])
 def test_single_name_modes_do_not_generate_compatibility_output(mode):
     distro = make_distro()
-    output_name = get_package_name("my_package", distro, {"package_name_mode": mode})
+    vinca_conf = VincaConfig(ros_distro="humble", package_name_mode=mode)
+    output_name = get_package_name("my_package", distro, vinca_conf)
     output = {"package": {"name": output_name, "version": "1.2.3"}}
 
     assert (
-        generate_legacy_compatibility_output(
-            output, "my_package", distro, {"package_name_mode": mode}
-        )
+        generate_legacy_compatibility_output(output, "my_package", distro, vinca_conf)
         is None
     )

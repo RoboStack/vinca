@@ -13,6 +13,7 @@ from vinca.distro import (
     is_archive_url,
 )
 from vinca.main import _source_reference
+from vinca.schemas import SnapshotEntry
 
 PACKAGE_XML = "<package format='3'><name>demo_pkg</name></package>"
 
@@ -142,11 +143,11 @@ def test_read_archive_member_rejects_a_directory_member():
 def test_get_released_repo_returns_the_checksum_of_an_archive():
     distro = Distro.__new__(Distro)
     distro.snapshot = {
-        "demo_pkg": {
-            "url": "https://example.com/demo-1.0.zip",
-            "sha256": "abc123",
-            "version": "1.0",
-        }
+        "demo_pkg": SnapshotEntry(
+            url="https://example.com/demo-1.0.zip",
+            sha256="abc123",
+            version="1.0",
+        )
     }
     assert distro.get_released_repo("demo_pkg") == (
         "https://example.com/demo-1.0.zip",
@@ -157,7 +158,9 @@ def test_get_released_repo_returns_the_checksum_of_an_archive():
 
 def test_get_released_repo_rejects_an_archive_without_a_checksum():
     distro = Distro.__new__(Distro)
-    distro.snapshot = {"demo_pkg": {"url": "https://example.com/demo-1.0.zip"}}
+    distro.snapshot = {
+        "demo_pkg": SnapshotEntry(url="https://example.com/demo-1.0.zip", version="1.0")
+    }
     with pytest.raises(RuntimeError, match="no sha256 checksum"):
         distro.get_released_repo("demo_pkg")
 
@@ -165,7 +168,9 @@ def test_get_released_repo_rejects_an_archive_without_a_checksum():
 def test_get_released_repo_still_returns_a_git_reference():
     distro = Distro.__new__(Distro)
     distro.snapshot = {
-        "demo_pkg": {"url": "https://github.com/org/repo.git", "rev": "deadbeef"}
+        "demo_pkg": SnapshotEntry(
+            url="https://github.com/org/repo.git", version="1.0", rev="deadbeef"
+        )
     }
     assert distro.get_released_repo("demo_pkg") == (
         "https://github.com/org/repo.git",
@@ -188,11 +193,12 @@ def test_package_xml_is_read_from_a_downloaded_archive(monkeypatch):
         return payload
 
     monkeypatch.setattr(distro, "_download_archive_or_cached", fake_download)
-    pkg_info = {
-        "url": "https://example.com/demo-1.0.zip",
-        "sha256": "abc123",
-        "additional_folder": "src/demo_pkg",
-    }
+    pkg_info = SnapshotEntry(
+        url="https://example.com/demo-1.0.zip",
+        version="1.0",
+        sha256="abc123",
+        additional_folder="src/demo_pkg",
+    )
     assert distro.get_package_xml_for_additional_package(pkg_info) == PACKAGE_XML
     # A second lookup is served from the cache.
     assert distro.get_package_xml_for_additional_package(pkg_info) == PACKAGE_XML

@@ -27,6 +27,7 @@ from vinca.license_utils import convert_to_spdx_license
 from vinca.mutex import get_mutex_package_dependency
 from vinca.naming import get_package_prefix, normalize_package_dependency
 from vinca.resolve import resolve_pkgname
+from vinca.schemas import DepMods, DummyPackage, Requirement, VincaConfig
 from vinca.utils import (
     get_pkg_additional_info,
     get_pkg_build_number,
@@ -92,8 +93,8 @@ _BUILD_TIME_PYTHON = "python ${{ python_min | default('3.11') }}.*"
 _HOST_PYTHON = ("python", "numpy", "pip")
 
 
-def _conditional_python(vinca_conf: dict[str, Any]) -> bool:
-    return bool(vinca_conf.get("conditional_python_dependency", False))
+def _conditional_python(vinca_conf: VincaConfig) -> bool:
+    return vinca_conf.conditional_python_dependency
 
 
 # Installed into every Python-free output's tests (conditional_python_dependency):
@@ -207,53 +208,53 @@ def _package_needs_python(package: catkin_pkg.package.Package, build_type: str) 
 
 
 def get_depmods(
-    vinca_conf: dict[str, Any], package_name: str, distro: Distro
+    vinca_conf: VincaConfig, package_name: str, distro: Distro
 ) -> tuple[Requirements, Requirements]:
     """Return normalized dependency removals and additions by requirement section."""
-    configured = vinca_conf.get("depmods", {}).get(package_name, {})
-    removed = {section: [] for section in ("build", "host", "run")}
-    added = {section: [] for section in ("build", "host", "run")}
-    for section in removed:
-        removed[section] = [
+    configured = vinca_conf.depmods.get(package_name, DepMods())
+
+    def normalized(dependencies: list[Requirement]) -> list[Any]:
+        return [
             normalize_package_dependency(dependency, distro, vinca_conf)
-            for dependency in configured.get(f"remove_{section}", [])
+            for dependency in dependencies
         ]
-        added[section] = [
-            normalize_package_dependency(dependency, distro, vinca_conf)
-            for dependency in configured.get(f"add_{section}", [])
-        ]
+
+    removed = {
+        "build": normalized(configured.remove_build),
+        "host": normalized(configured.remove_host),
+        "run": normalized(configured.remove_run),
+    }
+    added = {
+        "build": normalized(configured.add_build),
+        "host": normalized(configured.add_host),
+        "run": normalized(configured.add_run),
+    }
     return removed, added
 
 
-def _dummy_constraint(
-    config: dict[str, Any], version: str, shortname: str
-) -> tuple[str, str]:
-    dependency = config.get("dep_name")
-    if not dependency:
-        raise RuntimeError(f"Missing 'dep_name' for dummy recipe of {shortname}")
-    upper_bound = config.get("upper_bound") or config.get("max_pin")
-    if not upper_bound:
-        raise RuntimeError(
-            f"Missing 'upper_bound' or 'max_pin' for dummy recipe of {shortname}"
-        )
-
-    package_version = config.get("override_version", version)
+def _dummy_constraint(config: DummyPackage, version: str) -> tuple[str, str]:
+    package_version = (
+        version if config.override_version is None else config.override_version
+    )
     parts = [int(part) for part in package_version.split(".")]
-    pin_depth = len(upper_bound.split("."))
+    pin_depth = len(config.pin.split("."))
     upper_parts = parts[:pin_depth]
     upper_parts[-1] += 1
     upper_parts += [0] * (len(parts) - pin_depth)
     upper = ".".join(map(str, upper_parts)) + "a0"
-    return package_version, f"{dependency} >={package_version}, <{upper}"
+    return package_version, f"{config.dep_name} >={package_version}, <{upper}"
 
 
 def _initial_output(
     shortname: str,
     package_name: str,
     version: str,
-    vinca_conf: dict[str, Any],
+    vinca_conf: VincaConfig,
 ) -> dict[str, Any]:
-    if not is_dummy_metapackage(shortname, vinca_conf):
+    dummy_config = get_pkg_additional_info(
+        shortname, vinca_conf
+    ).generate_dummy_package_with_run_deps
+    if dummy_config is None:
         requirements = copy.deepcopy(_BASE_REQUIREMENTS)
         if _conditional_python(vinca_conf):
             requirements["host"] = [
@@ -265,15 +266,12 @@ def _initial_output(
             "build": {"script": ""},
         }
 
-    dummy_config = get_pkg_additional_info(shortname, vinca_conf)[
-        "generate_dummy_package_with_run_deps"
-    ]
-    package_version, constraint = _dummy_constraint(dummy_config, version, shortname)
+    package_version, constraint = _dummy_constraint(dummy_config, version)
     return {
         "package": {"name": package_name, "version": package_version},
         "build": {
             "number": get_pkg_build_number(
-                vinca_conf.get("build_number", 0), package_name, vinca_conf
+                vinca_conf.build_number or 0, package_name, vinca_conf
             ),
             "script": "",
         },
@@ -291,7 +289,7 @@ def _evaluated_dependency_names(dependencies) -> list[str]:
 def _resolve_into(
     dependencies: list[str],
     destination: list[Any],
-    vinca_conf: dict[str, Any],
+    vinca_conf: VincaConfig,
     distro: Distro,
     unsatisfied: set[str],
     *,
@@ -456,7 +454,7 @@ def _add_metadata(
 
 def generate_output(
     shortname: str,
-    vinca_conf: dict[str, Any],
+    vinca_conf: VincaConfig,
     distro: Distro,
     version: str,
     all_packages: list[Any] | None = None,
@@ -478,7 +476,7 @@ def generate_output(
     """
     all_packages = all_packages or []
     unsatisfied = unsatisfied if unsatisfied is not None else set()
-    if shortname not in vinca_conf["_selected_pkgs"]:
+    if shortname not in vinca_conf.selected_pkgs:
         return None
 
     package_names = resolve_pkgname(shortname, vinca_conf, distro)

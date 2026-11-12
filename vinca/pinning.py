@@ -18,36 +18,45 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator, Mapping, Optional, Sequence, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterator,
+    Mapping,
+    Optional,
+    Sequence,
+    Union,
+    cast,
+)
 from urllib.parse import quote
 
 import rattler
 import requests
 import ruamel.yaml
+from conda_forge_metadata.feedstock_outputs import package_to_feedstock
+from pydantic import ValidationError
 from rattler.exceptions import ExtractError, GatewayError
 from rattler.package_streaming import download_and_extract
 
+from vinca.schemas import (
+    MigrationFile,
+    MigrationStatus,
+    PinningSpec,
+    VincaConfig,
+    validate,
+)
 from vinca.v1_selectors import _eval_condition, _platform_flags
 from vinca.variant_algebra import variant_add
+
+if TYPE_CHECKING:
+    from vinca.distro import Distro
 
 PINNING_PACKAGE = "conda-forge-pinning"
 MIGRATION_STATUS_URL = (
     "https://raw.githubusercontent.com/conda-forge/conda-forge-bot-data/main/"
     "status/migration_json/{migration}.json"
 )
-FEEDSTOCK_OUTPUT_URL = (
-    "https://raw.githubusercontent.com/conda-forge/feedstock-outputs/main/"
-    "outputs/{shards}/{package}.json"
-)
 DEFAULT_PLATFORMS = ("linux-64", "osx-64", "win-64")
-STATUS_CATEGORIES = (
-    "done",
-    "in-pr",
-    "awaiting-pr",
-    "awaiting-parents",
-    "not-solvable",
-    "bot-error",
-)
 
 
 class PinningError(RuntimeError):
@@ -112,23 +121,17 @@ def download_pinning_package(
 
 
 def _pinning_spec_fields(
-    data: Mapping[str, Any],
+    data: Mapping[str, Any], source: Union[str, Path]
 ) -> tuple[str, list[str], Mapping[str, Any]]:
     """Validate and normalize version, migration, and override fields from a pinning spec."""
-    version = data.get("conda_forge_pinning_version")
-    migrations = data.get("migrations", [])
-    overrides = data.get("pinning_overrides")
+    try:
+        spec = validate(PinningSpec, data, source)
+    except ValidationError as exc:
+        raise PinningError(str(exc)) from exc
+    overrides = spec.pinning_overrides
     if overrides is None:
-        overrides = data.get("overrides", {})
-    if version is None:
-        raise PinningError("Missing 'conda_forge_pinning_version'")
-    if not isinstance(migrations, list) or not all(
-        isinstance(item, str) for item in migrations
-    ):
-        raise PinningError("'migrations' must be a list of migration names")
-    if not isinstance(overrides, dict):
-        raise PinningError("'pinning_overrides' must be a mapping")
-    return str(version), migrations, overrides
+        overrides = spec.overrides or {}
+    return spec.conda_forge_pinning_version, spec.migrations, overrides
 
 
 def _migration_name(name: str) -> str:
@@ -158,9 +161,17 @@ def _overlay(target: Any, source: Any) -> None:
             target.pop("zip_keys")
 
 
-def _migration_timestamp(payload: bytes) -> float:
+def _migration(payload: bytes, name: str = "migration") -> tuple[Any, MigrationFile]:
+    """The ruamel data of a migration file, and its validated ``__migrator`` fields."""
     data = _yaml().load(payload.decode("utf-8")) or {}
-    return float(data.get("migrator_ts", -1.0))
+    try:
+        return data, validate(MigrationFile, data, name)
+    except ValidationError as exc:
+        raise PinningError(str(exc)) from exc
+
+
+def _migration_timestamp(payload: bytes) -> float:
+    return _migration(payload)[1].migrator_ts
 
 
 def _validate_zipped_overrides(rendered: Any, overrides: Any) -> None:
@@ -225,7 +236,7 @@ def render_pinning(
             spec = yaml.load(stream) or {}
     except OSError as exc:
         raise PinningError(f"Could not read {config_path}: {exc}") from exc
-    version, selected_migrations, overrides = _pinning_spec_fields(spec)
+    version, selected_migrations, overrides = _pinning_spec_fields(spec, config_path)
     if package is None:
         base_payload, migration_payloads = download_pinning_package(version)
     else:
@@ -313,7 +324,7 @@ def _working_directory(path: Any) -> Iterator[None]:
 @contextmanager
 def _platform_configurations(
     base_dir: Union[str, Path], platforms: Sequence[str]
-) -> Iterator[Iterator[tuple[str, Any, dict[str, Any], Any]]]:
+) -> Iterator[Iterator[tuple[str, Distro, VincaConfig, Any]]]:
     """Yield ``(platform, distro, vinca_config, group_packages)`` for each platform.
 
     The global vinca config state is restored afterwards. Raises ``PinningError`` if
@@ -331,35 +342,34 @@ def _platform_configurations(
     previous_platform = config.selected_platform
     previous_args = config.parsed_args
 
-    def configurations() -> Iterator[tuple[str, Any, dict[str, Any], Any]]:
+    def configurations() -> Iterator[tuple[str, Distro, VincaConfig, Any]]:
         distro = None
         group_packages = None
         for platform in platforms:
             config.selected_platform = platform
             config.parsed_args = argparse.Namespace(platform=platform)
             vinca_config = read_vinca_yaml(base_dir / "vinca.yaml")
-            vinca_config["skip_built_packages"] = []
             if distro is None:
                 distro = Distro(
-                    vinca_config["ros_distro"],
-                    vinca_config.get("python_version"),
-                    vinca_config["_snapshot"],
-                    vinca_config["_additional_packages_snapshot"],
+                    vinca_config.ros_distro,
+                    vinca_config.python_version,
+                    vinca_config.snapshot,
+                    vinca_config.additional_packages_snapshot,
                 )
                 distro.prefetch_additional_package_xml()
                 group_packages = get_group_dependency_packages(distro)
             elif (
-                distro.name != vinca_config["ros_distro"]
-                or distro.snapshot != vinca_config["_snapshot"]
+                distro.name != vinca_config.ros_distro
+                or distro.snapshot != vinca_config.snapshot
                 or distro.additional_packages_snapshot
-                != vinca_config["_additional_packages_snapshot"]
+                != vinca_config.additional_packages_snapshot
             ):
                 raise PinningError(
                     "Platform selectors must not change the ROS distro snapshots"
                 )
             if group_packages is None:
                 raise PinningError("No group packages were generated")
-            vinca_config["_selected_pkgs"] = get_selected_packages(distro, vinca_config)
+            vinca_config.selected_pkgs = get_selected_packages(distro, vinca_config)
             yield platform, distro, vinca_config, group_packages
 
     try:
@@ -395,30 +405,16 @@ def _normalized(name: str) -> str:
     return name.lower().replace("_", "-")
 
 
-def _feedstock_output_url(package: str) -> str:
-    # feedstock-outputs shards by the first three alphanumeric characters
-    prefix = ("".join(c for c in package.lower() if c.isalnum()) + "zzz")[:3]
-    shards = "/".join(prefix)
-    return FEEDSTOCK_OUTPUT_URL.format(
-        shards=shards, package=quote(package.lower(), safe="")
-    )
-
-
 def package_feedstocks(package: str) -> set[str]:
     """Look up package-producing feedstocks, falling back to the package name on lookup failure."""
-    url = _feedstock_output_url(package)
     try:
-        response = requests.get(url, timeout=30)
-        if response.status_code == 404:
-            return {package}
-        response.raise_for_status()
-        feedstocks = response.json().get("feedstocks", [])
-    except (requests.RequestException, ValueError):
+        feedstocks = package_to_feedstock(package, timeout=30)
+    except (requests.RequestException, ValueError, KeyError):
         return {package}
     return set(feedstocks) or {package}
 
 
-def get_migration_status(migration: str) -> Optional[dict[str, Any]]:
+def get_migration_status(migration: str) -> Optional[MigrationStatus]:
     """Fetch migration status, returning ``None`` only when no status record exists."""
     url = MIGRATION_STATUS_URL.format(migration=quote(migration.lower(), safe=""))
     try:
@@ -426,7 +422,7 @@ def get_migration_status(migration: str) -> Optional[dict[str, Any]]:
         if response.status_code == 404:
             return None
         response.raise_for_status()
-        return response.json()
+        return validate(MigrationStatus, response.json(), url)
     except (requests.RequestException, ValueError) as exc:
         raise PinningError(
             f"Could not read conda-forge status for migration {migration}: {exc}"
@@ -443,8 +439,7 @@ def _migration_pin_keys(payload: bytes) -> set[str]:
 
 
 def _is_paused_migration(payload: bytes) -> bool:
-    data = _yaml().load(payload.decode("utf-8")) or {}
-    return bool((data.get("__migrator") or {}).get("paused", False))
+    return _migration(payload)[1].migrator.paused
 
 
 def _comment_selector(comment: Any) -> Optional[str]:
@@ -476,9 +471,8 @@ def _migration_selectors(data: Any) -> Iterator[Optional[str]]:
 
 def _migration_applies_to_platforms(payload: bytes, platforms: Sequence[str]) -> bool:
     """Return whether migration allowlists or selectors affect any requested platform."""
-    data = _yaml().load(payload.decode("utf-8")) or {}
-    migrator = data.get("__migrator") or {}
-    allowlist = set(migrator.get("platform_allowlist", []))
+    data, migration = _migration(payload)
+    allowlist = set(migration.migrator.platform_allowlist)
     if allowlist and not allowlist.intersection(platforms):
         return False
     selectors = list(_migration_selectors(data))
@@ -492,13 +486,10 @@ def _migration_applies_to_platforms(payload: bytes, platforms: Sequence[str]) ->
     )
 
 
-def _status_sets(status: Any) -> tuple[set[str], set[str]]:
-    values = {
-        category: {_normalized(name) for name in status.get(category, [])}
-        for category in STATUS_CATEGORIES
-    }
-    participants = set().union(*values.values())
-    return values["done"], participants
+def _status_sets(status: MigrationStatus) -> tuple[set[str], set[str]]:
+    done = {_normalized(name) for name in status.done}
+    participants = {_normalized(name) for name in status.participants}
+    return done, participants
 
 
 def select_completed_migrations(
@@ -600,7 +591,7 @@ def update_pinning(
     if config_path.exists():
         with config_path.open(encoding="utf-8") as stream:
             spec = yaml.load(stream) or {}
-        _, existing_migrations, _ = _pinning_spec_fields(spec)
+        _, existing_migrations, _ = _pinning_spec_fields(spec, config_path)
     else:
         spec = ruamel.yaml.comments.CommentedMap()
         spec["conda_forge_pinning_version"] = ""

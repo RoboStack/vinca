@@ -9,6 +9,8 @@ import rattler
 from rattler.exceptions import FetchRepoDataError
 from ruamel.yaml.representer import SafeRepresenter
 
+from vinca.schemas import PkgAdditionalInfo, VincaConfig, VincaYaml
+
 REPODATA_CACHE = Path(tempfile.gettempdir()) / "vinca-repodata"
 
 
@@ -79,13 +81,12 @@ def get_channel_records(channel, platform):
     return [json.loads(record.to_json()) for record in records]
 
 
-def ensure_name_is_without_distro_prefix_and_with_underscores(name, vinca_conf):
+def ensure_name_is_without_distro_prefix_and_with_underscores(
+    name: str, vinca_conf: VincaYaml
+) -> str:
     """Normalize new and legacy ROS package names to their ROS package name."""
     newname = name.replace("-", "_")
-    prefixes = ["ros2_"]
-    if ros_distro := vinca_conf.get("ros_distro"):
-        prefixes.append(f"ros_{ros_distro}_")
-    prefixes.append("ros_")
+    prefixes = ["ros2_", f"ros_{vinca_conf.ros_distro}_", "ros_"]
 
     for prefix in prefixes:
         if newname.startswith(prefix):
@@ -212,32 +213,31 @@ def add_package_name_variants(entries, ros_distro) -> None:
             entries.setdefault(variant, value)
 
 
-def get_pkg_additional_info(pkg_name, vinca_conf):
+def get_pkg_additional_info(
+    pkg_name: str, vinca_conf: VincaConfig
+) -> PkgAdditionalInfo:
     """The pkg_additional_info.yaml entry of a package, given its ROS name (ros2_pulse)
     or its conda name (ros2-ros2-pulse, ros-humble-ros2-pulse). A ROS name is used as
     it is: normalizing it again would strip a ROS name's own ros2_/ros_ prefix."""
-    pkg_additional_info_all = vinca_conf.get("_pkg_additional_info") or {}
+    pkg_additional_info_all = vinca_conf.pkg_additional_info
     name = pkg_name.replace("-", "_")
     if name not in pkg_additional_info_all:
         name = ensure_name_is_without_distro_prefix_and_with_underscores(
             pkg_name, vinca_conf
         )
-    return pkg_additional_info_all.get(name, {})
+    return pkg_additional_info_all.get(name, PkgAdditionalInfo())
 
 
-def get_pkg_build_number(default_build_number, pkg_name, vinca_conf):
-    pkg_additional_info = get_pkg_additional_info(pkg_name, vinca_conf)
-    return pkg_additional_info.get("build_number", default_build_number)
+def get_pkg_build_number(default_build_number, pkg_name: str, vinca_conf: VincaConfig):
+    build_number = get_pkg_additional_info(pkg_name, vinca_conf).build_number
+    return default_build_number if build_number is None else build_number
 
 
 # Return true if the package is actually provided in conda-forge, and so we generate
 # only a recipe with a run dependency on the conda forge package
-def is_dummy_metapackage(pkg_name, vinca_conf) -> bool:
+def is_dummy_metapackage(pkg_name: str, vinca_conf: VincaConfig) -> bool:
     pkg_additional_info = get_pkg_additional_info(pkg_name, vinca_conf)
-    if pkg_additional_info.get("generate_dummy_package_with_run_deps"):
-        return True
-    else:
-        return False
+    return pkg_additional_info.generate_dummy_package_with_run_deps is not None
 
 
 def built_for_distro(pkg: dict, ros_distro: str) -> bool:

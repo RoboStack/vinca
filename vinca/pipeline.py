@@ -17,6 +17,7 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
+from vinca.schemas import BuildTimingsFile, StageSettings, VincaYaml, validate
 from vinca.utils import get_channel_records
 
 # a stage this short is one job, shared with the short stages next to it
@@ -54,18 +55,18 @@ class BuildTimings:
     ) -> BuildTimings:
         """Read a JSON file ``{"recipes": {name: seconds}, "default": s, "job_overhead": s}``."""
         with Path(path).open(encoding="utf-8") as stream:
-            data = json.load(stream)
-        recipes = {
-            name: float(seconds)
-            for name, seconds in (data.get("recipes") or {}).items()
-        }
-        known = sorted(recipes.values())
-        default = data.get("default", known[len(known) // 2] if known else cls.default)
+            data = validate(BuildTimingsFile, json.load(stream), path)
+        known = sorted(data.recipes.values())
+        default = data.default
+        if default is None:
+            default = known[len(known) // 2] if known else cls.default
         return cls(
-            recipes=recipes,
-            default=float(default),
-            job_overhead=float(data.get("job_overhead", cls.job_overhead)),
-            runners=runners or int(data.get("runners", default_runners(platform))),
+            recipes=data.recipes,
+            default=default,
+            job_overhead=(
+                cls.job_overhead if data.job_overhead is None else data.job_overhead
+            ),
+            runners=runners or data.runners or default_runners(platform),
         )
 
     def seconds(self, package: str) -> float:
@@ -152,12 +153,13 @@ def batch_stages(
         timings = replace(timings, recipes=recipes)
 
     with Path(config_path).open(encoding="utf-8") as stream:
-        vinca_conf = YAML(typ="safe").load(stream) or {}
+        settings = validate(
+            StageSettings, YAML(typ="safe").load(stream) or {}, config_path
+        )
     build_individually = set(
-        vinca_conf.get("build_in_own_stage")
+        settings.build_in_own_stage
         # Accepted for compatibility with configurations written for the Azure generator.
-        or vinca_conf.get("build_in_own_azure_stage")
-        or []
+        or settings.build_in_own_azure_stage
     )
 
     # units in order: (packages, splittable); a unit that isn't splittable is one job
@@ -250,11 +252,10 @@ def batch_stages(
     return jobs
 
 
-def get_skip_existing(vinca_conf: Mapping[str, Any], platform: str) -> list[dict]:
+def get_skip_existing(vinca_conf: VincaYaml, platform: str) -> list[dict[str, Any]]:
     """Fetch the package records of the channels configured for skip-existing checks."""
-    repositories = vinca_conf.get("skip_existing") or []
     records = []
-    for repository in repositories:
+    for repository in vinca_conf.skip_existing:
         print(f"Fetching repodata: {repository}")
         records += get_channel_records(repository, platform)
     return records

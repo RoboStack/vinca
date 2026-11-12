@@ -22,6 +22,7 @@ from vinca.pipeline import (
     get_all_ancestors,
     get_skip_existing,
 )
+from vinca.schemas import AdditionalRecipe, VincaConfig, validate
 from vinca.utils import (
     NoAliasRepresenter,
     add_test_requirements,
@@ -138,11 +139,12 @@ def add_additional_recipes(args: Namespace):
     for recipe_path in glob.glob(additional_recipes_path + "/**/recipe.yaml"):
         with open(recipe_path, encoding="utf-8") as recipe:
             additional_recipe = YAML(typ="safe").load(recipe)
+        recipe_info = validate(AdditionalRecipe, additional_recipe, recipe_path)
 
         name, version, bnumber = (
-            additional_recipe["package"]["name"],
-            additional_recipe["package"]["version"],
-            additional_recipe["build"]["number"],
+            recipe_info.package.name,
+            recipe_info.package.version,
+            recipe_info.build.number,
         )
         print("Checking if ", name, version, bnumber, " exists")
         skip = False
@@ -151,7 +153,7 @@ def add_additional_recipes(args: Namespace):
                 pkg["name"] == name
                 and pkg["version"] == version
                 and pkg["build_number"] == bnumber
-                and built_for_distro(pkg, vinca_conf["ros_distro"])
+                and built_for_distro(pkg, vinca_conf.ros_distro)
             ):
                 skip = True
                 print(f"{name}=={version}=={bnumber} already exists. Skipping.")
@@ -520,7 +522,7 @@ def build_win_pipeline(
     dump_for_gha(workflow, outfile)
 
 
-def load_configuration():
+def load_configuration() -> VincaConfig:
     """Read vinca.yaml next to the recipes directory for the few settings the
     workflow needs (distribution, pixi versions); the recipes themselves are
     already generated, so the packages are not resolved again."""
