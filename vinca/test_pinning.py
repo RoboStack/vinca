@@ -8,6 +8,7 @@ import ruamel.yaml
 
 from vinca.pinning import (
     PinningError,
+    _feedstock_output_url,
     _migration_applies_to_platforms,
     dependencies_from_recipes,
     dependencies_from_vinca,
@@ -600,3 +601,16 @@ pinning_overrides:
     assert "This comment and value are maintained locally." in text
     parsed = ruamel.yaml.YAML(typ="safe").load(text)
     assert parsed["pinning_overrides"] == {"python": ["3.14.* *_cp314"]}
+
+
+@pytest.mark.parametrize(
+    "package,shards",
+    [
+        ("libboost-devel", "l/i/b"),
+        ("r-base", "r/b/a"),
+        ("c-ares", "c/a/r"),
+        ("go", "g/o/z"),
+    ],
+)
+def test_feedstock_output_url_shards_by_alphanumeric_characters(package, shards):
+    assert _feedstock_output_url(package).endswith(f"/outputs/{shards}/{package}.json")
