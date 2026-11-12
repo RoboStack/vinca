@@ -39,6 +39,7 @@ dependencies = [
   "jinja2 >=3.0.0",
   "license-expression >=30.0.0",
   "py-rattler >=0.28.1,<0.29",
+  "typer >=0.12",
 ]
 
 [project.urls]
