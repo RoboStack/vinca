@@ -1,6 +1,7 @@
 import argparse
 import glob
 import io
+import json
 import os
 import re
 import sys
@@ -116,6 +117,15 @@ def parse_command_line(argv: list[str]) -> Namespace:
         type=int,
         help="With --timings: how many jobs can run at once (default: the file's, else "
         "GitHub's limit for hosted runners, 20, or 5 on macOS)",
+    )
+
+    parser.add_argument(
+        "--json",
+        dest="json",
+        default=None,
+        help="Write the stages to this JSON file instead of a workflow: "
+        '{"stages": [[{"name": job name, "recipes": "recipe ..."}, ...], ...]}, one '
+        "list of jobs per stage, e.g. for a workflow's matrix",
     )
 
     arguments = parser.parse_args(argv[1:])
@@ -656,6 +666,14 @@ def main() -> None:
 
         fo.write("\n".join(order))
 
+    if args.json:
+        # no workflow file, so no size limit to fit
+        stages = batch_stages(
+            filtered_stages, args.batch_size, timings=timings, followers=followers
+        )
+        write_stages_json(stages, args.json)
+        return
+
     # as many jobs as fit GitHub's workflow size limit: when the workflow is too large,
     # batch again with a job budget scaled down by how much it's over
     budget = None
@@ -679,6 +697,23 @@ def main() -> None:
             print(f"{error}; batching again with at most {budget} jobs")
     else:
         raise RuntimeError("could not fit the workflow into GitHub's size limit")
+
+
+def write_stages_json(stages: list[list[list[str]]], path: str) -> None:
+    """Write the batched stages as {"stages": [[job, ...], ...]}, each job
+    {"name": ..., "recipes": "space-separated recipes"} as the workflow jobs get them."""
+    doc = {
+        "stages": [
+            [
+                {"name": get_stage_name(batch), "recipes": " ".join(batch)}
+                for batch in stage
+            ]
+            for stage in stages
+        ]
+    }
+    with open(path, "w", encoding="utf-8") as fo:
+        json.dump(doc, fo, indent=1)
+        fo.write("\n")
 
 
 def write_pipeline(

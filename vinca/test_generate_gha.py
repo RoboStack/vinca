@@ -1,5 +1,6 @@
 """Tests for the GitHub Actions pipeline generation."""
 
+import json
 import sys
 
 import pytest
@@ -179,6 +180,61 @@ def test_stages_are_derived_from_the_generated_recipes(tmp_path, monkeypatch):
         "ros2-b",
         "ros2-c",
     ]
+
+
+def test_json_writes_the_stages_instead_of_a_workflow(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "vinca.yaml").write_text("{}\n")
+    recipes = {"ros2-a": [], "ros2-b": ["ros2-a"], "ros2-c": ["ros2-a"]}
+    for name, deps in recipes.items():
+        (tmp_path / "recipes" / name).mkdir(parents=True)
+        recipe = {
+            "package": {"name": name, "version": "1.0.0"},
+            "requirements": {"host": deps, "run": deps},
+        }
+        yaml.dump(recipe, tmp_path / "recipes" / name / "recipe.yaml")
+    monkeypatch.setattr(generate_gha, "load_configuration", lambda: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "vinca-gha",
+            "-d",
+            "./recipes",
+            "-p",
+            "linux-64",
+            "-b",
+            "1",
+            "--json",
+            "stages.json",
+        ],
+    )
+
+    generate_gha.main()
+
+    assert not (tmp_path / "linux.yml").exists()
+    stages = json.loads((tmp_path / "stages.json").read_text())["stages"]
+    assert [sorted(job["recipes"] for job in stage) for stage in stages] == [
+        ["ros2-a"],
+        ["ros2-b", "ros2-c"],
+    ]
+    assert stages[0][0]["name"] == "a"
+
+
+def test_json_without_recipes_has_no_stages(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "vinca.yaml").write_text("{}\n")
+    (tmp_path / "recipes").mkdir()
+    monkeypatch.setattr(generate_gha, "load_configuration", lambda: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["vinca-gha", "-d", "./recipes", "-p", "linux-64", "--json", "stages.json"],
+    )
+
+    generate_gha.main()
+
+    assert json.loads((tmp_path / "stages.json").read_text()) == {"stages": []}
 
 
 @pytest.mark.parametrize(
