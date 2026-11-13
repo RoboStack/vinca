@@ -125,8 +125,9 @@ def parse_command_line(argv: list[str]) -> Namespace:
         default=None,
         help="Write the stages to this JSON file instead of a workflow: "
         '{"stages": [[{"id": job id, "name": job name, "recipes": "recipe ...", '
-        '"needs": [job id, ...]}, ...], ...]}, one list of jobs per stage, each with '
-        "the earlier jobs that build its recipes' requirements",
+        '"needs": [job id, ...], "requires": {recipe: [recipe, ...]}}, ...], ...]}, '
+        "one list of jobs per stage, each with the earlier jobs that build its "
+        "recipes' requirements, and each recipe's requirements that are built",
     )
 
     arguments = parser.parse_args(argv[1:])
@@ -707,8 +708,10 @@ def write_stages_json(
 ) -> None:
     """Write the batched stages as {"stages": [[job, ...], ...]}, each job
     {"id": "stage_<k>_job_<i>", "name": ..., "recipes": "space-separated recipes",
-    "needs": [ids of the earlier jobs building its recipes' requirements]}: the
-    recipes' dependency graph as a graph of CI jobs."""
+    "needs": [ids of the earlier jobs building its recipes' requirements],
+    "requires": {recipe: [the recipes being built that it requires]}}: the recipes'
+    dependency graph as a graph of CI jobs, and the recipes' own, so that a failed
+    recipe can hold back only the recipes that need it."""
     job_of = {
         recipe: f"stage_{k}_job_{i}"
         for k, stage in enumerate(stages)
@@ -734,6 +737,14 @@ def write_stages_json(
                     "needs": sorted(
                         needs, key=lambda j: [int(n) for n in j.split("_")[1::2]]
                     ),
+                    "requires": {
+                        recipe: sorted(
+                            r
+                            for r in set(requirements.get(recipe, []))
+                            if r in job_of and r != recipe
+                        )
+                        for recipe in batch
+                    },
                 }
             )
         doc["stages"].append(jobs)

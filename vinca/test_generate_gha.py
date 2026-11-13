@@ -230,11 +230,13 @@ def test_json_writes_the_stages_instead_of_a_workflow(tmp_path, monkeypatch):
         "name": "a",
         "recipes": "ros2-a",
         "needs": [],
+        "requires": {"ros2-a": []},
     }
     jobs = {job["recipes"]: job for stage in stages for job in stage}
     assert jobs["ros2-c"]["needs"] == ["stage_0_job_0"]
     # only the jobs of its direct requirements, not ros2-a's
     assert jobs["ros2-d"]["needs"] == [jobs["ros2-b"]["id"]]
+    assert jobs["ros2-d"]["requires"] == {"ros2-d": ["ros2-b"]}
 
 
 def test_json_without_recipes_has_no_stages(tmp_path, monkeypatch):
