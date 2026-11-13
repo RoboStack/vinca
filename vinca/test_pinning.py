@@ -78,6 +78,26 @@ def test_download_pinning_package_that_does_not_exist(tmp_path):
         download_pinning_package("1", artifact_url=url)
 
 
+def test_download_pinning_package_downloads_a_version_once(tmp_path, monkeypatch):
+    url = _pinning_package(
+        tmp_path / "conda-forge-pinning-1-0.tar.bz2",
+        {
+            "conda_build_config.yaml": BASE_CONFIG,
+            "share/conda-forge/migrations/libboost190.yaml": BOOST_MIGRATION,
+        },
+    )
+    monkeypatch.setenv("VINCA_CACHE_DIR", str(tmp_path / "cache"))
+    with patch("vinca.pinning.get_pinning_distribution", return_value=url) as lookup:
+        first = download_pinning_package("1")
+        second = download_pinning_package("1")
+
+    assert first == second == (BASE_CONFIG, {"libboost190": BOOST_MIGRATION})
+    assert lookup.call_count == 1
+    assert (
+        tmp_path / "cache" / "conda-forge-pinning" / "1" / "conda_build_config.yaml"
+    ).is_file()
+
+
 def test_render_applies_base_migration_then_override(tmp_path):
     config_path = tmp_path / "vinca_pinning.yaml"
     config_path.write_text(

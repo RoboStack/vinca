@@ -87,28 +87,57 @@ def get_pinning_distribution(version: str) -> str:
     return _newest_pinning_record(f"{PINNING_PACKAGE}=={version}").url
 
 
+def pinning_cache_dir() -> Path:
+    """Where downloaded conda-forge-pinning versions are kept: ``$VINCA_CACHE_DIR``,
+    or ``vinca`` in the user's cache directory."""
+    if cache := os.environ.get("VINCA_CACHE_DIR"):
+        return Path(cache) / "conda-forge-pinning"
+    base = os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache"
+    return Path(base) / "vinca" / "conda-forge-pinning"
+
+
+def _extract_pinning(url: str, dest: Path) -> None:
+    try:
+        asyncio.run(download_and_extract(rattler.Client(), url, dest))
+    except (ExtractError, OSError) as exc:
+        raise PinningError(f"Could not download {url}: {exc}") from exc
+    if not (dest / "conda_build_config.yaml").is_file():
+        raise PinningError("conda_build_config.yaml is missing from pinning artifact")
+
+
+def _read_pinning(path: Path) -> tuple[bytes, dict[str, bytes]]:
+    migrations = {
+        migration.stem: migration.read_bytes()
+        for migration in (path / "share/conda-forge/migrations").glob("*.yaml")
+    }
+    return (path / "conda_build_config.yaml").read_bytes(), migrations
+
+
 def download_pinning_package(
     version: str, *, artifact_url: Optional[str] = None
 ) -> tuple[bytes, dict[str, bytes]]:
     """Download a versioned pinning artifact, or the supplied artifact URL, into its
-    base config and named migrations."""
-    url = artifact_url or get_pinning_distribution(version)
-    with tempfile.TemporaryDirectory() as tmp:
-        dest = Path(tmp)
-        try:
-            asyncio.run(download_and_extract(rattler.Client(), url, dest))
-        except (ExtractError, OSError) as exc:
-            raise PinningError(f"Could not download {url}: {exc}") from exc
-        base = dest / "conda_build_config.yaml"
-        if not base.is_file():
-            raise PinningError(
-                "conda_build_config.yaml is missing from pinning artifact"
-            )
-        migrations = {
-            path.stem: path.read_bytes()
-            for path in (dest / "share/conda-forge/migrations").glob("*.yaml")
-        }
-        return base.read_bytes(), migrations
+    base config and named migrations.
+
+    A version is downloaded once and kept in :func:`pinning_cache_dir` (a version's
+    contents don't change): rendering every distribution, or rendering again, needs
+    no download."""
+    if artifact_url:
+        with tempfile.TemporaryDirectory() as tmp:
+            _extract_pinning(artifact_url, Path(tmp))
+            return _read_pinning(Path(tmp))
+    cached = pinning_cache_dir() / version
+    if not (cached / "conda_build_config.yaml").is_file():
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        # extracted next to the cache entry, then moved: never a partial entry
+        with tempfile.TemporaryDirectory(dir=cached.parent) as tmp:
+            _extract_pinning(get_pinning_distribution(version), Path(tmp) / "pkg")
+            try:
+                (Path(tmp) / "pkg").rename(cached)
+            except OSError:
+                if not (cached / "conda_build_config.yaml").is_file():
+                    raise  # not a concurrent download of the same version
+    return _read_pinning(cached)
 
 
 def _pinning_spec_fields(
