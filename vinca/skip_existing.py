@@ -11,12 +11,19 @@ published variants of the recipes that remain.
 
 from __future__ import annotations
 
-import json
 import shutil
-import subprocess
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Optional
+
+from rattler_build import (
+    JinjaConfig,
+    PlatformConfig,
+    RattlerBuildError,
+    RenderConfig,
+    Stage0Recipe,
+    VariantConfig,
+)
 
 from vinca.utils import built_for_distro
 
@@ -42,33 +49,32 @@ def render_outputs(
     are: the build platform is part of the variant hash, so rendering on another
     machine (e.g. one linux-64 runner generating every platform's recipes) gives
     build strings that never match the published ones."""
-    cmd = [
-        "rattler-build",
-        "build",
-        "--render-only",
-        "--recipe-dir",
-        str(recipes_dir),
-        "--target-platform",
-        target_platform,
-        "--build-platform",
-        target_platform,
-    ]
-    if variant_config is not None:
-        cmd += ["-m", str(variant_config)]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"rendering the recipes in {recipes_dir} failed:\n{proc.stderr}"
+    platform = PlatformConfig(
+        target_platform=target_platform,
+        build_platform=target_platform,
+        host_platform=target_platform,
+    )
+    variants = (
+        VariantConfig.from_files_with_context(
+            [variant_config], JinjaConfig(platform=platform)
         )
+        if variant_config is not None
+        else VariantConfig()
+    )
+    render_config = RenderConfig(platform=platform)
     rendered: dict[str, list[Build]] = {}
-    for output in json.loads(proc.stdout):
-        package = output["recipe"]["package"]
-        build = (
-            package["name"],
-            package["version"],
-            output["recipe"]["build"]["string"],
-        )
-        rendered.setdefault(package["name"], []).append(build)
+    for recipe_path in sorted(recipes_dir.glob("**/recipe.yaml")):
+        try:
+            variants_of_recipe = Stage0Recipe.from_file(recipe_path).render(
+                variants, render_config
+            )
+        except RattlerBuildError as error:
+            raise RuntimeError(f"rendering {recipe_path} failed: {error}") from error
+        for variant in variants_of_recipe:
+            recipe = variant.recipe
+            name = str(recipe.package.name)
+            build = (name, str(recipe.package.version), str(recipe.build.string))
+            rendered.setdefault(name, []).append(build)
     return rendered
 
 

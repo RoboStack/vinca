@@ -11,9 +11,11 @@ import ruamel.yaml
 from rattler import Version
 
 from vinca import config
+from vinca.configuration import read_vinca_yaml
 from vinca.distro import Distro
+from vinca.schemas import Migration, validate
 
-from .naming import PackageNameMode, get_package_name_mode, get_package_prefix
+from .naming import PackageNameMode, get_package_prefix
 from .utils import get_channel_records
 
 distro_version = None
@@ -39,19 +41,22 @@ def to_ros_name(distro: Distro, pkg_name):
         raise RuntimeError(f"Couldnt convert {pkg_name} to ROS pkg name")
 
 
-def create_migration_instructions(arch, packages_to_migrate, trigger_branch) -> None:
+def create_migration_instructions(
+    arch, packages_to_migrate: list[str], trigger_branch
+) -> None:
     url = "https://conda.anaconda.org/robostack/"
 
     yaml = ruamel.yaml.YAML()
     with open("vinca.yaml", encoding="utf-8") as fi:
         vinca_conf = yaml.load(fi)
+    settings = read_vinca_yaml("vinca.yaml", target_platform=arch)
 
     global distro_version, ros_prefix
-    distro_version = vinca_conf["ros_distro"]
+    distro_version = settings.ros_distro
     distro = Distro(distro_version)
-    ros_prefix = get_package_prefix(distro, vinca_conf)
+    ros_prefix = get_package_prefix(distro, settings)
     legacy_prefix = distro.get_legacy_package_prefix()
-    package_name_mode = get_package_name_mode(vinca_conf)
+    package_name_mode = settings.package_name_mode
 
     packages = {record["fn"]: record for record in get_channel_records(url, arch)}
     to_migrate = set()
@@ -200,8 +205,9 @@ def main() -> None:
 
     mfile = os.path.join(args.dir + "/migration.yaml")
     with open(mfile, encoding="utf-8") as fi:
-        migration = ruamel.yaml.YAML(typ="safe").load(fi)
-        print(migration)
+        data = ruamel.yaml.YAML(typ="safe").load(fi)
+        print(data)
+        migration = validate(Migration, data or {}, mfile)
         create_migration_instructions(
-            args.platform, migration.get("packages", []), args.trigger_branch
+            args.platform, migration.packages, args.trigger_branch
         )

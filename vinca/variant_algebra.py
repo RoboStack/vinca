@@ -16,6 +16,8 @@ from rattler import Version
 from rattler.exceptions import InvalidVersionError
 from ruamel.yaml.comments import CommentedSeq
 
+from vinca.schemas import MigrationFile, Migrator, validate
+
 _SELECTOR_RE = re.compile(r"#\s*\[(.+)]")
 _PLATFORMS = {
     "linux-64",
@@ -226,16 +228,22 @@ def _set_union(left: Any, right: Any, ordering: Any = None) -> list[Any]:
     return sorted(values, key=lambda value: _version_order(value, ordering))
 
 
+def _single_primary_key(migrator: Migrator) -> str:
+    if not isinstance(migrator.primary_key, str):
+        raise ValueError(f"{migrator.operation} migrations need one primary_key")
+    return migrator.primary_key
+
+
 def _key_add_operation(
-    left: MutableMapping[str, Any], right: MutableMapping[str, Any]
+    left: MutableMapping[str, Any], right: MutableMapping[str, Any], migrator: Migrator
 ) -> MutableMapping[str, Any]:
     """Apply CFEP-9 ``key_add``, preserving aligned zip-key value tuples.
 
     Raises when the declared primary or required zip keys cannot be merged safely.
     """
-    primary_key = right["__migrator"]["primary_key"]
-    additional_zip_keys = right["__migrator"].get("additional_zip_keys", [])
-    ordering = right["__migrator"].get("ordering", {})
+    primary_key = _single_primary_key(migrator)
+    additional_zip_keys = migrator.additional_zip_keys
+    ordering = migrator.ordering
     if primary_key not in right:
         return left
     if primary_key not in left:
@@ -299,14 +307,14 @@ def _key_add_operation(
 
 
 def _key_remove_operation(
-    left: MutableMapping[str, Any], right: MutableMapping[str, Any]
+    left: MutableMapping[str, Any], right: MutableMapping[str, Any], migrator: Migrator
 ) -> MutableMapping[str, Any]:
     """Apply CFEP-9 ``key_remove`` and remove corresponding zipped values.
 
     Raises if the migration supplies anything other than one primary value.
     """
-    primary_key = right["__migrator"]["primary_key"]
-    ordering = right["__migrator"].get("ordering", {})
+    primary_key = _single_primary_key(migrator)
+    ordering = migrator.ordering
     if primary_key not in right or primary_key not in left:
         return left
     if len(right[primary_key]) != 1:
@@ -354,16 +362,19 @@ def variant_add(
     left: MutableMapping[str, Any], right: MutableMapping[str, Any]
 ) -> MutableMapping[str, Any]:
     """Combine variants using CFEP-9 operations, zip alignment, ordering, and selectors."""
-    operation = (right.get("__migrator") or {}).get("operation")
+    migrator = validate(
+        MigrationFile, {"__migrator": right.get("__migrator")}, "__migrator"
+    ).migrator
+    operation = migrator.operation
     if operation == "key_add":
-        return _key_add_operation(left, right)
+        return _key_add_operation(left, right, migrator)
     if operation == "key_remove":
-        return _key_remove_operation(left, right)
+        return _key_remove_operation(left, right, migrator)
     if operation:
         raise ValueError(f"Unknown migration operation: {operation}")
 
-    ordering = (right.get("__migrator") or {}).get("ordering", {})
-    primary_keys = _ensure_list((right.get("__migrator") or {}).get("primary_key", []))
+    ordering = migrator.ordering
+    primary_keys = _ensure_list(migrator.primary_key or [])
     result = deepcopy(left)
     right_keys = {key for key in right if key != "__migrator" and key != "migrator_ts"}
 

@@ -125,7 +125,7 @@ def requirements_from_vinca(
     with _platform_configurations(base_dir, platforms) as configurations:
         for _, distro, vinca_config, group_packages in configurations:
             prefix = get_package_prefix(distro, vinca_config)
-            for name in vinca_config["_selected_pkgs"]:
+            for name in vinca_config.selected_pkgs:
                 if not distro.check_package(name):
                     continue
                 reqs = generate_output(

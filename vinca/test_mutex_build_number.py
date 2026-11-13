@@ -6,26 +6,25 @@ from ruamel.yaml import YAML
 
 from vinca.main import expected_build_number
 from vinca.mutex import generate_mutex_package_recipe
+from vinca.schemas import PkgAdditionalInfo, VincaConfig
 from vinca.template import write_recipe
 
 yaml = YAML(typ="safe")
 
 
-def _conf(**extra):
-    conf = {
-        "ros_distro": "lyrical",
-        "build_number": 27,
-        "mutex_package": {
+def _conf(**mutex_package):
+    return VincaConfig(
+        ros_distro="lyrical",
+        build_number=27,
+        mutex_package={
             "name": "ros2-distro-mutex",
             "version": "0.21.0",
             "upper_bound": "x.x",
             "build_number": 28,
+            **mutex_package,
         },
-        "_pkg_additional_info": {"rclcpp": {"build_number": 30}},
-        "_tests": {},
-    }
-    conf.update(extra)
-    return conf
+        pkg_additional_info={"rclcpp": PkgAdditionalInfo(build_number=30)},
+    )
 
 
 def test_expected_build_number_of_the_mutex_is_its_own():
@@ -39,8 +38,7 @@ def test_expected_build_number_of_other_packages():
 
 
 def test_mutex_without_own_build_number_uses_the_distribution_one():
-    conf = _conf()
-    del conf["mutex_package"]["build_number"]
+    conf = _conf(build_number=None)
     assert expected_build_number(27, "ros2-distro-mutex", conf) == 27
 
 
@@ -61,8 +59,7 @@ def test_mutex_recipe_keeps_its_build_number(tmp_path, monkeypatch):
 
 
 def test_mutex_with_run_constraints_keeps_them():
-    conf = _conf()
-    conf["mutex_package"]["run_constraints"] = ["libfoo 1.*"]
+    conf = _conf(run_constraints=["libfoo 1.*"])
     distro = Mock()
     distro.name = "lyrical"
     recipe = generate_mutex_package_recipe(conf, distro)

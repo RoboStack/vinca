@@ -4,28 +4,10 @@ from __future__ import annotations
 
 import copy
 import re
-from enum import Enum
 from typing import Any, Mapping, Sequence
 
-
-class VariantsMode(Enum):
-    """How generated recipes consume the repository-wide pinning configuration."""
-
-    GLOBAL = "global"
-    LOCAL = "local"
-
-
-def get_variants_mode(vinca_conf: Mapping[str, Any]) -> VariantsMode:
-    """Return the configured variants mode, defaulting to the global mode."""
-    value = vinca_conf.get("variants_mode", VariantsMode.GLOBAL.value)
-    try:
-        return VariantsMode(value)
-    except ValueError as exc:
-        choices = ", ".join(mode.value for mode in VariantsMode)
-        raise ValueError(
-            f"Invalid variants_mode {value!r}; expected one of: {choices}"
-        ) from exc
-
+from vinca.schemas import VariantsMode as VariantsMode
+from vinca.schemas import VincaConfig
 
 _SELECTOR_RE = re.compile(r"#\s*\[(?P<condition>[^]]+)]")
 _COMPILER_RE = re.compile(r"\bcompiler\(\s*['\"](?P<language>[^'\"]+)['\"]\s*\)")
@@ -180,15 +162,12 @@ def _prune_zip_keys(groups: Any, used: set[str]) -> list[list[str]]:
 def get_recipe_variants(
     recipe: Mapping[str, Any],
     package_name: str,
-    vinca_conf: Mapping[str, Any],
+    vinca_conf: VincaConfig,
 ) -> dict[str, Any]:
     """Return a v1, package-local subset of the repository variant config."""
-    variants = copy.deepcopy(vinca_conf.get("_variant_config") or {})
-    overrides = copy.deepcopy(
-        vinca_conf.get("_pkg_additional_info", {})
-        .get(package_name, {})
-        .get("variant_overrides", {})
-    )
+    variants = copy.deepcopy(vinca_conf.variant_config)
+    package_info = vinca_conf.pkg_additional_info.get(package_name)
+    overrides = copy.deepcopy(package_info.variant_overrides if package_info else {})
     variants.update(overrides)
 
     used = _used_variant_keys(recipe, variants) | set(overrides)

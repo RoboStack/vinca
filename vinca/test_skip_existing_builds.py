@@ -1,7 +1,5 @@
 """Tests for skipping recipes whose exact builds are already published."""
 
-import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -105,7 +103,6 @@ requirements:
 """
 
 
-@pytest.mark.skipif(shutil.which("rattler-build") is None, reason="needs rattler-build")
 def test_render_outputs_gives_one_build_string_per_variant(tmp_path: Path):
     recipes = tmp_path / "recipes"
     for name, host in (("ros2-py", "    - python"), ("ros2-cpp", "    - zlib")):
@@ -121,18 +118,28 @@ def test_render_outputs_gives_one_build_string_per_variant(tmp_path: Path):
     assert "py" not in rendered["ros2-cpp"][0][2]
 
 
-def test_render_outputs_renders_as_a_native_build(tmp_path: Path, monkeypatch):
+def test_render_outputs_renders_as_a_native_build(tmp_path: Path):
     # the build platform is part of the variant hash: rendered for another platform
     # than the one it runs on, the build strings didn't match the published ones
-    calls = []
+    (tmp_path / "probe").mkdir()
+    (tmp_path / "probe" / "recipe.yaml").write_text(
+        """\
+package:
+  name: probe
+  version: "1.0.0"
+build:
+  string: ${{ build_platform | replace("-", "_") }}_${{ target_platform | replace("-", "_") }}
+"""
+    )
 
-    def fake_run(cmd, **_kwargs):
-        calls.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0, stdout="[]", stderr="")
+    rendered = render_outputs(tmp_path, "linux-aarch64", None)
 
-    monkeypatch.setattr(skip_existing.subprocess, "run", fake_run)
-    render_outputs(tmp_path, "linux-aarch64", None)
+    assert rendered == {"probe": [("probe", "1.0.0", "linux_aarch64_linux_aarch64")]}
 
-    (cmd,) = calls
-    assert cmd[cmd.index("--target-platform") + 1] == "linux-aarch64"
-    assert cmd[cmd.index("--build-platform") + 1] == "linux-aarch64"
+
+def test_render_outputs_names_the_failing_recipe(tmp_path: Path):
+    (tmp_path / "broken").mkdir()
+    (tmp_path / "broken" / "recipe.yaml").write_text("package: [\n")
+
+    with pytest.raises(RuntimeError, match="broken"):
+        render_outputs(tmp_path, "linux-64", None)

@@ -5,9 +5,10 @@ Beyond parsing it resolves selectors for the target platform and discovers the
 files that live alongside the config: patches, test definitions, dependency
 overrides, per-package metadata and rosdistro snapshots.
 
-Derived values are written back into the returned mapping under underscore-prefixed
-keys (``_patches``, ``_tests``, ``_conda_indexes``, ``_snapshot`` and friends). Those
-keys are internal to vinca and are never read from the user's file.
+The result is a :class:`~vinca.schemas.VincaConfig`: the validated ``vinca.yaml``
+together with what is derived from those files (``patches``, ``tests``,
+``conda_indexes``, ``snapshot`` and friends), which are never read from the user's
+file.
 """
 
 from __future__ import annotations
@@ -15,22 +16,32 @@ from __future__ import annotations
 import re
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, TypeVar
 
+from pydantic import BaseModel
 from ruamel.yaml import YAML
 
 from vinca import config
-from vinca.naming import get_package_name_mode
 from vinca.resolve import get_conda_index
-from vinca.utils import add_package_name_variants
-from vinca.v1_selectors import evaluate_selectors
-from vinca.variants import (
+from vinca.schemas import (
+    CondaIndex,
+    DepMods,
+    PkgAdditionalInfo,
+    RecipeTests,
+    Snapshot,
     VariantsMode,
-    convert_v0_variant_selectors,
-    get_variants_mode,
+    VincaConfig,
+    VincaYaml,
+    VincaYamlLayer,
+    validate,
 )
+from vinca.utils import add_package_name_variants
+from vinca.v1_selectors import evaluate_distro_selectors, evaluate_selectors
+from vinca.variants import convert_v0_variant_selectors
 
 _PATCH_PLATFORMS = ("osx", "linux", "win", "emscripten")
+
+_Entry = TypeVar("_Entry", bound=BaseModel)
 
 
 def _load_yaml(path: Path) -> Any:
@@ -90,17 +101,30 @@ def _discover_tests(
     return tests, test_folders
 
 
+def read_recipe_tests(path: Path, ros_distro: Optional[str]) -> RecipeTests:
+    """A package's test definitions, with its ``ros_distro`` selectors resolved."""
+    data = YAML(typ="safe").load(path.read_text(encoding="utf-8"))
+    return validate(
+        RecipeTests,
+        evaluate_distro_selectors(data, ros_distro=ros_distro) or {},
+        path,
+    )
+
+
+def _load_snapshot(path: Path) -> Snapshot:
+    return validate(Snapshot, _load_yaml(path) or {}, path)
+
+
 def read_snapshot(
-    vinca_conf: dict[str, Any],
-) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    vinca_conf: VincaYaml,
+) -> tuple[Optional[Snapshot], Optional[Snapshot]]:
     """Load the primary and optional additional package snapshots."""
-    snapshot_path = vinca_conf.get("rosdistro_snapshot")
-    if not snapshot_path:
+    if not vinca_conf.rosdistro_snapshot:
         return None, None
 
-    snapshot = _load_yaml(Path(snapshot_path)) or {}
-    additional_path = vinca_conf.get("rosdistro_additional_recipes")
-    additional = _load_yaml(Path(additional_path)) or {} if additional_path else None
+    snapshot = _load_snapshot(Path(vinca_conf.rosdistro_snapshot))
+    additional_path = vinca_conf.rosdistro_additional_recipes
+    additional = _load_snapshot(Path(additional_path)) if additional_path else None
     if additional:
         snapshot.update(additional)
     return snapshot, additional
@@ -111,7 +135,9 @@ def _names(items: Any) -> list[str]:
     return [str(item) for item in items or [] if item is not None]
 
 
-def _apply_package_exclusions(vinca_conf: dict[str, Any]) -> None:
+def _apply_package_exclusions(
+    vinca_conf: dict[str, Any],
+) -> tuple[list[str], list[str]]:
     """Normalize ``packages_exclude`` / ``packages_skip``.
 
     ``packages_exclude``: the package is not built, and is dropped from the host and
@@ -122,6 +148,9 @@ def _apply_package_exclusions(vinca_conf: dict[str, Any]) -> None:
 
     Both also remove the package from ``packages_select_by_deps``. Selectors
     (``- if: ... then: ...``) have already been resolved for the target platform.
+
+    Returns what the dependency traversal ignores, and what is dropped from
+    dependencies.
     """
     exclude = list(dict.fromkeys(_names(vinca_conf.get("packages_exclude"))))
     skip = list(dict.fromkeys(_names(vinca_conf.get("packages_skip"))))
@@ -140,15 +169,16 @@ def _apply_package_exclusions(vinca_conf: dict[str, Any]) -> None:
         )
     vinca_conf["packages_exclude"] = exclude
     vinca_conf["packages_skip"] = skip
-    # what the dependency traversal ignores, and what is dropped from dependencies
-    vinca_conf["_skip_by_deps"] = list(dict.fromkeys(exclude + skip + legacy_skip))
-    vinca_conf["_remove_from_deps"] = list(dict.fromkeys(exclude + legacy_remove))
     dropped = {name.replace("-", "_") for name in exclude + skip}
     vinca_conf["packages_select_by_deps"] = [
         name
         for name in _names(vinca_conf.get("packages_select_by_deps"))
         if name.replace("-", "_") not in dropped
     ]
+    return (
+        list(dict.fromkeys(exclude + skip + legacy_skip)),
+        list(dict.fromkeys(exclude + legacy_remove)),
+    )
 
 
 # paths in a configuration, relative to the file that sets them
@@ -188,12 +218,17 @@ def _merge_configs(base: dict[str, Any], own: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
-def _merge_per_package(base: dict[str, Any], own: dict[str, Any]) -> dict[str, Any]:
-    """Per-package settings: own keys of a package's entry win over the base's."""
-    merged = {k: (dict(v) if isinstance(v, dict) else v) for k, v in base.items()}
+def _merge_per_package(
+    base: dict[str, _Entry], own: dict[str, _Entry]
+) -> dict[str, _Entry]:
+    """Per-package settings: the keys set in own's entry of a package win over the
+    base's."""
+    merged = dict(base)
     for package, entry in own.items():
-        if isinstance(entry, dict) and isinstance(merged.get(package), dict):
-            merged[package] = {**merged[package], **entry}
+        if package in merged:
+            merged[package] = merged[package].model_copy(
+                update={key: getattr(entry, key) for key in entry.model_fields_set}
+            )
         else:
             merged[package] = entry
     return merged
@@ -203,7 +238,7 @@ def _load_layers(
     filepath: Path, target_platform: str, seen: tuple[Path, ...] = ()
 ) -> list[tuple[Path, dict[str, Any]]]:
     """The configuration and the ones it ``extends`` (resolved relative to the
-    file), base first, each as (directory, selector-resolved content)."""
+    file), base first, each as (file, selector-resolved content)."""
     filepath = filepath.resolve()
     if filepath in seen:
         chain = " -> ".join(str(p) for p in (*seen, filepath))
@@ -218,90 +253,103 @@ def _load_layers(
         if base
         else []
     )
-    return [*layers, (filepath.parent, conf)]
+    return [*layers, (filepath, conf)]
 
 
-def read_vinca_yaml(filepath: str | Path, target_platform: str) -> dict[str, Any]:
+def read_vinca_yaml(filepath: str | Path, target_platform: str) -> VincaConfig:
     """Read a vinca configuration and populate its derived internal fields."""
     filepath = Path(filepath)
     config_dir = filepath.parent
     layers = _load_layers(filepath, target_platform)
-    vinca_conf: dict[str, Any] = {}
+    merged: dict[str, Any] = {}
     for _, layer in layers:
-        vinca_conf = _merge_configs(vinca_conf, layer)
-    _apply_package_exclusions(vinca_conf)
-    vinca_conf["package_name_mode"] = get_package_name_mode(vinca_conf).value
-    vinca_conf["variants_mode"] = get_variants_mode(vinca_conf).value
+        merged = _merge_configs(merged, layer)
+    skip_by_deps, remove_from_deps = _apply_package_exclusions(merged)
+    settings = validate(VincaYaml, merged, filepath)
+    ros_distro = settings.ros_distro
 
     # Files of each layer: patches and dependencies.yaml (patch_dir), tests,
     # pkg_additional_info.yaml and conda_index files, relative to that layer's file.
-    patches: dict[str, Any] = {}
+    patches: dict[str, dict[str, list[str]]] = {}
     tests: dict[str, Path] = {}
     test_folders: dict[str, Path] = {}
-    depmods: dict[str, Any] = {}
-    additional_info: dict[str, Any] = {}
-    conda_indexes: list[Any] = []
+    depmods: dict[str, DepMods] = {}
+    additional_info: dict[str, PkgAdditionalInfo] = {}
+    conda_indexes: list[CondaIndex] = []
     patch_dir: Path | None = None
-    for layer_dir, layer in layers:
-        if layer.get("patch_dir"):
-            layer_patch_dir = Path(layer["patch_dir"])
-            patches.update(_discover_patches(layer_patch_dir, vinca_conf["ros_distro"]))
+    for layer_file, layer_content in layers:
+        layer_dir = layer_file.parent
+        layer = validate(VincaYamlLayer, layer_content, layer_file)
+        if layer.patch_dir:
+            layer_patch_dir = Path(layer.patch_dir)
+            patches.update(_discover_patches(layer_patch_dir, ros_distro))
             dependencies_path = layer_patch_dir / "dependencies.yaml"
             if dependencies_path.exists():
                 depmods = _merge_per_package(
                     depmods,
-                    _load_selected_yaml(dependencies_path, target_platform) or {},
+                    validate(
+                        dict[str, DepMods],
+                        _load_selected_yaml(dependencies_path, target_platform) or {},
+                        dependencies_path,
+                    ),
                 )
             patch_dir = layer_patch_dir
-        layer_tests, layer_test_folders = _discover_tests(
-            layer_dir, vinca_conf["ros_distro"]
-        )
+        layer_tests, layer_test_folders = _discover_tests(layer_dir, ros_distro)
         tests.update(layer_tests)
         test_folders.update(layer_test_folders)
         additional_info_path = layer_dir / "pkg_additional_info.yaml"
         if additional_info_path.exists():
             additional_info = _merge_per_package(
                 additional_info,
-                _load_selected_yaml(additional_info_path, target_platform) or {},
+                validate(
+                    dict[str, PkgAdditionalInfo],
+                    _load_selected_yaml(additional_info_path, target_platform) or {},
+                    additional_info_path,
+                ),
             )
-        if layer.get("conda_index"):
+        if layer.conda_index:
             layer_indexes = [
                 str(layer_dir / i) if (layer_dir / i).is_file() else i
-                for i in layer["conda_index"]
+                for i in layer.conda_index
             ]
             # the extending configuration's mappings are looked up first
             conda_indexes = (
-                get_conda_index({"conda_index": layer_indexes}, str(layer_dir))
-                + conda_indexes
+                get_conda_index(layer_indexes, str(layer_dir)) + conda_indexes
             )
-    vinca_conf["conda_index"] = _normalize_conda_indexes(
-        vinca_conf.get("conda_index") or []
-    )
-    vinca_conf["_patch_dir"] = patch_dir or Path(vinca_conf["patch_dir"]).absolute()
-    vinca_conf["_patches"] = patches
-    vinca_conf["_tests"], vinca_conf["_test_folders"] = tests, test_folders
-    vinca_conf["depmods"] = depmods or vinca_conf.get("depmods") or {}
 
-    config.ros_distro = vinca_conf["ros_distro"]
-    config.skip_testing = vinca_conf.get("skip_testing", True)
-    config.setup_pixi_version = vinca_conf.get("setup_pixi_version")
-    config.pixi_version = vinca_conf.get("pixi_version")
-    vinca_conf["_conda_indexes"] = conda_indexes
-    vinca_conf["trigger_new_versions"] = vinca_conf.get("trigger_new_versions", False)
-    vinca_conf["_pkg_additional_info"] = additional_info
+    config.ros_distro = ros_distro
+    config.skip_testing = settings.skip_testing
+    config.setup_pixi_version = settings.setup_pixi_version
+    config.pixi_version = settings.pixi_version
 
-    vinca_conf["_variant_config"] = {}
-    if get_variants_mode(vinca_conf) is VariantsMode.LOCAL:
+    variant_config: dict[str, Any] = {}
+    if settings.variants_mode is VariantsMode.LOCAL:
         variant_config_path = config_dir / "conda_build_config.yaml"
         if not variant_config_path.is_file():
             raise FileNotFoundError(
                 "variants_mode 'local' requires conda_build_config.yaml next to vinca.yaml"
             )
-        vinca_conf["_variant_config"] = convert_v0_variant_selectors(
+        variant_config = convert_v0_variant_selectors(
             _load_yaml(variant_config_path) or {}
         )
 
-    snapshot, additional = read_snapshot(vinca_conf)
-    vinca_conf["_snapshot"] = snapshot or {}
-    vinca_conf["_additional_packages_snapshot"] = additional or {}
-    return vinca_conf
+    snapshot, additional = read_snapshot(settings)
+    fields = dict(settings)
+    fields.update(
+        conda_index=_normalize_conda_indexes(settings.conda_index),
+        depmods=depmods or settings.depmods,
+    )
+    return VincaConfig(
+        **fields,
+        skip_by_deps=skip_by_deps,
+        remove_from_deps=remove_from_deps,
+        patch_dir_path=patch_dir,
+        patches=patches,
+        tests=tests,
+        test_folders=test_folders,
+        conda_indexes=conda_indexes,
+        pkg_additional_info=additional_info,
+        variant_config=variant_config,
+        snapshot=snapshot or {},
+        additional_packages_snapshot=additional or {},
+    )

@@ -1,55 +1,42 @@
 """Helpers for selecting and generating ROS package names."""
 
-from enum import Enum
+from __future__ import annotations
 
+from typing import Any, Optional
+
+from vinca.distro import Distro
 from vinca.mutex import get_mutex_package_dependency
+from vinca.schemas import PackageNameMode as PackageNameMode
+from vinca.schemas import VincaYaml
 
 
-class PackageNameMode(str, Enum):
-    """Supported ROS package naming transition modes."""
-
-    LEGACY = "legacy"
-    BOTH = "both"
-    NEW = "new"
-
-
-def get_package_name_mode(vinca_conf) -> PackageNameMode:
-    """Return the configured package name mode, defaulting to legacy names."""
-    value = vinca_conf.get("package_name_mode", PackageNameMode.LEGACY.value)
-    try:
-        return PackageNameMode(value)
-    except ValueError as error:
-        choices = ", ".join(mode.value for mode in PackageNameMode)
-        raise ValueError(
-            f"Invalid package_name_mode {value!r}; expected one of: {choices}"
-        ) from error
-
-
-def get_package_prefix(distro, vinca_conf):
+def get_package_prefix(distro: Distro, vinca_conf: VincaYaml) -> str:
     """Return the prefix used for generated packages and their dependencies."""
-    if get_package_name_mode(vinca_conf) is PackageNameMode.LEGACY:
+    if vinca_conf.package_name_mode is PackageNameMode.LEGACY:
         return distro.get_legacy_package_prefix()
     return distro.get_package_prefix()
 
 
-def get_new_package_name(pkg_shortname, distro) -> str:
+def get_new_package_name(pkg_shortname: str, distro: Distro) -> str:
     """Return the ROS-major-version package name."""
     return f"{distro.get_package_prefix()}-{pkg_shortname.replace('_', '-')}"
 
 
-def get_legacy_package_name(pkg_shortname, distro) -> str:
+def get_legacy_package_name(pkg_shortname: str, distro: Distro) -> str:
     """Return the distro-qualified package name."""
     return f"{distro.get_legacy_package_prefix()}-{pkg_shortname.replace('_', '-')}"
 
 
-def get_package_name(pkg_shortname, distro, vinca_conf) -> str:
+def get_package_name(pkg_shortname: str, distro: Distro, vinca_conf: VincaYaml) -> str:
     """Return the primary generated name for a ROS package."""
-    if get_package_name_mode(vinca_conf) is PackageNameMode.LEGACY:
+    if vinca_conf.package_name_mode is PackageNameMode.LEGACY:
         return get_legacy_package_name(pkg_shortname, distro)
     return get_new_package_name(pkg_shortname, distro)
 
 
-def normalize_package_dependency(dependency, distro, vinca_conf):
+def normalize_package_dependency(
+    dependency: Any, distro: Distro, vinca_conf: VincaYaml
+) -> Any:
     """Rewrite current-distro legacy dependency names for the selected mode."""
     if isinstance(dependency, dict):
         return {
@@ -72,9 +59,11 @@ def normalize_package_dependency(dependency, distro, vinca_conf):
     return package_prefix + dependency[len(legacy_prefix) :]
 
 
-def generate_legacy_compatibility_output(output, pkg_shortname, distro, vinca_conf):
+def generate_legacy_compatibility_output(
+    output: dict[str, Any], pkg_shortname: str, distro: Distro, vinca_conf: VincaYaml
+) -> Optional[dict[str, Any]]:
     """Create an old-name package that depends on the renamed package, if requested."""
-    if get_package_name_mode(vinca_conf) is not PackageNameMode.BOTH:
+    if vinca_conf.package_name_mode is not PackageNameMode.BOTH:
         return None
 
     canonical_name = get_new_package_name(pkg_shortname, distro)
@@ -98,9 +87,11 @@ def generate_legacy_compatibility_output(output, pkg_shortname, distro, vinca_co
     }
 
 
-def is_legacy_compatibility_output(output, distro, vinca_conf):
+def is_legacy_compatibility_output(
+    output: dict[str, Any], distro: Distro, vinca_conf: VincaYaml
+) -> bool:
     """Return whether an output is one of the generated compatibility packages."""
-    if get_package_name_mode(vinca_conf) is not PackageNameMode.BOTH:
+    if vinca_conf.package_name_mode is not PackageNameMode.BOTH:
         return False
 
     legacy_prefix_getter = getattr(distro, "get_legacy_package_prefix", None)

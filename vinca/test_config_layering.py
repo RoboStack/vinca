@@ -3,6 +3,7 @@
 import pytest
 
 from vinca.configuration import read_vinca_yaml
+from vinca.schemas import DepMods, MutexPackage, PkgAdditionalInfo
 
 
 def _write(path, text):
@@ -82,27 +83,28 @@ packages_skip:
 def test_lists_and_scalars_are_layered(layered):
     conf = read_vinca_yaml(layered[1] / "vinca.yaml", "linux-64")
 
-    assert conf["packages_select_by_deps"] == ["extra"]  # desktop is skipped
-    assert conf["packages_skip"] == ["desktop"]
-    assert conf["packages_exclude"] == ["broken"]
-    assert conf["package_name_mode"] == "new"
-    assert conf["skip_testing"] is True
-    assert "extends" not in conf
+    assert conf.packages_select_by_deps == ["extra"]  # desktop is skipped
+    assert conf.packages_skip == ["desktop"]
+    assert conf.packages_exclude == ["broken"]
+    assert conf.package_name_mode == "new"
+    assert conf.skip_testing is True
+    assert "extends" not in conf.model_dump()
 
 
 def test_selectors_of_the_base_are_resolved(layered):
     conf = read_vinca_yaml(layered[1] / "vinca.yaml", "win-64")
 
-    assert conf["packages_select_by_deps"] == ["win_only", "extra"]
+    assert conf.packages_select_by_deps == ["win_only", "extra"]
 
 
 def test_mutex_constraints_are_overridden_by_package(layered):
-    mutex = read_vinca_yaml(layered[1] / "vinca.yaml", "linux-64")["mutex_package"]
+    mutex = read_vinca_yaml(layered[1] / "vinca.yaml", "linux-64").mutex_package
 
-    assert mutex["name"] == "ros2-distro-mutex"
-    assert mutex["version"] == "0.10.0"
-    assert mutex["upper_bound"] == "x.x"
-    assert mutex["run_constraints"] == ["libboost 1.90.*", "pcl 1.16.*", "krb5 1.22.*"]
+    assert isinstance(mutex, MutexPackage)
+    assert mutex.name == "ros2-distro-mutex"
+    assert mutex.version == "0.10.0"
+    assert mutex.upper_bound == "x.x"
+    assert mutex.run_constraints == ["libboost 1.90.*", "pcl 1.16.*", "krb5 1.22.*"]
 
 
 def test_files_of_each_layer(layered):
@@ -110,25 +112,21 @@ def test_files_of_each_layer(layered):
     conf = read_vinca_yaml(distro / "vinca.yaml", "linux-64")
 
     # per-package settings: the distribution's keys win
-    assert conf["depmods"]["demo"] == {
-        "add_host": ["shared-dep"],
-        "add_run": ["own-dep"],
-    }
-    assert conf["_pkg_additional_info"]["demo"] == {
-        "additional_cmake_args": "-DFOO=ON",
-        "build_number": 3,
-    }
+    assert conf.depmods["demo"] == DepMods(add_host=["shared-dep"], add_run=["own-dep"])
+    assert conf.pkg_additional_info["demo"] == PkgAdditionalInfo(
+        additional_cmake_args="-DFOO=ON", build_number=3
+    )
     # patches and tests: the distribution's file replaces the shared one
-    assert conf["_patches"]["ros2-demo"]["any"] == [
+    assert conf.patches["ros2-demo"]["any"] == [
         str(distro / "patch" / "ros2-demo.patch")
     ]
-    assert conf["_patches"]["ros2-other"]["any"] == [
+    assert conf.patches["ros2-other"]["any"] == [
         str(shared / "patch" / "ros2-other.patch")
     ]
-    assert conf["_tests"]["ros2-demo"] == distro / "tests" / "ros2-demo.yaml"
-    assert conf["_tests"]["ros2-other"] == shared / "tests" / "ros2-other.yaml"
+    assert conf.tests["ros2-demo"] == distro / "tests" / "ros2-demo.yaml"
+    assert conf.tests["ros2-other"] == shared / "tests" / "ros2-other.yaml"
     # conda_index: the distribution's mappings are looked up first
-    assert [list(index) for index in conf["_conda_indexes"]] == [
+    assert [list(index) for index in conf.conda_indexes] == [
         ["foo"],
         ["eigen", "foo"],
     ]
@@ -145,7 +143,10 @@ def test_extends_cycle_is_rejected(tmp_path, monkeypatch):
 
 def test_paths_are_relative_to_the_file_that_sets_them(layered, tmp_path, monkeypatch):
     shared, distro = layered
-    _write(distro / "rosdistro_snapshot.yaml", "demo:\n  version: 1.0.0\n")
+    _write(
+        distro / "rosdistro_snapshot.yaml",
+        "demo:\n  url: https://github.com/x/demo.git\n  version: 1.0.0\n",
+    )
     text = (distro / "vinca.yaml").read_text()
     (distro / "vinca.yaml").write_text(
         text + "rosdistro_snapshot: rosdistro_snapshot.yaml\n"
@@ -154,8 +155,8 @@ def test_paths_are_relative_to_the_file_that_sets_them(layered, tmp_path, monkey
 
     conf = read_vinca_yaml(distro / "vinca.yaml", "linux-64")
 
-    assert conf["_snapshot"]["demo"]["version"] == "1.0.0"
-    assert conf["_patch_dir"] == distro / "patch"
-    assert conf["_patches"]["ros2-demo"]["any"] == [
+    assert conf.snapshot["demo"].version == "1.0.0"
+    assert conf.patch_dir_path == distro / "patch"
+    assert conf.patches["ros2-demo"]["any"] == [
         str(distro / "patch" / "ros2-demo.patch")
     ]

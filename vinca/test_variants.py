@@ -1,3 +1,4 @@
+from vinca.schemas import VincaConfig
 from vinca.variants import get_recipe_variants
 
 
@@ -12,8 +13,9 @@ def test_get_recipe_variants_prunes_to_recipe_dependencies_and_expressions():
             "script": "echo ${{ cxx_compiler_version }}",
         },
     }
-    config = {
-        "_variant_config": {
+    config = VincaConfig(
+        ros_distro="humble",
+        variant_config={
             "python": ["3.12.* *_cpython"],
             "python_impl": ["cpython"],
             "libfoo": ["2"],
@@ -30,8 +32,7 @@ def test_get_recipe_variants_prunes_to_recipe_dependencies_and_expressions():
                 "unused": {"max_pin": "x"},
             },
         },
-        "_pkg_additional_info": {},
-    }
+    )
 
     assert get_recipe_variants(recipe, "demo", config) == {
         "python": ["3.12.* *_cpython"],
@@ -45,12 +46,13 @@ def test_get_recipe_variants_prunes_to_recipe_dependencies_and_expressions():
 
 
 def test_get_recipe_variants_merges_and_keeps_package_overrides():
-    config = {
-        "_variant_config": {
+    config = VincaConfig(
+        ros_distro="humble",
+        variant_config={
             "python": ["3.12.* *_cpython"],
             "unused": ["1"],
         },
-        "_pkg_additional_info": {
+        pkg_additional_info={
             "demo": {
                 "variant_overrides": {
                     "python": ["3.13.* *_cpython"],
@@ -58,7 +60,7 @@ def test_get_recipe_variants_merges_and_keeps_package_overrides():
                 }
             }
         },
-    }
+    )
 
     assert get_recipe_variants(
         {"requirements": {"host": ["python"]}}, "demo", config
@@ -69,15 +71,15 @@ def test_get_recipe_variants_merges_and_keeps_package_overrides():
 
 
 def test_get_recipe_variants_trims_zip_keys_to_used_members():
-    config = {
-        "_variant_config": {
+    config = VincaConfig(
+        ros_distro="humble",
+        variant_config={
             "python": ["3.12", "3.13"],
             "numpy": ["1", "2"],
             "python_impl": ["cpython", "cpython"],
             "zip_keys": [["python", "numpy", "python_impl"]],
         },
-        "_pkg_additional_info": {},
-    }
+    )
 
     assert get_recipe_variants(
         {"requirements": {"host": ["python", "numpy"]}}, "demo", config
@@ -89,13 +91,13 @@ def test_get_recipe_variants_trims_zip_keys_to_used_members():
 
 
 def test_get_recipe_variants_uses_test_requirements_not_test_commands():
-    config = {
-        "_variant_config": {
+    config = VincaConfig(
+        ros_distro="humble",
+        variant_config={
             "python": ["3.12"],
             "pytest": ["8"],
         },
-        "_pkg_additional_info": {},
-    }
+    )
 
     assert get_recipe_variants(
         {

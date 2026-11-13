@@ -15,6 +15,8 @@ from rosdistro import get_cached_distribution, get_index, get_index_url
 from rosdistro.dependency_walker import DependencyWalker
 from rosdistro.manifest_provider import get_release_tag
 
+from vinca.schemas import Snapshot, SnapshotEntry
+
 # Retries for fetching package.xml files (raw.githubusercontent.com is flaky in CI).
 _FETCH_ATTEMPTS = 5
 _RETRY_STATUS = {429, 500, 502, 503, 504}
@@ -36,7 +38,7 @@ ARCHIVE_SUFFIXES = (
 )
 
 
-def is_archive_url(url):
+def is_archive_url(url: str):
     """Return True when url points at a source archive rather than a git repository."""
     if not url:
         return False
@@ -51,7 +53,7 @@ def is_bloom_release_repository_url(url):
     return repository_name.endswith(("-release", "_release"))
 
 
-def _strip_git_suffix(url):
+def _strip_git_suffix(url: str):
     """Return a repository URL without its optional ``.git`` suffix."""
     return url[:-4] if url.lower().endswith(".git") else url
 
@@ -118,10 +120,10 @@ def _read_archive_member(*, payload, url, member) -> str:
 class Distro(object):
     def __init__(
         self,
-        distro_name,
-        python_version=None,
-        snapshot=None,
-        additional_packages_snapshot=None,
+        distro_name: str,
+        python_version: Optional[str] = None,
+        snapshot: Optional[Snapshot] = None,
+        additional_packages_snapshot: Optional[Snapshot] = None,
         distribution_cache=None,
     ) -> None:
         index = get_index(get_index_url())
@@ -160,7 +162,7 @@ class Distro(object):
         os.environ["ROS_VERSION"] = "1" if self.check_ros1() else "2"
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self.distro_name
 
     def add_packages(self, packages) -> None:
@@ -213,8 +215,8 @@ class Distro(object):
         additional_packages_snapshot = self.additional_packages_snapshot or {}
         is_additional_package = pkg in additional_packages_snapshot
         if snapshot_info is not None and not is_additional_package:
-            if "dependencies" in snapshot_info:
-                direct = set(snapshot_info["dependencies"] or [])
+            if snapshot_info.dependencies is not None:
+                direct = set(snapshot_info.dependencies)
                 self._direct_depends_cache[pkg] = set(direct)
                 return direct
             # Snapshots written before dependencies were recorded: resolve them
@@ -275,7 +277,7 @@ class Distro(object):
         self._direct_depends_cache[pkg] = set(direct)
         return direct
 
-    def _get_snapshot_package_info(self, pkg_name: str):
+    def _get_snapshot_package_info(self, pkg_name: str) -> Optional[SnapshotEntry]:
         if not self.snapshot:
             return None
         for name in (pkg_name, pkg_name.replace("_", "-")):
@@ -289,23 +291,18 @@ class Distro(object):
             # In the case of snapshot, for rosdistro_additional_recipes
             # we also support a 'rev' field, so depending on what is available
             # we return either the tag or the rev, and the third argument is either 'rev' or 'tag'
-            url = pkg_info.get("url", None)
+            url = pkg_info.url
             # An archive URL is not a git repository: the reference is its sha256 checksum.
             if is_archive_url(url):
-                sha256 = pkg_info.get("sha256", None)
+                sha256 = pkg_info.sha256
                 if not sha256:
                     raise RuntimeError(
                         f"The archive source of '{pkg_name}' has no sha256 checksum: {url}"
                     )
                 return url, sha256, "sha256"
-            if "tag" in pkg_info:
-                tag_or_rev = pkg_info.get("tag", None)
-                ref_type = "tag"
-            else:
-                tag_or_rev = pkg_info.get("rev", None)
-                ref_type = "rev"
-
-            return url, tag_or_rev, ref_type
+            if pkg_info.tag is not None:
+                return url, pkg_info.tag, "tag"
+            return url, pkg_info.rev, "rev"
 
         pkg = self._distro.release_packages[pkg_name]
         repo = self._distro.repositories[pkg.repository_name].release_repository
@@ -316,12 +313,12 @@ class Distro(object):
         """Return the best declared upstream repository for a package."""
         pkg_info = self._get_snapshot_package_info(pkg_name)
         if pkg_info is not None:
-            if repository := pkg_info.get("repository"):
+            if repository := pkg_info.repository:
                 return _strip_git_suffix(repository)
 
         additional_info = (self.additional_packages_snapshot or {}).get(pkg_name)
         if additional_info is not None:
-            if repository := additional_info.get("repository"):
+            if repository := additional_info.repository:
                 return _strip_git_suffix(repository)
         else:
             package = self._distro.release_packages.get(pkg_name)
@@ -344,7 +341,7 @@ class Distro(object):
                 return _strip_git_suffix(package_url.url)
         return None
 
-    def check_package(self, pkg_name: str):
+    def check_package(self, pkg_name: str) -> bool:
         # If the package is in the additional_packages_snapshot, it is always considered valid
         # even if it is not in the released packages, as it is an additional
         # package specified in rosdistro_additional_recipes.yaml
@@ -373,13 +370,13 @@ class Distro(object):
     def get_version(self, pkg_name):
         pkg_info = self._get_snapshot_package_info(pkg_name)
         if pkg_info is not None:
-            return pkg_info.get("version", None)
+            return pkg_info.version
 
         pkg = self._distro.release_packages[pkg_name]
         repo = self._distro.repositories[pkg.repository_name].release_repository
         return repo.version.split("-")[0]
 
-    def live_cache_matches_snapshot(self, pkg_name, snapshot_entry):
+    def live_cache_matches_snapshot(self, pkg_name, snapshot_entry: SnapshotEntry):
         """Return whether rosdistro's cached manifest is the pinned snapshot source."""
 
         for live_name in (pkg_name, pkg_name.replace("_", "-")):
@@ -388,11 +385,11 @@ class Distro(object):
                 repository = self._distro.repositories[package.repository_name]
                 release_repository = repository.release_repository
                 return (
-                    release_repository.url == snapshot_entry.get("url")
+                    release_repository.url == snapshot_entry.url
                     and get_release_tag(release_repository, live_name)
-                    == snapshot_entry.get("tag")
+                    == snapshot_entry.tag
                     and release_repository.version.split("-")[0]
-                    == snapshot_entry.get("version")
+                    == snapshot_entry.version
                 )
             except (AttributeError, KeyError, TypeError):
                 continue
@@ -435,8 +432,8 @@ class Distro(object):
             return self.snapshot.keys()
         return self._distro.release_packages.keys()
 
-    def get_package_xml_for_additional_package(self, pkg_info):
-        raw_url_base = pkg_info.get("url")
+    def get_package_xml_for_additional_package(self, pkg_info: SnapshotEntry):
+        raw_url_base = pkg_info.url
         # An archive has no raw-file endpoint, so read package.xml out of the archive itself.
         if is_archive_url(raw_url_base):
             return self._package_xml_from_archive_or_cached(pkg_info)
@@ -454,7 +451,7 @@ class Distro(object):
         package_infos = [
             package_info
             for package_info in (self.additional_packages_snapshot or {}).values()
-            if not is_archive_url(package_info.get("url"))
+            if not is_archive_url(package_info.url)
         ]
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             list(
@@ -519,16 +516,15 @@ class Distro(object):
         self._additional_xml_cache[url] = xml_content
         return xml_content
 
-    def _package_xml_from_archive_or_cached(self, pkg_info):
+    def _package_xml_from_archive_or_cached(self, pkg_info: SnapshotEntry):
         """Read package.xml out of a source archive referenced by an additional recipe.
 
         The member is looked up under the archive's additional_folder, after dropping a
         single common top-level directory. That mirrors how the build tool unpacks the
         archive, so one additional_folder value describes both the recipe and this lookup.
         """
-        url = pkg_info.get("url")
-        xml_name = pkg_info.get("package_xml_name", "package.xml")
-        member = posixpath.join(pkg_info.get("additional_folder", ""), xml_name)
+        url = pkg_info.url
+        member = posixpath.join(pkg_info.additional_folder, pkg_info.package_xml_name)
         cache_key = f"{url}#{member}"
         if cache_key in self._additional_xml_cache:
             return self._additional_xml_cache[cache_key]
@@ -547,7 +543,7 @@ class Distro(object):
         self._additional_xml_cache[cache_key] = xml_content
         return xml_content
 
-    def _download_archive_or_cached(self, url):
+    def _download_archive_or_cached(self, url: str):
         """Download the archive at url, keeping only the most recent payload in memory.
 
         Several packages can share one archive, so reusing the last download avoids
@@ -566,9 +562,9 @@ class Distro(object):
 
     # Based on https://github.com/ros-infrastructure/rosdistro/blob/fad8d9f647631945847cb18bc1d1f43008d7a282/src/rosdistro/manifest_provider/github.py#L51C1-L69C29
     # But with the option to specify the name of the package.xml file in case the repo uses a non-standard name
-    def _construct_raw_url_github(self, pkg_info) -> str:
+    def _construct_raw_url_github(self, pkg_info: SnapshotEntry) -> str:
         # Build raw GitHub URL for package.xml
-        raw_url_base = pkg_info.get("url")
+        raw_url_base = pkg_info.url
         if raw_url_base.endswith(".git"):
             raw_url_base = raw_url_base[:-4]
         if "github.com" not in raw_url_base:
@@ -576,10 +572,10 @@ class Distro(object):
         # Extract owner/repo
         owner_repo = raw_url_base.split("github.com/")[-1]
         # Use rev if available, otherwise fallback to tag
-        rev = pkg_info.get("rev")
-        tag = pkg_info.get("tag")
-        xml_name = pkg_info.get("package_xml_name", "package.xml")
-        additional_folder = pkg_info.get("additional_folder", "")
+        rev = pkg_info.rev
+        tag = pkg_info.tag
+        xml_name = pkg_info.package_xml_name
+        additional_folder = pkg_info.additional_folder
         if additional_folder != "":
             additional_folder = additional_folder + "/"
         if rev:
@@ -599,16 +595,16 @@ class Distro(object):
         return raw_url
 
     # format (checked against GitLab 19.x): https://gitlab.com/<NAMESPACE>/-/raw/<REV>/<PATH>
-    def _construct_raw_url_gitlab(self, pkg_info) -> str:
-        raw_url_base = pkg_info.get("url")
+    def _construct_raw_url_gitlab(self, pkg_info: SnapshotEntry) -> str:
+        raw_url_base = pkg_info.url
         if raw_url_base.endswith(".git"):
             raw_url_base = raw_url_base[:-4]
         if "gitlab.com" not in raw_url_base:
             raise RuntimeError(f"Cannot handle non-GitLab URL: {raw_url_base}")
         # Use rev if available, otherwise fallback to tag
-        ref = pkg_info.get("rev") or pkg_info.get("tag")
-        xml_name = pkg_info.get("package_xml_name", "package.xml")
-        additional_folder = pkg_info.get("additional_folder", "")
+        ref = pkg_info.rev or pkg_info.tag
+        xml_name = pkg_info.package_xml_name
+        additional_folder = pkg_info.additional_folder
         if additional_folder != "":
             additional_folder = additional_folder + "/"
         raw_url = f"{raw_url_base}/-/raw/{ref}/{additional_folder}{xml_name}"

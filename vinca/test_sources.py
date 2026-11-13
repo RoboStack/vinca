@@ -1,3 +1,4 @@
+from vinca.schemas import VincaConfig
 from vinca.sources import _recipe_patch_paths, generate_source, source_reference
 
 
@@ -35,20 +36,17 @@ def test_generate_source_combines_generic_and_platform_patches(tmp_path, monkeyp
     generic.parent.mkdir()
     generic.touch()
     platform_patch.touch()
-    config = {
-        "_selected_pkgs": ["demo"],
-        "_conda_indexes": [],
-        "_pkg_additional_info": {},
-        "_patches": {
+    config = VincaConfig(
+        selected_pkgs=["demo"],
+        patches={
             "ros-humble-demo": {
                 "any": [str(generic)],
                 "linux": [str(platform_patch)],
             }
         },
-        "ros_distro": "humble",
-        "package_name_mode": "legacy",
-        "skip_built_packages": [],
-    }
+        ros_distro="humble",
+        package_name_mode="legacy",
+    )
 
     sources = generate_source(FakeDistro(), config, "linux-64")
 
@@ -72,14 +70,11 @@ def test_recipe_refers_to_patches_next_to_it():
 
 
 def test_generate_source_skips_already_built_package():
-    config = {
-        "_selected_pkgs": ["demo"],
-        "_conda_indexes": [],
-        "_pkg_additional_info": {},
-        "_patches": {},
-        "ros_distro": "humble",
-        "package_name_mode": "legacy",
-        "skip_built_packages": ["ros-humble-demo"],
-    }
+    config = VincaConfig(
+        selected_pkgs=["demo"],
+        ros_distro="humble",
+        package_name_mode="legacy",
+        skip_built_packages={"ros-humble-demo"},
+    )
 
     assert generate_source(FakeDistro(), config, "linux-64") == {}

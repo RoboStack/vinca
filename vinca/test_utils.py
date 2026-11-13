@@ -8,6 +8,7 @@ import pytest
 from rattler.exceptions import FetchRepoDataError
 
 from vinca import utils
+from vinca.schemas import PkgAdditionalInfo, VincaConfig
 from vinca.utils import (
     CyclicTestRequirement,
     add_test_requirements,
@@ -175,13 +176,13 @@ def test_get_channel_records_raises_when_the_channel_is_unreachable(channel):
         get_channel_records(f"http://127.0.0.1:{port}/", "linux-64")
 
 
-ADDITIONAL_INFO_CONF = {
-    "ros_distro": "humble",
-    "_pkg_additional_info": {
+ADDITIONAL_INFO_CONF = VincaConfig(
+    ros_distro="humble",
+    pkg_additional_info={
         "ros2_pulse": {"build_number": 7, "additional_cmake_args": "-DX=1"},
         "rtabmap_odom": {"build_number": 5},
     },
-}
+)
 
 
 @pytest.mark.parametrize(
@@ -189,10 +190,9 @@ ADDITIONAL_INFO_CONF = {
 )
 def test_additional_info_of_a_ros2_prefixed_package(name):
     # a ROS name starting with ros2_/ros_ was normalized twice (ros2_pulse -> pulse)
-    assert get_pkg_additional_info(name, ADDITIONAL_INFO_CONF) == {
-        "build_number": 7,
-        "additional_cmake_args": "-DX=1",
-    }
+    assert get_pkg_additional_info(name, ADDITIONAL_INFO_CONF) == PkgAdditionalInfo(
+        build_number=7, additional_cmake_args="-DX=1"
+    )
     assert get_pkg_build_number(0, name, ADDITIONAL_INFO_CONF) == 7
 
 
@@ -204,5 +204,11 @@ def test_additional_info_by_ros_or_conda_name(name):
 
 
 def test_additional_info_of_a_package_without_an_entry():
-    assert get_pkg_additional_info("ros2-rclcpp", ADDITIONAL_INFO_CONF) == {}
-    assert get_pkg_additional_info("rclcpp", {"_pkg_additional_info": None}) == {}
+    assert (
+        get_pkg_additional_info("ros2-rclcpp", ADDITIONAL_INFO_CONF)
+        == PkgAdditionalInfo()
+    )
+    assert (
+        get_pkg_additional_info("rclcpp", VincaConfig(ros_distro="humble"))
+        == PkgAdditionalInfo()
+    )

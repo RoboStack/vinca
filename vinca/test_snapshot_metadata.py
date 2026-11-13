@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 import vinca.main as main
 import vinca.recipes as recipes
 from vinca.distro import Distro
+from vinca.schemas import Snapshot, SnapshotEntry, VincaConfig, VincaYaml, validate
 
 
 def package_xml(name, version, build_dependency=None):
@@ -31,7 +32,7 @@ SNAPSHOT_DEPENDENCY_XML = package_xml("snapshot_dependency", "1.0.0")
 
 
 def make_snapshot_distro(monkeypatch):
-    snapshot = {
+    raw_snapshot = {
         "snapshot_package": {
             "url": "https://github.com/example/snapshot-package-release.git",
             "repository": "https://github.com/example/snapshot-package.git",
@@ -49,7 +50,7 @@ def make_snapshot_distro(monkeypatch):
     }
     distro = Distro.__new__(Distro)
     distro.distro_name = "rolling"
-    distro.snapshot = snapshot
+    distro.snapshot = validate(Snapshot, raw_snapshot, "rosdistro_snapshot.yaml")
     distro.additional_packages_snapshot = None
     distro.build_packages = set()
     distro._distribution_type = "ros2"
@@ -156,7 +157,7 @@ def test_snapshot_without_dependencies_falls_back_to_rosdistro_cache(
     monkeypatch, capsys
 ):
     distro = make_snapshot_distro(monkeypatch)
-    del distro.snapshot["snapshot_package"]["dependencies"]
+    distro.snapshot["snapshot_package"].dependencies = None
     distro._walker = Mock()
     distro._walker.get_depends.side_effect = (
         lambda pkg, dependency_type, ros_packages_only: (
@@ -183,12 +184,11 @@ def test_snapshot_metadata_generates_dependency_required_by_pinned_source(
         "resolve_pkgname",
         lambda name, *_args, **_kwargs: [dependency_names[name]],
     )
-    config = {
-        "_selected_pkgs": {"snapshot_package"},
-        "_pkg_additional_info": {},
-        "depmods": {},
-        "package_name_mode": "new",
-    }
+    config = VincaConfig(
+        ros_distro="rolling",
+        selected_pkgs=["snapshot_package"],
+        package_name_mode="new",
+    )
 
     output = main.generate_output(
         "snapshot_package",
@@ -273,11 +273,14 @@ def test_additional_package_repository_must_be_explicit():
     distro = Distro.__new__(Distro)
     distro.snapshot = None
     distro.additional_packages_snapshot = {
-        "explicit": {
-            "url": "https://github.com/example/explicit-release.git",
-            "repository": "https://github.com/example/explicit.git",
-        },
-        "source_only": {"url": "https://github.com/example/source-only.git"},
+        "explicit": SnapshotEntry(
+            url="https://github.com/example/explicit-release.git",
+            version="1.0.0",
+            repository="https://github.com/example/explicit.git",
+        ),
+        "source_only": SnapshotEntry(
+            url="https://github.com/example/source-only.git", version="1.0.0"
+        ),
     }
 
     assert (
@@ -334,23 +337,31 @@ def test_read_snapshot_merges_additional_packages(tmp_path, monkeypatch):
     snapshot_path.write_text(
         """\
 snapshot_package:
+  url: https://github.com/example/snapshot-package-release.git
   version: 1.0.0
 """
     )
     additional_path.write_text(
         """\
 additional_package:
+  url: https://github.com/example/additional-package.git
   version: 2.0.0
 """
     )
     monkeypatch.chdir(tmp_path)
 
     snapshot, additional = main.read_snapshot(
-        {
-            "rosdistro_snapshot": snapshot_path.name,
-            "rosdistro_additional_recipes": additional_path.name,
-        }
+        VincaYaml(
+            ros_distro="rolling",
+            rosdistro_snapshot=snapshot_path.name,
+            rosdistro_additional_recipes=additional_path.name,
+        )
     )
 
+    assert snapshot is not None
     assert set(snapshot) == {"snapshot_package", "additional_package"}
-    assert additional == {"additional_package": {"version": "2.0.0"}}
+    assert additional == {
+        "additional_package": SnapshotEntry(
+            url="https://github.com/example/additional-package.git", version="2.0.0"
+        )
+    }
