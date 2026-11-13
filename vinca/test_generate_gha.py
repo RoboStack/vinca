@@ -185,7 +185,13 @@ def test_stages_are_derived_from_the_generated_recipes(tmp_path, monkeypatch):
 def test_json_writes_the_stages_instead_of_a_workflow(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "vinca.yaml").write_text("{}\n")
-    recipes = {"ros2-a": [], "ros2-b": ["ros2-a"], "ros2-c": ["ros2-a"]}
+    recipes = {
+        "ros2-a": [],
+        "ros2-b": ["ros2-a"],
+        "ros2-c": ["ros2-a"],
+        # ros2-published is not in ./recipes (already built): no job needed for it
+        "ros2-d": ["ros2-b", "ros2-published"],
+    }
     for name, deps in recipes.items():
         (tmp_path / "recipes" / name).mkdir(parents=True)
         recipe = {
@@ -217,8 +223,18 @@ def test_json_writes_the_stages_instead_of_a_workflow(tmp_path, monkeypatch):
     assert [sorted(job["recipes"] for job in stage) for stage in stages] == [
         ["ros2-a"],
         ["ros2-b", "ros2-c"],
+        ["ros2-d"],
     ]
-    assert stages[0][0]["name"] == "a"
+    assert stages[0][0] == {
+        "id": "stage_0_job_0",
+        "name": "a",
+        "recipes": "ros2-a",
+        "needs": [],
+    }
+    jobs = {job["recipes"]: job for stage in stages for job in stage}
+    assert jobs["ros2-c"]["needs"] == ["stage_0_job_0"]
+    # only the jobs of its direct requirements, not ros2-a's
+    assert jobs["ros2-d"]["needs"] == [jobs["ros2-b"]["id"]]
 
 
 def test_json_without_recipes_has_no_stages(tmp_path, monkeypatch):
