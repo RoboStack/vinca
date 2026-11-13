@@ -1,6 +1,6 @@
 import pytest
 
-from vinca import platforms
+from vinca import config, platforms, resolve
 
 
 def test_explicit_conda_subdir_wins(monkeypatch):
@@ -14,6 +14,7 @@ def test_explicit_conda_subdir_wins(monkeypatch):
     [
         ("linux", "x86_64", "linux-64"),
         ("linux", "aarch64", "linux-aarch64"),
+        ("linux", "riscv64", "linux-riscv64"),
         ("darwin", "arm64", "osx-arm64"),
         ("darwin", "x86_64", "osx-64"),
         ("win32", "AMD64", "win-64"),
@@ -42,3 +43,11 @@ def test_unknown_linux_machine_is_rejected(monkeypatch):
 
     with pytest.raises(RuntimeError, match="system='linux'.*machine='mips'"):
         platforms.get_conda_subdir()
+
+
+@pytest.mark.parametrize("subdir", ["linux-64", "linux-aarch64", "linux-riscv64"])
+def test_linux_subdirs_use_the_linux_dependency_mapping(monkeypatch, subdir):
+    monkeypatch.setattr(config, "selected_platform", subdir)
+    conda_index = [{"pkg": {"robostack": {"linux": "linux-pkg", "osx": "osx-pkg"}}}]
+
+    assert resolve.resolve_pkgname_from_indexes("pkg", conda_index) == "linux-pkg"
