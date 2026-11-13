@@ -8,6 +8,7 @@ from vinca.naming import get_package_name
 map_platform_python_to_conda = {
     "linux-64": "linux",
     "linux-aarch64": "linux",
+    "linux-riscv64": "linux",
     "osx-64": "osx",
     "osx-arm64": "osx",
     "win-64": "win64",

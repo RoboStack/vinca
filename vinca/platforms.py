@@ -7,6 +7,7 @@ import sys
 
 _PLATFORM_BY_SYSTEM_AND_MACHINE = {
     ("linux", "aarch64"): "linux-aarch64",
+    ("linux", "riscv64"): "linux-riscv64",
     ("linux", "x86_64"): "linux-64",
     ("darwin", "arm64"): "osx-arm64",
 }
