@@ -92,7 +92,7 @@ def generate_legacy_compatibility_output(output, pkg_shortname, distro, vinca_co
         run.append(mutex_dependency)
     return {
         "package": {"name": legacy_name, "version": version},
-        "build": {"script": ""},
+        "build": {"script": "", "noarch": "generic"},
         "requirements": {"run": run},
         "about": {"summary": f"Compatibility package for {canonical_name}"},
     }
