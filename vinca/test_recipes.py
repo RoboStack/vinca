@@ -28,7 +28,10 @@ SYSTEM_PACKAGES = {
     "python-setuptools": ["setuptools"],
     "cmake": ["cmake"],
     "git": ["git"],
-    "doxygen": ["doxygen"],
+    "git-lfs": ["git-lfs"],
+    # matches robostack.yaml's real rosdep mapping: doxygen brings graphviz for dot
+    "doxygen": ["doxygen", "graphviz"],
+    "graphviz": ["graphviz"],
     "cyclonedds": ["ros2-cyclonedds"],
     "mimick_vendor": ["ros2-mimick-vendor"],
     "pybind11_vendor": ["ros2-pybind11-vendor"],
@@ -438,17 +441,34 @@ def test_pybind11_vendor_pulls_in_pybind11():
 
 
 def test_host_only_tools_are_split_across_build_and_host():
-    output = build("demo", depends=[("build_depend", "doxygen")])
+    output = build("demo", depends=[("build_depend", "git-lfs")])
 
     assert {
         "if": "build_platform == target_platform",
-        "then": ["doxygen"],
+        "then": ["git-lfs"],
     } in output["requirements"]["host"]
     assert {
         "if": "build_platform != target_platform",
-        "then": ["doxygen"],
+        "then": ["git-lfs"],
     } in output["requirements"]["build"]
+    assert "git-lfs" not in output["requirements"]["host"]
+
+
+@pytest.mark.parametrize("tag", ["build_depend", "buildtool_depend"])
+def test_doxygen_and_its_graphviz_go_to_build_not_host(tag):
+    output = build("demo", depends=[(tag, "doxygen")])
+
+    assert "doxygen" in output["requirements"]["build"]
+    assert "graphviz" in output["requirements"]["build"]
     assert "doxygen" not in output["requirements"]["host"]
+    assert "graphviz" not in output["requirements"]["host"]
+
+
+def test_direct_graphviz_dependency_stays_in_host():
+    output = build("demo", depends=[("build_depend", "graphviz")])
+
+    assert "graphviz" in output["requirements"]["host"]
+    assert "graphviz" not in output["requirements"]["build"]
 
 
 def test_cyclonedds_gets_a_build_platform_copy():
