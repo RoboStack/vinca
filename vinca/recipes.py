@@ -400,9 +400,16 @@ def _adjust_requirements(requirements: Requirements, package_prefix: str) -> Non
                 {"if": "build_platform != target_platform", "then": [dependency]}
             )
 
+    # doxygen is a build-machine doc generator; keeping it (or the graphviz it
+    # expands to) in `host` leaks graphviz's run_exports into `run` and its
+    # post-link caches into $PREFIX.
+    while "doxygen" in requirements["host"]:
+        requirements["host"].remove("doxygen")
+        requirements["build"].append("doxygen")
+
     # These run on the build machine, so a target-platform build of them is useless:
     # keep them in `host` only when not cross-compiling, and in `build` when we are.
-    for dependency in ("pyqt-builder", "git", "doxygen", "git-lfs"):
+    for dependency in ("pyqt-builder", "git", "git-lfs"):
         _replace_with_selector(
             requirements["host"],
             dependency,
@@ -574,7 +581,7 @@ def generate_output(
         resolved = resolve_pkgname(dependency, vinca_conf, distro)
         if not resolved:
             unsatisfied.add(dependency)
-        elif "git" in resolved:
+        elif "git" in resolved or "doxygen" in resolved:
             output["requirements"]["build"].extend(resolved)
         elif conditional_python and resolved == ["python"]:
             pass
@@ -590,13 +597,14 @@ def generate_output(
             }
         )
 
-    _resolve_into(
-        build_dependencies,
-        output["requirements"]["host"],
-        vinca_conf,
-        distro,
-        unsatisfied,
-    )
+    for dependency in build_dependencies:
+        resolved = resolve_pkgname(dependency, vinca_conf, distro)
+        if not resolved:
+            unsatisfied.add(dependency)
+        elif "doxygen" in resolved:
+            output["requirements"]["build"].extend(resolved)
+        else:
+            output["requirements"]["host"].extend(resolved)
     run_dependencies = (
         _evaluated_dependency_names(
             [
