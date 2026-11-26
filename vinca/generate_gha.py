@@ -1,6 +1,7 @@
 import argparse
 import glob
 import io
+import json
 import os
 import re
 import sys
@@ -116,6 +117,17 @@ def parse_command_line(argv: list[str]) -> Namespace:
         type=int,
         help="With --timings: how many jobs can run at once (default: the file's, else "
         "GitHub's limit for hosted runners, 20, or 5 on macOS)",
+    )
+
+    parser.add_argument(
+        "--json",
+        dest="json",
+        default=None,
+        help="Write the stages to this JSON file instead of a workflow: "
+        '{"stages": [[{"id": job id, "name": job name, "recipes": "recipe ...", '
+        '"needs": [job id, ...], "requires": {recipe: [recipe, ...]}}, ...], ...]}, '
+        "one list of jobs per stage, each with the earlier jobs that build its "
+        "recipes' requirements, and each recipe's requirements that are built",
     )
 
     arguments = parser.parse_args(argv[1:])
@@ -656,6 +668,16 @@ def main() -> None:
 
         fo.write("\n".join(order))
 
+    if args.json:
+        # no workflow file, so no size limit to fit
+        stages = batch_stages(
+            filtered_stages, args.batch_size, timings=timings, followers=followers
+        )
+        write_stages_json(
+            stages, args.json, requirements if isinstance(requirements, dict) else {}
+        )
+        return
+
     # as many jobs as fit GitHub's workflow size limit: when the workflow is too large,
     # batch again with a job budget scaled down by how much it's over
     budget = None
@@ -679,6 +701,56 @@ def main() -> None:
             print(f"{error}; batching again with at most {budget} jobs")
     else:
         raise RuntimeError("could not fit the workflow into GitHub's size limit")
+
+
+def write_stages_json(
+    stages: list[list[list[str]]], path: str, requirements: dict[str, list[str]]
+) -> None:
+    """Write the batched stages as {"stages": [[job, ...], ...]}, each job
+    {"id": "stage_<k>_job_<i>", "name": ..., "recipes": "space-separated recipes",
+    "needs": [ids of the earlier jobs building its recipes' requirements],
+    "requires": {recipe: [the recipes being built that it requires]}}: the recipes'
+    dependency graph as a graph of CI jobs, and the recipes' own, so that a failed
+    recipe can hold back only the recipes that need it."""
+    job_of = {
+        recipe: f"stage_{k}_job_{i}"
+        for k, stage in enumerate(stages)
+        for i, batch in enumerate(stage)
+        for recipe in batch
+    }
+    doc: dict[str, list[list[dict[str, Any]]]] = {"stages": []}
+    for k, stage in enumerate(stages):
+        jobs = []
+        for i, batch in enumerate(stage):
+            job_id = f"stage_{k}_job_{i}"
+            needs = {
+                job_of[r]
+                for recipe in batch
+                for r in requirements.get(recipe, [])
+                if r in job_of and job_of[r] != job_id
+            }
+            jobs.append(
+                {
+                    "id": job_id,
+                    "name": get_stage_name(batch),
+                    "recipes": " ".join(batch),
+                    "needs": sorted(
+                        needs, key=lambda j: [int(n) for n in j.split("_")[1::2]]
+                    ),
+                    "requires": {
+                        recipe: sorted(
+                            r
+                            for r in set(requirements.get(recipe, []))
+                            if r in job_of and r != recipe
+                        )
+                        for recipe in batch
+                    },
+                }
+            )
+        doc["stages"].append(jobs)
+    with open(path, "w", encoding="utf-8") as fo:
+        json.dump(doc, fo, indent=1)
+        fo.write("\n")
 
 
 def write_pipeline(
